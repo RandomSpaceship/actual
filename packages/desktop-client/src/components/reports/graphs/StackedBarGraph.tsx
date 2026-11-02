@@ -1,11 +1,12 @@
 // @ts-strict-ignore
 import React, { useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 
 import { theme } from '@actual-app/components/theme';
 import type {
   balanceTypeOpType,
   DataEntity,
+  LegendEntity,
   RuleConditionEntity,
 } from '@actual-app/core/types/models';
 import {
@@ -13,10 +14,12 @@ import {
   BarChart,
   CartesianGrid,
   LabelList,
+  Rectangle,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import type { BarShapeProps } from 'recharts';
 
 import { useRechartsAnimation } from '#components/reports/chart-theme';
 import { Container } from '#components/reports/Container';
@@ -28,9 +31,11 @@ import { useFormat } from '#hooks/useFormat';
 import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
+import { ChartSelection } from './ChartSelection';
 import { renderCustomLabel } from './renderCustomLabel';
-import { SeriesTooltip } from './SeriesTooltip';
+import { readTooltipRow, SeriesTooltip } from './SeriesTooltip';
 import { showActivity } from './showActivity';
+import { getChartSelectionKey, useChartPress } from './useChartPress';
 
 const customLabel = props => {
   const calcX = props.x + props.width / 2;
@@ -93,6 +98,57 @@ export function StackedBarGraph({
 
   const [pointer, setPointer] = useState('');
   const [tooltip, setTooltip] = useState('');
+  // A tap on the selected segment opens it; a tap on any other segment,
+  // even in the same column, only selects it
+  const { onPointerDownCapture, isOpeningClick, onMissedClick } =
+    useChartPress();
+  const canOpen = groupBy !== 'Interval';
+
+  const onSegmentClick = (
+    index: number,
+    series: string,
+    event: MouseEvent<Element>,
+    segment?: Element,
+  ) => {
+    const entry = data.legend.find(item => item.dataKey === series);
+    if (
+      !entry ||
+      (compact && !showTooltip) ||
+      !canOpen ||
+      !isOpeningClick(
+        getChartSelectionKey(index, series),
+        event,
+        showTooltip,
+        segment,
+      )
+    ) {
+      setTooltip(series);
+      return;
+    }
+    openSegment(index, entry);
+  };
+
+  const openSegment = (index: number, entry: LegendEntity) => {
+    const intervalItem = data.intervalData[index];
+    showActivity({
+      navigate,
+      categories,
+      accounts,
+      balanceTypeOp,
+      filters,
+      showHiddenCategories,
+      showOffBudget,
+      type: 'time',
+      startDate: intervalItem?.intervalStartDate,
+      endDate: intervalItem?.intervalEndDate,
+      field: groupBy.toLowerCase(),
+      id: entry.id,
+      uncategorizedId: entry.uncategorizedId,
+      bucketTagNames: entry.bucketTagNames,
+      scopeTagNames: data.scopeTagNames,
+      interval,
+    });
+  };
 
   const largestValue = data.intervalData
     .map(c => c[balanceTypeOp])
@@ -106,10 +162,71 @@ export function StackedBarGraph({
         ...style,
         ...(compact && { height: 'auto' }),
       }}
+      onTooltipRowTap={
+        canOpen && showTooltip
+          ? row => {
+              const { date, series } = readTooltipRow(row);
+              const index = data.intervalData.findIndex(
+                item => item.date === date,
+              );
+              const entry = data.legend.find(item => item.dataKey === series);
+              if (index !== -1 && entry) {
+                openSegment(index, entry);
+              }
+            }
+          : undefined
+      }
     >
       {(width, height) =>
         data.intervalData && (
-          <div>
+          <div
+            // Only catches pointer taps beside the segments; the chart has
+            // its own keyboard support
+            role="presentation"
+            onPointerDownCapture={onPointerDownCapture}
+            // While a finger scrubs, the segment nearest it is selected
+            onTouchMove={event => {
+              const touch = event.touches[0];
+              const segment =
+                touch &&
+                findNearestSegment(
+                  event.currentTarget,
+                  touch.clientX,
+                  touch.clientY,
+                  Infinity,
+                );
+              if (segment) {
+                setTooltip(segment.series);
+              }
+            }}
+            // A click beside the segments picks the nearest one, if it's
+            // close enough
+            onClick={event => {
+              if (
+                !(event.target instanceof Element) ||
+                event.target.closest('[data-series]')
+              ) {
+                return;
+              }
+              const segment = findNearestSegment(
+                event.currentTarget,
+                event.clientX,
+                event.clientY,
+                MAX_CLICK_DISTANCE,
+              );
+              if (segment) {
+                onSegmentClick(
+                  segment.index,
+                  segment.series,
+                  event,
+                  segment.element,
+                );
+              } else {
+                setTooltip('');
+                onMissedClick(event);
+              }
+            }}
+          >
             {!compact && <div style={{ marginTop: '15px' }} />}
             <BarChart
               width={width}
@@ -129,6 +246,7 @@ export function StackedBarGraph({
                       hoveredKey={tooltip}
                       order="stack"
                       hideZero
+                      canOpenRows={canOpen}
                     />
                   }
                   formatter={numberFormatterTooltip}
@@ -155,6 +273,7 @@ export function StackedBarGraph({
                   tickSize={0}
                 />
               )}
+              <ChartSelection data={data.intervalData} series={tooltip} />
               {data.legend
                 .slice(0)
                 .reverse()
@@ -165,37 +284,23 @@ export function StackedBarGraph({
                     stackId="a"
                     fill={entry.color}
                     {...animationProps}
+                    shape={(props: BarShapeProps) => (
+                      <g data-series={entry.dataKey} data-index={props.index}>
+                        <Rectangle {...props} />
+                      </g>
+                    )}
                     onMouseLeave={() => {
                       setPointer('');
                       setTooltip('');
                     }}
                     onMouseEnter={() => {
                       setTooltip(entry.dataKey);
-                      if (groupBy !== 'Interval') {
+                      if (canOpen) {
                         setPointer('pointer');
                       }
                     }}
-                    onClick={e =>
-                      ((compact && showTooltip) || !compact) &&
-                      groupBy !== 'Interval' &&
-                      showActivity({
-                        navigate,
-                        categories,
-                        accounts,
-                        balanceTypeOp,
-                        filters,
-                        showHiddenCategories,
-                        showOffBudget,
-                        type: 'time',
-                        startDate: e.payload?.intervalStartDate,
-                        endDate: e.payload?.intervalEndDate,
-                        field: groupBy.toLowerCase(),
-                        id: entry.id,
-                        uncategorizedId: entry.uncategorizedId,
-                        bucketTagNames: entry.bucketTagNames,
-                        scopeTagNames: data.scopeTagNames,
-                        interval,
-                      })
+                    onClick={(_, index, event) =>
+                      onSegmentClick(index, entry.dataKey, event)
                     }
                   >
                     {viewLabels && !compact && (
@@ -212,4 +317,38 @@ export function StackedBarGraph({
       }
     </Container>
   );
+}
+
+// How far from a segment a click can be and still pick it, about a fingertip
+const MAX_CLICK_DISTANCE = 40;
+
+// The segment nearest a point on the page, within `maxDistance` of it
+function findNearestSegment(
+  container: Element,
+  x: number,
+  y: number,
+  maxDistance: number,
+) {
+  let nearest: SVGElement | undefined;
+  let nearestDistance = maxDistance;
+  for (const segment of container.querySelectorAll<SVGElement>(
+    '[data-series]',
+  )) {
+    const box = segment.getBoundingClientRect();
+    if (box.height === 0) {
+      continue;
+    }
+    const distance = Math.hypot(
+      Math.max(box.left - x, x - box.right, 0),
+      Math.max(box.top - y, y - box.bottom, 0),
+    );
+    if (distance <= nearestDistance) {
+      nearest = segment;
+      nearestDistance = distance;
+    }
+  }
+  const series = nearest?.dataset.series;
+  return nearest && series
+    ? { element: nearest, series, index: Number(nearest.dataset.index) }
+    : undefined;
 }

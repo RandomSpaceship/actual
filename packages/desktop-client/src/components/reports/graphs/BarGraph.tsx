@@ -1,7 +1,7 @@
 // @ts-strict-ignore
 import React, { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { AlignedText } from '@actual-app/components/aligned-text';
 import { theme } from '@actual-app/components/theme';
@@ -38,9 +38,11 @@ import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
 import { adjustTextSize } from './adjustTextSize';
+import { ChartSelection } from './ChartSelection';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
 import { TooltipCard } from './TooltipCard';
+import { getChartSelectionKey, useChartPress } from './useChartPress';
 
 type PayloadChild = {
   props: {
@@ -70,6 +72,7 @@ type CustomTooltipProps = {
   balanceTypeOp?: balanceTypeOpType;
   yAxis?: string;
   format: (value: unknown, type: FormatType) => string;
+  showOpenHint: boolean;
 };
 
 const CustomTooltip = ({
@@ -78,12 +81,16 @@ const CustomTooltip = ({
   balanceTypeOp,
   yAxis,
   format,
+  showOpenHint,
 }: CustomTooltipProps) => {
   const { t } = useTranslation();
 
   if (active && payload && payload.length) {
     return (
-      <TooltipCard title={payload[0].payload[yAxis]}>
+      <TooltipCard
+        title={payload[0].payload[yAxis]}
+        openHint={showOpenHint && <Trans>Tap again for details</Trans>}
+      >
         {['totalAssets', 'totalTotals', 'totalBudgeted'].includes(
           balanceTypeOp,
         ) && (
@@ -221,6 +228,8 @@ export function BarGraph({
   const format = useFormat();
 
   const [pointer, setPointer] = useState('');
+  // A tap on the selected bar opens it; a tap on any other bar only selects it
+  const { onPointerDownCapture, isOpeningClick } = useChartPress();
 
   const yAxis = groupBy === 'Interval' ? 'date' : 'name';
   const splitData = groupBy === 'Interval' ? 'intervalData' : 'data';
@@ -253,7 +262,7 @@ export function BarGraph({
     >
       {(width, height) =>
         data[splitData] && (
-          <div>
+          <div onPointerDownCapture={onPointerDownCapture}>
             {!compact && <div style={{ marginTop: '15px' }} />}
             <BarChart<GroupedEntity | IntervalEntity>
               responsive
@@ -277,6 +286,7 @@ export function BarGraph({
                       balanceTypeOp={balanceTypeOp}
                       yAxis={yAxis}
                       format={format}
+                      showOpenHint
                     />
                   }
                   formatter={numberFormatterTooltip}
@@ -307,14 +317,24 @@ export function BarGraph({
                 />
               )}
               {!compact && <ReferenceLine y={0} stroke={theme.pageTextLight} />}
+              <ChartSelection data={data[splitData]} />
               <Bar
                 dataKey={val => getVal(val)}
                 stackId="a"
+                // Lets a tap anywhere in a bar's column count as a tap on it
+                background={{ fill: 'transparent' }}
                 {...animationProps}
                 onMouseLeave={() => setPointer('')}
                 onMouseEnter={() => setPointer('pointer')}
-                onClick={item => {
-                  if (compact && !showTooltip) {
+                onClick={(item, index, event) => {
+                  if (
+                    (compact && !showTooltip) ||
+                    !isOpeningClick(
+                      getChartSelectionKey(index),
+                      event,
+                      showTooltip,
+                    )
+                  ) {
                     return;
                   }
 

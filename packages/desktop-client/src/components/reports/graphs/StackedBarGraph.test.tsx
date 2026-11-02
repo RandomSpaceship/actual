@@ -24,8 +24,11 @@ vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CartesianGrid: () => null,
   LabelList: () => null,
+  Rectangle: () => null,
   XAxis: () => null,
   YAxis: () => null,
+  useActiveTooltipDataPoints: () => undefined,
+  useIsTooltipActive: () => false,
   Tooltip: ({
     content,
   }: {

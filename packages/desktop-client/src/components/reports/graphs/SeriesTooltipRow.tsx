@@ -28,8 +28,14 @@ export function SeriesTooltipRow({
 
   return (
     <>
-      <span style={{ color: row.color, textDecoration }}>{row.name}</span>
+      <span
+        data-tooltip-row={row.key}
+        style={{ color: row.color, textDecoration }}
+      >
+        {row.name}
+      </span>
       <FinancialText
+        data-tooltip-row={row.key}
         style={{ color: row.color, textAlign: 'right', textDecoration }}
       >
         {format(row.value, 'financial')}

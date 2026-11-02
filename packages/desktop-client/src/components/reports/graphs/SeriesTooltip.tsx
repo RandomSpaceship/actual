@@ -36,6 +36,8 @@ type SeriesTooltipProps = {
   // Lines list the largest values first; stacks list top to bottom
   order: 'value' | 'stack';
   hideZero?: boolean;
+  // Whether a tap on a row opens that series
+  canOpenRows?: boolean;
 };
 
 /**
@@ -51,6 +53,7 @@ export function SeriesTooltip({
   hoveredKey,
   order,
   hideZero = false,
+  canOpenRows = false,
 }: SeriesTooltipProps) {
   const interval = payload?.[0]?.payload;
   if (!active || !interval) {
@@ -93,8 +96,12 @@ export function SeriesTooltip({
   );
 
   return (
-    <TooltipCard title={interval.date}>
+    <TooltipCard
+      title={interval.date}
+      openHint={canOpenRows && <Trans>Tap a row for details</Trans>}
+    >
       <div
+        data-tooltip-interval={interval.date}
         style={{
           display: 'grid',
           gridTemplateColumns: 'auto auto',
@@ -136,4 +143,13 @@ function trimRows(rows: SeriesRow[], hoveredKey: string) {
     return [...rows.slice(0, maxCompactRows - 1), rows[hoveredIndex]];
   }
   return rows.slice(0, maxCompactRows);
+}
+
+// The interval and series of a tapped row, as useChartTouch hands it over
+export function readTooltipRow(row: HTMLElement) {
+  return {
+    date: row.closest<HTMLElement>('[data-tooltip-interval]')?.dataset
+      .tooltipInterval,
+    series: row.dataset.tooltipRow,
+  };
 }

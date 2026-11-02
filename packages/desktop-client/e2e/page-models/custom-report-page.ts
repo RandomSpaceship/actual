@@ -42,7 +42,7 @@ export class CustomReportPage {
 
   // Present while the sector is selected
   donutSectorSelection(index: number) {
-    return this.donutSector(index).locator('[data-donut-selected]');
+    return this.donutSector(index).locator('[data-chart-selected]');
   }
 
   // A point inside the sector. The centre of its bounding box can be in the

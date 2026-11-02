@@ -1,10 +1,6 @@
 // @ts-strict-ignore
-import React, { useCallback, useMemo, useRef } from 'react';
-import type {
-  CSSProperties,
-  PointerEvent,
-  MouseEvent as ReactMouseEvent,
-} from 'react';
+import React, { useCallback, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 
 import { theme } from '@actual-app/components/theme';
 import type {
@@ -32,6 +28,7 @@ import type { DonutHighlightProps } from './donutHighlightProps';
 import { DonutSector } from './DonutSector';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
+import { useChartPress } from './useChartPress';
 
 const RADIAN = Math.PI / 180;
 
@@ -148,46 +145,8 @@ export function DonutGraph({
   // the Pie, which remounts every sector and loses slow pointer moves.
   //
   // A tap on the selected slice opens it; a tap on any other slice only
-  // selects it. Most browsers move the selection with mouse events before
-  // the tap's click arrives, so the selected slice is noted when the finger
-  // goes down.
-  const pressRef = useRef<{ isTouch: boolean; selectedKey?: string }>(null);
-  const onPointerDownCapture = (event: PointerEvent<HTMLDivElement>) => {
-    const selected = event.currentTarget.querySelector<SVGElement>(
-      '[data-donut-selected]',
-    );
-    pressRef.current = {
-      isTouch: event.pointerType !== 'mouse',
-      selectedKey: selected?.dataset.donutSelected,
-    };
-  };
-  const hasOpenedRef = useRef(false);
-  // Without a highlight there's nothing to select, so every tap opens
-  const isOpeningClick = (
-    key: string,
-    event: ReactMouseEvent<Element>,
-    canSelect: boolean,
-  ) => {
-    const press = pressRef.current;
-    pressRef.current = null;
-    // Only the first opening click of a double-click opens, so going back
-    // takes one press
-    if (event.detail <= 1) {
-      hasOpenedRef.current = false;
-    } else if (hasOpenedRef.current) {
-      return false;
-    }
-    if (!press?.isTouch || !canSelect || press.selectedKey === key) {
-      hasOpenedRef.current = true;
-      return true;
-    }
-    // Some browsers send no mouse events after a tap (Firefox's touch
-    // simulation), so hover the tapped sector to select it
-    event.currentTarget.dispatchEvent(
-      new MouseEvent('mouseover', { bubbles: true }),
-    );
-    return false;
-  };
+  // selects it
+  const { onPointerDownCapture, isOpeningClick } = useChartPress();
 
   const isCategoryGroup =
     groupBy === 'CategoryGroup' && !!data.groupedData?.length;
@@ -236,7 +195,8 @@ export function DonutGraph({
   );
 
   return (
-    <Container style={style}>
+    // The donut always shows a selection, so a tap outside keeps it
+    <Container style={style} canDismissTooltip={false}>
       {(width, height) => {
         const { chartInnerRadius, chartMidRadius, chartOuterRadius, compact } =
           getDonutDimensions(width, height, isCategoryGroup);

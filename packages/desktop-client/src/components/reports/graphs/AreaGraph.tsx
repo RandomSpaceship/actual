@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import type { CSSProperties, SVGAttributes } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { AlignedText } from '@actual-app/components/aligned-text';
 import { theme } from '@actual-app/components/theme';
 import type {
   balanceTypeOpType,
   DataEntity,
-  IntervalEntity,
   RuleConditionEntity,
 } from '@actual-app/core/types/models';
 import {
@@ -32,9 +31,12 @@ import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
 import { adjustTextSize } from './adjustTextSize';
+import { ChartColumns } from './ChartColumns';
+import { ChartSelection } from './ChartSelection';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
 import { TooltipCard } from './TooltipCard';
+import { getChartSelectionKey, useChartPress } from './useChartPress';
 
 type PayloadItem = {
   payload: {
@@ -53,6 +55,7 @@ type CustomTooltipProps = {
   payload?: PayloadItem[];
   balanceTypeOp: balanceTypeOpType;
   format: (value: unknown, type: FormatType) => string;
+  showOpenHint: boolean;
 };
 
 const CustomTooltip = ({
@@ -60,12 +63,16 @@ const CustomTooltip = ({
   payload,
   balanceTypeOp,
   format,
+  showOpenHint,
 }: CustomTooltipProps) => {
   const { t } = useTranslation();
 
   if (active && payload && payload.length) {
     return (
-      <TooltipCard title={payload[0].payload.date}>
+      <TooltipCard
+        title={payload[0].payload.date}
+        openHint={showOpenHint && <Trans>Tap again for details</Trans>}
+      >
         {['totalAssets', 'totalTotals', 'totalBudgeted'].includes(
           balanceTypeOp,
         ) && (
@@ -163,14 +170,6 @@ const customLabel = ({
   return renderCustomLabel(calcX, calcY, textAnchor, display, textSize);
 };
 
-// Recharts calls activeDot handlers with the dot's props (including the data
-// point) as the second argument, although its types declare a MouseEvent
-function hasIntervalPayload(
-  value: unknown,
-): value is { payload: IntervalEntity } {
-  return value !== null && typeof value === 'object' && 'payload' in value;
-}
-
 type AreaGraphProps = {
   style?: CSSProperties;
   data: DataEntity;
@@ -199,6 +198,9 @@ export function AreaGraph({
   const { data: categories = { grouped: [], list: [] } } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const [pointer, setPointer] = useState('');
+  // A tap on the selected column opens it; a tap on any other column only
+  // selects it
+  const { onPointerDownCapture, isOpeningClick } = useChartPress();
   const animationProps = useRechartsAnimation({ animationDuration: 1000 });
 
   const privacyMode = usePrivacyMode();
@@ -251,7 +253,7 @@ export function AreaGraph({
     >
       {(width, height) =>
         data.intervalData && (
-          <div>
+          <div onPointerDownCapture={onPointerDownCapture}>
             {!compact && <div style={{ marginTop: '15px' }} />}
             <AreaChart
               responsive
@@ -295,6 +297,7 @@ export function AreaGraph({
                     <CustomTooltip
                       balanceTypeOp={balanceTypeOp}
                       format={format}
+                      showOpenHint
                     />
                   }
                   isAnimationActive={false}
@@ -342,33 +345,7 @@ export function AreaGraph({
               <Area
                 type="linear"
                 dot={false}
-                activeDot={{
-                  r: pointer && !compact ? 8 : 3,
-                  onMouseEnter: () => setPointer('pointer'),
-                  onMouseLeave: () => setPointer(''),
-                  onClick: (_, dot: unknown) => {
-                    const intervalItem = hasIntervalPayload(dot)
-                      ? dot.payload
-                      : undefined;
-                    const startDate =
-                      intervalItem?.intervalStartDate ?? data.startDate;
-
-                    if (((compact && showTooltip) || !compact) && startDate) {
-                      showActivity({
-                        navigate,
-                        categories,
-                        accounts,
-                        balanceTypeOp,
-                        filters,
-                        showHiddenCategories,
-                        showOffBudget,
-                        type: 'totals',
-                        startDate,
-                        endDate: intervalItem?.intervalEndDate ?? data.endDate,
-                      });
-                    }
-                  },
-                }}
+                activeDot={{ r: pointer && !compact ? 8 : 3 }}
                 {...animationProps}
                 dataKey={balanceTypeOp}
                 stroke={`url(#stroke${balanceTypeOp})`}
@@ -389,6 +366,40 @@ export function AreaGraph({
                   />
                 )}
               </Area>
+              <ChartColumns
+                data={data.intervalData}
+                onMouseEnter={() => setPointer('pointer')}
+                onMouseLeave={() => setPointer('')}
+                onClick={(index, _series, event) => {
+                  const intervalItem = data.intervalData[index];
+                  const startDate =
+                    intervalItem?.intervalStartDate ?? data.startDate;
+
+                  if (
+                    ((compact && showTooltip) || !compact) &&
+                    startDate &&
+                    isOpeningClick(
+                      getChartSelectionKey(index),
+                      event,
+                      showTooltip,
+                    )
+                  ) {
+                    showActivity({
+                      navigate,
+                      categories,
+                      accounts,
+                      balanceTypeOp,
+                      filters,
+                      showHiddenCategories,
+                      showOffBudget,
+                      type: 'totals',
+                      startDate,
+                      endDate: intervalItem?.intervalEndDate ?? data.endDate,
+                    });
+                  }
+                }}
+              />
+              <ChartSelection data={data.intervalData} />
             </AreaChart>
           </div>
         )

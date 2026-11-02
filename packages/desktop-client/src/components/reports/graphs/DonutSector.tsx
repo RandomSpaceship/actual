@@ -37,7 +37,7 @@ export function DonutSector({
   const highlight = isSelected ? renderHighlight?.() : null;
 
   return (
-    <g data-donut-selected={isSelected ? selectionKey : undefined}>
+    <g data-chart-selected={isSelected ? selectionKey : undefined}>
       <Sector
         {...sector}
         fill={fill}

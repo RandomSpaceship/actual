@@ -4,6 +4,8 @@ import { AutoSizer } from 'react-virtualized-auto-sizer';
 
 import { View } from '@actual-app/components/view';
 
+import { useChartTouch } from './useChartTouch';
+
 type ContainerProps = {
   style?: CSSProperties;
   children: (
@@ -11,9 +13,23 @@ type ContainerProps = {
     height: number,
     host: HTMLDivElement | null,
   ) => ReactNode;
+  // Whether a tap outside the chart, or on its tooltip, closes the tooltip.
+  // Off for charts that always show a selection.
+  canDismissTooltip?: boolean;
+  // A tap on a tooltip row marked with `data-tooltip-row` calls this
+  onTooltipRowTap?: (row: HTMLElement) => void;
 };
-export function Container({ style, children }: ContainerProps) {
+export function Container({
+  style,
+  children,
+  canDismissTooltip = true,
+  onTooltipRowTap,
+}: ContainerProps) {
   const portalHost = useRef<HTMLDivElement>(null);
+  const touchProps = useChartTouch({
+    canDismiss: canDismissTooltip,
+    onTooltipRowTap,
+  });
 
   return (
     <View
@@ -27,7 +43,7 @@ export function Container({ style, children }: ContainerProps) {
           }
 
           return (
-            <div style={{ width, height }}>
+            <div style={{ width, height }} {...touchProps}>
               {children(width, height, portalHost.current)}
             </div>
           );

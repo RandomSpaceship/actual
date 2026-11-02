@@ -654,8 +654,8 @@ test.describe('Donut graph interactions', () => {
 
     // Before any tap, one category is selected and no group
     const rings = customReportPage.pageContent.locator('.recharts-pie');
-    await expect(rings.nth(0).locator('[data-donut-selected]')).toHaveCount(0);
-    await expect(rings.nth(1).locator('[data-donut-selected]')).toHaveCount(1);
+    await expect(rings.nth(0).locator('[data-chart-selected]')).toHaveCount(0);
+    await expect(rings.nth(1).locator('[data-chart-selected]')).toHaveCount(1);
 
     // The group ring is drawn first, so its sectors come first
     const groupIndex = 0;

@@ -28,8 +28,11 @@ import { useFormat } from '#hooks/useFormat';
 import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
-import { SeriesTooltip } from './SeriesTooltip';
+import { ChartColumns } from './ChartColumns';
+import { ChartSelection } from './ChartSelection';
+import { readTooltipRow, SeriesTooltip } from './SeriesTooltip';
 import { showActivity } from './showActivity';
+import { getChartSelectionKey, useChartPress } from './useChartPress';
 import { computeTrendLines } from './util/computeTrendLines';
 
 type LineGraphProps = {
@@ -68,6 +71,11 @@ export function LineGraph({
 
   const [pointer, setPointer] = useState('');
   const [tooltip, setTooltip] = useState('');
+  // A tap in a column picks the nearest line. A tap on the selected line
+  // and column opens it; any other tap only selects.
+  const { onPointerDownCapture, isOpeningClick, onMissedClick } =
+    useChartPress();
+  const canOpen = groupBy !== 'Interval';
 
   const largestValue = data.intervalData
     .map(c => c[balanceTypeOp])
@@ -106,10 +114,29 @@ export function LineGraph({
         ...style,
         ...(compact && { height: 'auto' }),
       }}
+      onTooltipRowTap={
+        canOpen && showTooltip
+          ? row => {
+              const { date, series } = readTooltipRow(row);
+              const intervalItem = data.intervalData.find(
+                item => item.date === date,
+              );
+              const entry = data.legend.find(item => item.dataKey === series);
+              if (intervalItem && entry) {
+                onShowActivity(
+                  entry.id,
+                  { payload: intervalItem },
+                  entry.uncategorizedId,
+                  entry.bucketTagNames,
+                );
+              }
+            }
+          : undefined
+      }
     >
       {(width, height) =>
         data && (
-          <div>
+          <div onPointerDownCapture={onPointerDownCapture}>
             {!compact && <div style={{ marginTop: '15px' }} />}
             <LineChart
               responsive
@@ -128,6 +155,7 @@ export function LineGraph({
                       compact={compact}
                       hoveredKey={tooltip}
                       order="value"
+                      canOpenRows={canOpen}
                     />
                   }
                   formatter={numberFormatterTooltip}
@@ -165,6 +193,7 @@ export function LineGraph({
                   ifOverflow="extendDomain"
                 />
               ))}
+              <ChartSelection data={data.intervalData} series={tooltip} />
               {data.legend.map((entry, index) => {
                 return (
                   <Line
@@ -176,29 +205,49 @@ export function LineGraph({
                     {...animationProps}
                     activeDot={{
                       r: entry.dataKey === tooltip && !compact ? 8 : 3,
-                      onMouseEnter: () => {
-                        setTooltip(entry.dataKey);
-                        if (groupBy !== 'Interval') {
-                          setPointer('pointer');
-                        }
-                      },
-                      onMouseLeave: () => {
-                        setPointer('');
-                        setTooltip('');
-                      },
-                      onClick: (e, payload) =>
-                        ((compact && showTooltip) || !compact) &&
-                        groupBy !== 'Interval' &&
-                        onShowActivity(
-                          entry.id,
-                          payload,
-                          entry.uncategorizedId,
-                          entry.bucketTagNames,
-                        ),
                     }}
                   />
                 );
               })}
+              <ChartColumns
+                data={data.intervalData}
+                series={data.legend.map(entry => entry.dataKey)}
+                onMouseEnter={() => canOpen && setPointer('pointer')}
+                onMouseLeave={() => {
+                  setPointer('');
+                  setTooltip('');
+                }}
+                onMove={(_index, series) => setTooltip(series ?? '')}
+                onClick={(index, series, event) => {
+                  if (!series) {
+                    setTooltip('');
+                    onMissedClick(event);
+                    return;
+                  }
+                  const entry = data.legend.find(
+                    item => item.dataKey === series,
+                  );
+                  if (
+                    entry &&
+                    ((compact && showTooltip) || !compact) &&
+                    canOpen &&
+                    isOpeningClick(
+                      getChartSelectionKey(index, series),
+                      event,
+                      showTooltip,
+                    )
+                  ) {
+                    onShowActivity(
+                      entry.id,
+                      { payload: data.intervalData[index] },
+                      entry.uncategorizedId,
+                      entry.bucketTagNames,
+                    );
+                  } else {
+                    setTooltip(series);
+                  }
+                }}
+              />
             </LineChart>
           </div>
         )
