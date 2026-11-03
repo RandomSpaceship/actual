@@ -2,10 +2,12 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { listen } from '@actual-app/core/platform/client/connection';
 import type { ServerEvents } from '@actual-app/core/types/server-events';
+import { useQuery } from '@tanstack/react-query';
 
 import { executeFormula } from '#components/formula/executeFormula';
 import type { SimpleAccount } from '#components/formula/executeFormula';
 import { resolveQuery } from '#components/formula/resolveQuery';
+import { formulaLibraryQueries } from '#formula-library';
 import type {
   FormulaIssue,
   FormulaQueryConfig,
@@ -43,6 +45,10 @@ export function useFormulaExecution(
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<FormulaIssue[]>(NO_ISSUES);
   const [dataVersion, setDataVersion] = useState(0);
+  // The library list is refetched when it changes, also from sync
+  const libraryQuery = useQuery(formulaLibraryQueries.list());
+  // If the library cannot be read, run without it: its queries show as not found
+  const library = libraryQuery.isError ? [] : libraryQuery.data;
 
   const onSyncEvent = useEffectEvent((event: ServerEvents['sync-event']) => {
     if (
@@ -63,6 +69,7 @@ export function useFormulaExecution(
   const queriesKey = JSON.stringify(queries ?? {});
   const namedExpressionsKey = JSON.stringify(namedExpressions ?? null);
   const accountsKey = JSON.stringify(accounts ?? null);
+  const libraryKey = JSON.stringify(library ?? null);
 
   const queriesRef = useRef(queries);
   queriesRef.current = queries;
@@ -70,6 +77,8 @@ export function useFormulaExecution(
   namedExpressionsRef.current = namedExpressions;
   const accountsRef = useRef(accounts);
   accountsRef.current = accounts;
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +93,13 @@ export function useFormulaExecution(
         return;
       }
 
+      // Without the library, library queries would show as not found
+      const library = libraryRef.current;
+      if (!library) {
+        setIsLoading(true);
+        return;
+      }
+
       const localQueries = queriesRef.current ?? {};
 
       setIsLoading(true);
@@ -91,7 +107,7 @@ export function useFormulaExecution(
       try {
         const execution = await executeFormula({
           formula,
-          resolveQuery: name => resolveQuery(name, { localQueries }),
+          resolveQuery: name => resolveQuery(name, { localQueries, library }),
           accounts: accountsRef.current ?? [],
           namedExpressions: namedExpressionsRef.current,
           language,
@@ -135,6 +151,7 @@ export function useFormulaExecution(
     queriesKey,
     namedExpressionsKey,
     accountsKey,
+    libraryKey,
     dataVersion,
   ]);
 

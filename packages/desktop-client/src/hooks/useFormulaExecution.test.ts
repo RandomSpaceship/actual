@@ -21,6 +21,13 @@ vi.mock(
   () => import('#mocks/connection'),
 );
 
+// The hook reads the formula library with a query. Most tests have no
+// library items
+function isFormulaLibraryQuery(payload: unknown) {
+  return (payload as { table?: string }).table === 'formula_library';
+}
+const emptyLibrary = { data: [], dependencies: [] };
+
 type SerializedQuery = {
   filterExpressions: ReadonlyArray<Record<string, unknown>>;
   tableOptions?: Record<string, unknown>;
@@ -133,6 +140,7 @@ describe('formula query timeframes', () => {
         };
       },
       query: async payload => {
+        if (isFormulaLibraryQuery(payload)) return emptyLibrary;
         queryPayloads.push(payload as unknown as SerializedQuery);
         return { data: queryPayloads.length * 100, dependencies: [] };
       },
@@ -240,6 +248,7 @@ describe('BALANCE_OF in query mode', () => {
         currencySpaceBetweenAmountAndSymbol: false,
       }),
       query: async payload => {
+        if (isFormulaLibraryQuery(payload)) return emptyLibrary;
         queryPayloads.push(payload as unknown as SerializedQuery);
         return { data: 12345, dependencies: [] };
       },
@@ -393,9 +402,11 @@ describe('formula execution stability', () => {
 
 describe('formula query errors', () => {
   let failQueries: boolean;
+  let library: unknown[];
 
   beforeEach(() => {
     failQueries = false;
+    library = [];
     initServer({
       'formula-load-user-preferences': async () => ({
         currency: getCurrency('USD'),
@@ -408,7 +419,10 @@ describe('formula query errors', () => {
         currencySpaceBetweenAmountAndSymbol: false,
       }),
       'make-filters-from-conditions': async () => ({ filters: [] }),
-      query: async () => {
+      query: async payload => {
+        if (isFormulaLibraryQuery(payload)) {
+          return { data: library, dependencies: [] };
+        }
         if (failQueries) {
           throw new Error('query failed');
         }
@@ -449,6 +463,37 @@ describe('formula query errors', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('uses a library query, and warns when a card query has its name', async () => {
+    library = [
+      {
+        id: 'library-rent',
+        type: 'query',
+        name: 'Rent',
+        data: { conditions: [], conditionsOp: 'and' },
+        created_at: 0,
+      },
+      {
+        id: 'library-income',
+        type: 'query',
+        name: 'Income',
+        data: { conditions: [], conditionsOp: 'and' },
+        created_at: 1,
+      },
+    ];
+
+    const { result } = renderHook(
+      () =>
+        useFormulaExecution('=QUERY("rent") + QUERY("Income")', formulaQueries),
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() => expect(result.current.result).toBe(20));
+    expect(result.current.error).toBeNull();
+    expect(result.current.issues).toMatchObject([
+      { severity: 'warning', kind: 'shadowed', name: 'Income' },
+    ]);
+  });
+
   it('gives an error when a query cannot run', async () => {
     failQueries = true;
 
@@ -481,7 +526,10 @@ describe('formula data changes', () => {
         currencySpaceBetweenAmountAndSymbol: false,
       }),
       'make-filters-from-conditions': async () => ({ filters: [] }),
-      query: async () => ({ data: queryResult, dependencies: [] }),
+      query: async payload =>
+        isFormulaLibraryQuery(payload)
+          ? emptyLibrary
+          : { data: queryResult, dependencies: [] },
     });
   });
 

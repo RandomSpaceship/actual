@@ -7,6 +7,7 @@ import { accountGroupQueries } from './account-groups';
 import { accountQueries } from './accounts';
 import { resetSync, sync } from './app/appSlice';
 import { budgetBoundsQueries, categoryQueries } from './budget';
+import { formulaLibraryQueries } from './formula-library';
 import {
   closeAndDownloadBudget,
   uploadBudget,
@@ -163,6 +164,12 @@ export function listenForSyncEvent(store: AppStore, queryClient: QueryClient) {
       if (tables.includes('dashboard') || tables.includes('dashboard_pages')) {
         void queryClient.invalidateQueries({
           queryKey: dashboardQueries.lists(),
+        });
+      }
+
+      if (tables.includes('formula_library')) {
+        void queryClient.invalidateQueries({
+          queryKey: formulaLibraryQueries.lists(),
         });
       }
 
