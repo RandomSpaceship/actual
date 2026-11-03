@@ -224,6 +224,14 @@ export const schema = {
     created_at: f('integer', { required: true }),
     tombstone: f('boolean'),
   },
+  formula_library: {
+    id: f('id'),
+    type: f('string', { required: true }),
+    name: f('string', { required: true }),
+    data: f('json'),
+    created_at: f('integer', { required: true }),
+    tombstone: f('boolean'),
+  },
 };
 
 export const schemaConfig: SchemaConfig = {
@@ -298,6 +306,9 @@ export const schemaConfig: SchemaConfig = {
           return ['sort_order', 'id'];
         case 'schedules':
           return [{ $condition: { completed: true } }, 'next_date'];
+        case 'formula_library':
+          // The oldest item wins a duplicate name, so keep that order
+          return ['created_at', 'id'];
         default:
       }
 

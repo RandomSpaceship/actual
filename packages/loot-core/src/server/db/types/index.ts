@@ -284,6 +284,15 @@ export type DbDashboardPage = {
   tombstone: 1 | 0;
 };
 
+export type DbFormulaLibraryItem = {
+  id: string;
+  type: string;
+  name: string;
+  data: JsonString;
+  created_at: number;
+  tombstone: 1 | 0;
+};
+
 export type DbDashboard = {
   id: string;
   dashboard_page_id: string;

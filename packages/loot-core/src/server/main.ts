@@ -23,6 +23,7 @@ import { app as encryptionApp } from './encryption/app';
 import { DocumentDirError, withErrorCode } from './errors';
 import { app as filtersApp } from './filters/app';
 import { app as forecastApp } from './forecast/app';
+import { app as formulaLibraryApp } from './formula-library/app';
 import { app as formulasApp } from './formulas/app';
 import { app } from './main-app';
 import { mutator, runHandler } from './mutators';
@@ -139,6 +140,7 @@ app.combine(
   toolsApp,
   filtersApp,
   formulasApp,
+  formulaLibraryApp,
   forecastApp,
   reportsApp,
   rulesApp,

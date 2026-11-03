@@ -8,6 +8,7 @@ export type * from './category-group';
 export type * from './dashboard';
 export type * from './enablebanking';
 export type * from './forecast';
+export type * from './formula-library';
 export type * from './gocardless';
 export type * from './import-transaction';
 export type * from './nearby-payee';
