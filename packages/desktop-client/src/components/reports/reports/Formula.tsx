@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
@@ -11,15 +11,21 @@ import { styles } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
-import type { FormulaWidget } from '@actual-app/core/types/models';
+import type {
+  FormulaLibraryItemEntity,
+  FormulaWidget,
+} from '@actual-app/core/types/models';
+import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
+import { listQueryNames } from '#components/formula/resolveQuery';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
 import { MobilePageHeader, Page, PageHeader } from '#components/Page';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import { LoadingIndicator } from '#components/reports/LoadingIndicator';
+import { formulaLibraryQueries } from '#formula-library';
 import { useAccounts } from '#hooks/useAccounts';
 import { useCategories } from '#hooks/useCategories';
 import { useDashboardWidget } from '#hooks/useDashboardWidget';
@@ -35,6 +41,9 @@ const FormulaEditor = lazy(() =>
     default: module.FormulaEditor,
   })),
 );
+
+// A stable identity, so the editor does not rebuild while the library loads
+const EMPTY_LIBRARY: FormulaLibraryItemEntity[] = [];
 
 export function Formula() {
   const params = useParams();
@@ -61,8 +70,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const { isNarrowWidth } = useResponsive();
   const themeColors = useThemeColors();
 
-  const queriesRef = useRef(widget?.meta?.queries || {});
-  const [queriesVersion, setQueriesVersion] = useState(0);
+  const [queries, setQueries] = useState(widget?.meta?.queries || {});
   const {
     data: { list: categories, grouped: categoryGroups } = {
       list: [],
@@ -70,6 +78,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     },
   } = useCategories();
   const { data: accounts = [] } = useAccounts();
+  const library = useQuery(formulaLibraryQueries.list()).data ?? EMPTY_LIBRARY;
 
   const [formula, setFormula] = useState(
     widget?.meta?.formula || '=SUM(1, 2, 3)',
@@ -103,8 +112,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     issues,
   } = useFormulaExecution(
     formula,
-    queriesRef.current,
-    queriesVersion,
+    queries,
+    undefined,
     undefined,
     simpleAccounts,
   );
@@ -145,18 +154,16 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     issues: colorIssues,
   } = useFormulaExecution(
     colorFormula,
-    queriesRef.current,
-    queriesVersion,
+    queries,
+    undefined,
     colorVariables,
     simpleAccounts,
   );
 
-  const handleQueriesChange = useCallback(
-    (newQueries: typeof queriesRef.current) => {
-      queriesRef.current = newQueries;
-      setQueriesVersion(v => v + 1);
-    },
-    [],
+  // For autocomplete and badges: card queries and library queries
+  const queryNames = useMemo(
+    () => listQueryNames({ localQueries: queries, library }),
+    [queries, library],
   );
 
   const updateDashboardWidgetMutation = useUpdateDashboardWidgetMutation();
@@ -182,7 +189,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           ...(widget.meta ?? {}),
           name,
           formula,
-          queries: queriesRef.current,
+          queries,
           fontSizeMode,
           staticFontSize,
           showTitle,
@@ -212,7 +219,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           meta: {
             ...(widget.meta ?? {}),
             formula,
-            queries: queriesRef.current,
+            queries,
             fontSizeMode,
             staticFontSize,
             showTitle,
@@ -382,7 +389,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 value={formula}
                 onChange={setFormula}
                 mode="query"
-                queries={queriesRef.current}
+                queries={queryNames}
                 categoryBadges={categoryBadges}
                 singleLine={false}
                 showLineNumbers
@@ -470,7 +477,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   variables={colorVariables}
                   onChange={setColorFormula}
                   mode="query"
-                  queries={queriesRef.current}
+                  queries={queryNames}
                   categoryBadges={categoryBadges}
                   singleLine
                   showLineNumbers={false}
@@ -498,10 +505,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             overflowY: 'auto',
           }}
         >
-          <QueryManager
-            queries={queriesRef.current}
-            onQueriesChange={handleQueriesChange}
-          />
+          <QueryManager queries={queries} onQueriesChange={setQueries} />
         </View>
       </View>
     </Page>

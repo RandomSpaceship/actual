@@ -1,7 +1,7 @@
 import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
 import { describe, expect, it } from 'vitest';
 
-import { resolveQuery } from './resolveQuery';
+import { listQueryNames, resolveQuery } from './resolveQuery';
 import type { FormulaQueryConfig } from './resolveQuery';
 
 const food: FormulaQueryConfig = {
@@ -120,6 +120,19 @@ describe('resolveQuery', () => {
       expect(issues).toMatchObject([
         { severity: 'warning', kind: 'duplicate-name', name: 'food' },
       ]);
+    });
+
+    it('lists card names, then library names that no card query hides', () => {
+      expect(
+        listQueryNames({
+          localQueries: { food: foodUpperCase, rent: food },
+          library: [
+            libraryFood,
+            libraryQuery('salary', 'Salary', food),
+            libraryQuery('newer-salary', 'salary', food),
+          ],
+        }),
+      ).toEqual({ food: 'local', rent: 'local', Salary: 'library' });
     });
   });
 });

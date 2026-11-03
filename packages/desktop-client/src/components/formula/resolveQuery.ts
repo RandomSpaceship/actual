@@ -135,3 +135,25 @@ export function resolveQuery(
     ],
   };
 }
+
+// The query names that a formula on this card can use, with the place each
+// name comes from. A library name that a card query hides is not in the list.
+// For library names with the same name, only the oldest is in the list.
+export function listQueryNames({
+  localQueries,
+  library,
+}: QueryResolverContext): Record<string, ResolvedQuery['source']> {
+  const names: Record<string, ResolvedQuery['source']> = {};
+  for (const name of Object.keys(localQueries)) {
+    names[name] = 'local';
+  }
+  for (const item of library) {
+    if (
+      item.type === 'query' &&
+      !Object.keys(names).some(name => isSameQueryName(name, item.name))
+    ) {
+      names[item.name] = 'library';
+    }
+  }
+  return names;
+}
