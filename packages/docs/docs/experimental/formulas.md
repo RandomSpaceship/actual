@@ -307,6 +307,8 @@ When you rename a query that cards use, Actual shows a list of these cards, and 
 
 To reverse a rename and the formula changes that it made, use undo once.
 
+Actual also changes the query name in every provider that uses the query. The list shows these providers too.
+
 Actual cannot change a name that a formula builds from parts, for example `QUERY("fo" & "od")`. The list of cards does not show these formulas.
 
 #### Delete a Library Query
@@ -324,13 +326,69 @@ A card time frame stays with its library query, also after a rename. If a differ
 
 #### Export and Import a Dashboard
 
-When you export a dashboard, the file also holds the library queries that its formula cards use. When you import the file, Actual does one of these for each library query in the file:
+When you export a dashboard, the file also holds the library queries and the providers that its formula cards use. When you import the file, Actual does one of these for each library query in the file:
 
 - If your formula library has a query with the same name, filters, and time frame, the cards use your query.
 - If your formula library has a different query with the same name, each card that uses the name gets a copy of the query from the file. The card query has priority over the library query, so the card shows the same result as before the export.
 - If your formula library has no query with the name, Actual adds the query to your formula library.
 
-The import does not change or delete the queries that are already in your formula library. A card time frame for a library query stays with its query.
+For each provider in the file, Actual does one of these:
+
+- If your formula library has a provider with the same name and formula, the cards use your provider.
+- If your formula library has a different provider with the same name, Actual adds the provider from the file with a new name, for example `NetIncome_2`. Actual changes the name in the imported cards and providers, so the cards show the same result as before the export.
+- If your formula library has no provider with the name, Actual adds the provider to your formula library.
+
+The import does not change or delete the queries and providers that are already in your formula library. A card time frame for a library query stays with its query.
+
+### Reuse a Formula With Providers
+
+A provider is a named formula in the formula library. A card formula uses a provider by its name, with no quotes. For example, the provider `NetIncome` has the formula `=QUERY("income") + QUERY("expenses")`. This card formula then gives the average for each month of a year:
+
+```text
+=NetIncome / 12
+```
+
+A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. Providers are available in formula cards only, not in rule formulas.
+
+To add a provider:
+
+1. Go to **Settings** > **Formula library**.
+2. Under **Providers**, select **Create new provider**.
+3. Type a name. Names are not case-sensitive, so `NetIncome` and `netincome` are the same name.
+4. Optionally, type a description.
+5. Type the formula. The formula must start with `=`. **Result** shows the value of the formula.
+6. Select **Save**.
+
+A provider name can have letters, digits, `_` and `.`. It must start with a letter or `_`. A name cannot look like a cell reference, for example `AB12`. Formulas use `RESULT`, `TRUE`, `FALSE` and names that start with `theme_` for other things, so a provider cannot have these names.
+
+#### How a Provider Uses Queries
+
+A provider uses the queries of the card that uses it:
+
+- If the card has its own query with the same name as a library query, the provider uses the card query.
+- If the card has its own time frame for a library query, the provider uses that time frame.
+
+Thus one provider can give a different value on each card. **Result** in the provider editor has no card, so it uses the library queries only.
+
+#### Use Providers in the Card Editor
+
+The formula autocomplete shows the providers in their own section.
+
+To see the providers, turn on **Show providers** under **Query Definitions**. If the card formula uses a provider when you open the editor, this option is already on. Each provider shows its formula and its value on this card, and has these buttons:
+
+- **Insert** adds the provider name to the card formula, at the cursor.
+- **Edit** opens the provider. A change applies to every card that uses the provider.
+
+#### Rename or Delete a Provider
+
+When you rename a provider that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the provider name in the formulas of the selected cards. Actual also changes the name in every provider that uses the renamed provider. A card that you clear keeps the old name, and shows an error until you change its formula or add a provider with the old name.
+
+Before Actual deletes a provider, it shows the cards and the providers that use it. After the delete, these cards show the error `Provider "name" not found`.
+
+#### Provider Errors
+
+- If the formula of a provider gives an error, for example a division by zero, the card shows which provider gives the error.
+- If two library providers have the same name, formulas use the older provider. This can happen when two devices sync. The card shows a warning line at the bottom.
 
 ### Budget queries with `BUDGET_QUERY`
 
