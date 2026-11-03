@@ -7,11 +7,11 @@ import { useQuery } from '@tanstack/react-query';
 import { executeFormula } from '#components/formula/executeFormula';
 import type { SimpleAccount } from '#components/formula/executeFormula';
 import { resolveQuery } from '#components/formula/resolveQuery';
-import { formulaLibraryQueries } from '#formula-library';
 import type {
   FormulaIssue,
   FormulaQueryConfig,
 } from '#components/formula/resolveQuery';
+import { formulaLibraryQueries } from '#formula-library';
 
 import { useGlobalPref } from './useGlobalPref';
 

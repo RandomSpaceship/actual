@@ -1,8 +1,8 @@
+import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
 import { describe, expect, it } from 'vitest';
 
 import { resolveQuery } from './resolveQuery';
 import type { FormulaQueryConfig } from './resolveQuery';
-import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
 
 const food: FormulaQueryConfig = {
   conditions: [{ field: 'category', op: 'is', value: 'food', type: 'id' }],
@@ -16,14 +16,19 @@ const foodUpperCase: FormulaQueryConfig = {
 
 describe('resolveQuery', () => {
   it('resolves a local query with its own time frame', () => {
-    expect(resolveQuery('food', { localQueries: { food }, library: [] })).toEqual({
+    expect(
+      resolveQuery('food', { localQueries: { food }, library: [] }),
+    ).toEqual({
       query: { name: 'food', source: 'local', config: food },
       issues: [],
     });
   });
 
   it('ignores case in names', () => {
-    const { query, issues } = resolveQuery('FOOD', { localQueries: { food }, library: [] });
+    const { query, issues } = resolveQuery('FOOD', {
+      localQueries: { food },
+      library: [],
+    });
 
     expect(query?.name).toBe('food');
     expect(issues).toEqual([]);
@@ -32,14 +37,18 @@ describe('resolveQuery', () => {
   it('prefers an exact match to a match that ignores case', () => {
     const localQueries = { food, FOOD: foodUpperCase };
 
-    expect(resolveQuery('food', { localQueries, library: [] }).query?.config).toBe(food);
-    expect(resolveQuery('FOOD', { localQueries, library: [] }).query?.config).toBe(
-      foodUpperCase,
-    );
+    expect(
+      resolveQuery('food', { localQueries, library: [] }).query?.config,
+    ).toBe(food);
+    expect(
+      resolveQuery('FOOD', { localQueries, library: [] }).query?.config,
+    ).toBe(foodUpperCase);
   });
 
   it('gives a missing-query error for an unknown name', () => {
-    expect(resolveQuery('rent', { localQueries: { food }, library: [] })).toEqual({
+    expect(
+      resolveQuery('rent', { localQueries: { food }, library: [] }),
+    ).toEqual({
       query: null,
       issues: [
         {
