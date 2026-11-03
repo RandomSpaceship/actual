@@ -16,6 +16,7 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     queryExtractCategoryNames: new Set(),
     queryExtractTimeframeStartNames: new Set(),
     queryExtractTimeframeEndNames: new Set(),
+    queryDateRangeNames: new Set(),
     balanceOfNames: new Set(),
     budgetQueryRequests: new Map(),
     querySumPrefetch: new Map(),
@@ -23,6 +24,7 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     queryExtractCategoriesPrefetch: new Map(),
     queryExtractTimeframeStartPrefetch: new Map(),
     queryExtractTimeframeEndPrefetch: new Map(),
+    queryDateRangePrefetch: new Map(),
     balanceOfPrefetch: new Map(),
     budgetQueryPrefetch: new Map(),
     budgetQueryErrors: new Map(),
@@ -106,6 +108,28 @@ describe('CustomFunctionsPlugin formula query functions', () => {
     expect(result).toBe(0);
     expect(context.queryNames).toEqual(new Set(['missing']));
     expect(context.queryCountNames).toEqual(new Set(['missing']));
+  });
+
+  it('records query date requests and returns prefetched days', () => {
+    const context = createFormulaQueryContext();
+    context.queryDateRangePrefetch.set('january', {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      days: 31,
+    });
+    context.queryDateRangePrefetch.set('all', null);
+
+    expect(
+      evaluateFormula(
+        '=QUERY_START_DATE("january") & ":" & QUERY_END_DATE("january") & ":" & QUERY_DAYS("january")',
+        context,
+      ),
+    ).toBe('2026-01-01:2026-01-31:31');
+    expect(evaluateFormula('=QUERY_START_DATE("all")', context)).toBe('');
+    expect(evaluateFormula('=QUERY_DAYS("all")', context)).toEqual(
+      expect.objectContaining({ type: 'VALUE' }),
+    );
+    expect(context.queryDateRangeNames).toEqual(new Set(['january', 'all']));
   });
 
   it('resolves BUDGET_QUERY from prefetched nested query extraction values', () => {

@@ -260,6 +260,48 @@ export function getFormulaFunctionCatalog(): Record<
         },
       ],
     },
+    QUERY_START_DATE: {
+      name: 'QUERY_START_DATE',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get the first day that a named query includes, as YYYY-MM-DD.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+      ],
+    },
+    QUERY_END_DATE: {
+      name: 'QUERY_END_DATE',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get the last day that a named query includes, as YYYY-MM-DD.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+      ],
+    },
+    QUERY_DAYS: {
+      name: 'QUERY_DAYS',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get the number of days that a named query includes, with the first and last day counted.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+      ],
+    },
     FLOOR: {
       name: 'FLOOR',
       category: 'math',

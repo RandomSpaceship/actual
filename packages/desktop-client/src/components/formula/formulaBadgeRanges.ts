@@ -106,6 +106,9 @@ const queryNameFunctions = new Set([
   'QUERY_EXTRACT_CATEGORIES',
   'QUERY_EXTRACT_TIMEFRAME_START',
   'QUERY_EXTRACT_TIMEFRAME_END',
+  'QUERY_START_DATE',
+  'QUERY_END_DATE',
+  'QUERY_DAYS',
 ]);
 
 const budgetDimensions = new Set<string>(budgetQueryDimensions);

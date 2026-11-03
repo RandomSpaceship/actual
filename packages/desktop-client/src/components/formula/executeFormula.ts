@@ -3,7 +3,10 @@ import {
   createBudgetQueryPrefetchKey,
   setCachedUserPreferences,
 } from '@actual-app/core/shared/formulas/customFunctions';
-import type { FormulaQueryContext } from '@actual-app/core/shared/formulas/customFunctions';
+import type {
+  FormulaQueryContext,
+  QueryDateRange,
+} from '@actual-app/core/shared/formulas/customFunctions';
 import * as monthUtils from '@actual-app/core/shared/months';
 import { q } from '@actual-app/core/shared/query';
 import type { Query } from '@actual-app/core/shared/query';
@@ -54,6 +57,7 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     queryExtractCategoryNames: new Set(),
     queryExtractTimeframeStartNames: new Set(),
     queryExtractTimeframeEndNames: new Set(),
+    queryDateRangeNames: new Set(),
     balanceOfNames: new Set(),
     budgetQueryRequests: new Map(),
     querySumPrefetch: new Map(),
@@ -61,6 +65,7 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     queryExtractCategoriesPrefetch: new Map(),
     queryExtractTimeframeStartPrefetch: new Map(),
     queryExtractTimeframeEndPrefetch: new Map(),
+    queryDateRangePrefetch: new Map(),
     balanceOfPrefetch: new Map(),
     budgetQueryPrefetch: new Map(),
     budgetQueryErrors: new Map(),
@@ -402,6 +407,14 @@ async function prefetchFormulaQueries(
     fetchValue: async config => extractQueryTimeframeEnd(config),
   });
 
+  fetchCount += await prefetchQueryValues({
+    ...common,
+    names: formulaQueryContext.queryDateRangeNames,
+    prefetch: formulaQueryContext.queryDateRangePrefetch,
+    fallback: null,
+    fetchValue: async config => getQueryDateRange(config),
+  });
+
   return fetchCount;
 }
 
@@ -496,12 +509,33 @@ async function prefetchBudgetQueries(
   }
   return fetchCount;
 }
+
+// The days that the query filter includes, or null if the query has no time
+// frame
+function getQueryDateRange(config: FormulaQueryConfig): QueryDateRange | null {
+  const timeFrame = config.timeFrame;
+  if (!timeFrame || !timeFrame.mode) {
+    return null;
+  }
+
+  const [calculatedStart, calculatedEnd] = calculateTimeRange(
+    asMonthSlidingTimeFrame(timeFrame),
+  );
+  const start = normalizeQueryTimeFrameStart(calculatedStart);
+  const end = normalizeQueryTimeFrameEnd(calculatedEnd);
+  return {
+    start,
+    end,
+    days: monthUtils.differenceInCalendarDays(end, start) + 1,
+  };
+}
+
 export async function buildFilteredTransactionsQuery(
   config: FormulaQueryConfig,
 ): Promise<Query> {
   const conditions = config.conditions || [];
   const conditionsOp = config.conditionsOp || 'and';
-  const timeFrame = config.timeFrame;
+  const dateRange = getQueryDateRange(config);
 
   // Convert conditions to query filters
   const { filters: queryFilters } = await send('make-filters-from-conditions', {
@@ -514,15 +548,12 @@ export async function buildFilteredTransactionsQuery(
   let transQuery = q('transactions');
 
   // Add date range filter if provided
-  if (timeFrame && timeFrame.mode) {
-    const [calculatedStart, calculatedEnd] = calculateTimeRange(
-      asMonthSlidingTimeFrame(timeFrame),
-    );
-    const startDate = normalizeQueryTimeFrameStart(calculatedStart);
-    const endDate = normalizeQueryTimeFrameEnd(calculatedEnd);
-
+  if (dateRange) {
     transQuery = transQuery.filter({
-      $and: [{ date: { $gte: startDate } }, { date: { $lte: endDate } }],
+      $and: [
+        { date: { $gte: dateRange.start } },
+        { date: { $lte: dateRange.end } },
+      ],
     });
   }
 

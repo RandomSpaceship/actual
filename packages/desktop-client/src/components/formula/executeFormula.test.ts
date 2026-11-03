@@ -24,6 +24,10 @@ const localQueries = {
     },
   },
   c: {},
+  // A time frame in months includes the full months
+  february: {
+    timeFrame: { start: '2024-02', end: '2024-02', mode: 'static' as const },
+  },
 };
 
 function run(formula: string, library: FormulaLibraryItemEntity[] = []) {
@@ -110,5 +114,31 @@ describe('executeFormula', () => {
     expect(
       await run('=IFERROR(Inner, 7)', [provider('Inner', '=1 / 0')]),
     ).toEqual({ value: 7, issues: [] });
+  });
+
+  it('gives the days that a query includes', async () => {
+    expect(await run('=QUERY_START_DATE("february")')).toEqual({
+      value: '2024-02-01',
+      issues: [],
+    });
+    expect(await run('=QUERY_END_DATE("b")')).toEqual({
+      value: '2024-01-31',
+      issues: [],
+    });
+    expect(await run('=QUERY_DAYS("february") + QUERY_DAYS("b")')).toEqual({
+      value: 29 + 31,
+      issues: [],
+    });
+    expect(
+      await run('=QUERY_END_DATE("february") - QUERY_START_DATE("b") + 1'),
+    ).toEqual({ value: 31 + 29, issues: [] });
+  });
+
+  it('gives no days for a query without a time frame', async () => {
+    expect(await run('=QUERY_START_DATE("a")')).toEqual({
+      value: '',
+      issues: [],
+    });
+    await expect(run('=QUERY_DAYS("a")')).rejects.toThrow('VALUE');
   });
 });

@@ -24,12 +24,17 @@ export type BudgetQueryRequest = {
   endMonth: string;
 };
 
+// The days that a query filter includes, with both ends counted in days.
+// null: the query has no time frame.
+export type QueryDateRange = { start: string; end: string; days: number };
+
 export type FormulaQueryContext = {
   queryNames?: Set<string>;
   queryCountNames?: Set<string>;
   queryExtractCategoryNames?: Set<string>;
   queryExtractTimeframeStartNames?: Set<string>;
   queryExtractTimeframeEndNames?: Set<string>;
+  queryDateRangeNames?: Set<string>;
   balanceOfNames?: Set<string>;
   budgetQueryRequests?: Map<string, BudgetQueryRequest>;
   querySumPrefetch?: Map<string, number>;
@@ -37,6 +42,7 @@ export type FormulaQueryContext = {
   queryExtractCategoriesPrefetch?: Map<string, string[]>;
   queryExtractTimeframeStartPrefetch?: Map<string, string>;
   queryExtractTimeframeEndPrefetch?: Map<string, string>;
+  queryDateRangePrefetch?: Map<string, QueryDateRange | null>;
   balanceOfPrefetch?: Map<string, number>;
   budgetQueryPrefetch?: Map<string, number>;
   budgetQueryErrors?: Map<string, string>;
@@ -305,6 +311,46 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
     );
   }
 
+  private getQueryDateRange(queryName: string) {
+    const ctx = this.getFormulaQueryContext();
+    ctx?.queryDateRangeNames?.add(queryName);
+    return ctx?.queryDateRangePrefetch?.get(queryName);
+  }
+
+  queryStartDate(ast: ProcedureAst, state: InterpreterState) {
+    return this.runFunction(
+      ast.args,
+      state,
+      this.metadata('QUERY_START_DATE'),
+      (queryName: string) => this.getQueryDateRange(queryName)?.start ?? '',
+    );
+  }
+
+  queryEndDate(ast: ProcedureAst, state: InterpreterState) {
+    return this.runFunction(
+      ast.args,
+      state,
+      this.metadata('QUERY_END_DATE'),
+      (queryName: string) => this.getQueryDateRange(queryName)?.end ?? '',
+    );
+  }
+
+  queryDays(ast: ProcedureAst, state: InterpreterState) {
+    return this.runFunction(
+      ast.args,
+      state,
+      this.metadata('QUERY_DAYS'),
+      (queryName: string) => {
+        const range = this.getQueryDateRange(queryName);
+        // undefined: not fetched yet
+        if (range === null) {
+          return new CellError(ErrorType.VALUE, 'The query has no time frame');
+        }
+        return range?.days ?? 0;
+      },
+    );
+  }
+
   budgetQuery(ast: ProcedureAst, state: InterpreterState) {
     return this.runFunction(
       ast.args,
@@ -502,6 +548,18 @@ CustomFunctionsPlugin.implementedFunctions = {
     method: 'queryExtractTimeframeStart',
     parameters: [{ argumentType: FunctionArgumentType.STRING }],
   },
+  QUERY_START_DATE: {
+    method: 'queryStartDate',
+    parameters: [{ argumentType: FunctionArgumentType.STRING }],
+  },
+  QUERY_END_DATE: {
+    method: 'queryEndDate',
+    parameters: [{ argumentType: FunctionArgumentType.STRING }],
+  },
+  QUERY_DAYS: {
+    method: 'queryDays',
+    parameters: [{ argumentType: FunctionArgumentType.STRING }],
+  },
   BUDGET_QUERY: {
     method: 'budgetQuery',
     parameters: [
@@ -580,6 +638,9 @@ export const customFunctionsTranslations = {
     QUERY_EXTRACT_CATEGORIES: 'QUERY_EXTRACT_CATEGORIES',
     QUERY_EXTRACT_TIMEFRAME_END: 'QUERY_EXTRACT_TIMEFRAME_END',
     QUERY_EXTRACT_TIMEFRAME_START: 'QUERY_EXTRACT_TIMEFRAME_START',
+    QUERY_START_DATE: 'QUERY_START_DATE',
+    QUERY_END_DATE: 'QUERY_END_DATE',
+    QUERY_DAYS: 'QUERY_DAYS',
     BUDGET_QUERY: 'BUDGET_QUERY',
     FORMATNUMBER: 'FORMATNUMBER',
     FORMATCURRENCY: 'FORMATCURRENCY',
