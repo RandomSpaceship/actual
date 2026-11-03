@@ -99,7 +99,8 @@ export function useFormulaExecution(
         return;
       }
 
-      // Without the library, library queries would show as not found
+      // Without the library, library queries and providers would show as
+      // not found
       const library = libraryRef.current;
       if (!library) {
         setIsLoading(true);
@@ -118,6 +119,7 @@ export function useFormulaExecution(
             resolveQuery(name, { localQueries, library, timeFrameOverrides }),
           accounts: accountsRef.current ?? [],
           namedExpressions: namedExpressionsRef.current,
+          library,
           language,
         });
 

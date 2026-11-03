@@ -20,10 +20,13 @@ export type FormulaIssue = {
     | 'missing-query'
     | 'missing-account'
     | 'query-failed'
+    | 'missing-provider'
+    | 'provider-cycle'
+    | 'provider-error'
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';
-  // The query or account name as written in the formula
+  // The query, account or provider name as written in the formula
   name: string;
   message: string;
 };

@@ -10,6 +10,7 @@ import type { Query } from '@actual-app/core/shared/query';
 import { integerToAmount } from '@actual-app/core/shared/util';
 import type {
   CategoryEntity,
+  FormulaLibraryItemEntity,
   RuleConditionEntity,
 } from '@actual-app/core/types/models';
 import { HyperFormula } from 'hyperformula';
@@ -19,6 +20,8 @@ import {
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from '#components/formula/queryTimeFrame';
+import { resolveProviders } from '#components/formula/resolveProviders';
+import type { ResolvedProvider } from '#components/formula/resolveProviders';
 import type {
   FormulaIssue,
   FormulaQueryConfig,
@@ -66,25 +69,32 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
 
 function isHyperFormulaError(
   cellValue: unknown,
-): cellValue is { type: string; message?: string } {
+): cellValue is { type: string; value?: string; message?: string } {
   return Boolean(
     cellValue && typeof cellValue === 'object' && 'type' in cellValue,
   );
 }
+
+type FormulaEvaluation = {
+  value: FormulaCellValue;
+  cellError: { type: string; message?: string } | null;
+  // The error type of each provider whose value is an error
+  providerErrors: Map<string, string>;
+};
 
 function evaluateFormulaWithContext({
   formula,
   formulaQueryContext,
   locale,
   namedExpressions,
-  throwOnCellError = true,
+  providers,
 }: {
   formula: string;
   formulaQueryContext: FormulaQueryContext;
   locale: string;
   namedExpressions?: Record<string, number | string>;
-  throwOnCellError?: boolean;
-}): FormulaCellValue {
+  providers: ResolvedProvider[];
+}): FormulaEvaluation {
   let hfInstance: ReturnType<typeof HyperFormula.buildEmpty> | null = null;
 
   try {
@@ -114,6 +124,11 @@ function evaluateFormulaWithContext({
       }
     }
 
+    // HyperFormula finds the order and the cycles of the providers
+    for (const provider of providers) {
+      hfInstance.addNamedExpression(provider.name, provider.formula);
+    }
+
     hfInstance.setCellContents({ sheet: sheetId, col: 0, row: 0 }, [[formula]]);
 
     const cellValue = hfInstance.getCellValue({
@@ -122,38 +137,73 @@ function evaluateFormulaWithContext({
       row: 0,
     });
 
-    if (isHyperFormulaError(cellValue)) {
-      if (throwOnCellError) {
-        throw new Error(`Formula error: ${cellValue.type}`);
+    const providerErrors = new Map<string, string>();
+    for (const provider of providers) {
+      const providerValue = hfInstance.getNamedExpressionValue(provider.name);
+      if (isHyperFormulaError(providerValue)) {
+        providerErrors.set(
+          provider.name.toUpperCase(),
+          providerValue.value ?? providerValue.type,
+        );
       }
-      return null;
     }
 
-    return cellValue as FormulaCellValue;
+    if (isHyperFormulaError(cellValue)) {
+      return { value: null, cellError: cellValue, providerErrors };
+    }
+
+    return {
+      value: cellValue as FormulaCellValue,
+      cellError: null,
+      providerErrors,
+    };
   } finally {
     hfInstance?.destroy();
   }
 }
 
+// The provider that gives an error of its own, and does not only pass on an
+// error from a provider that it uses
+function findProviderWithError(
+  providers: ResolvedProvider[],
+  providerErrors: Map<string, string>,
+) {
+  return providers.find(
+    provider =>
+      providerErrors.has(provider.name.toUpperCase()) &&
+      !provider.uses.some(name => providerErrors.has(name.toUpperCase())),
+  );
+}
+
+// A formula that keeps asking for new data stops after this many passes
+const MAX_EVALUATION_PASSES = 20;
+
 // Runs a formula card formula. HyperFormula is synchronous, so the formula is
-// evaluated three times: the first pass collects the query and account names,
-// then their data is fetched; the second pass collects the BUDGET_QUERY
-// requests, which can depend on that data; the last pass gives the value.
+// evaluated more than once. Each pass collects the names and requests that
+// the formula asks for, then their data is fetched for the next pass. Query
+// and account data comes first, because BUDGET_QUERY requests can depend on
+// it. The pass that asks for nothing new gives the value. A normal formula
+// takes three passes. A provider can ask for data too, so it can add passes.
 //
-// Problems with names (an unknown query or account) and failed fetches are
-// returned as issues. An error issue replaces the value. Formula errors, and a
-// formula that does not start with "=", throw.
+// Problems with names (an unknown query, account or provider, or providers
+// that use each other) and failed fetches are returned as issues. An error
+// issue replaces the value. A provider whose value is an error also gives an
+// error issue. Other formula errors, and a formula that does not start with
+// "=", throw.
 export async function executeFormula({
   formula,
   resolveQuery,
   accounts,
   namedExpressions,
+  library = [],
   language,
 }: {
   formula: string;
   resolveQuery: QueryResolver;
   accounts: SimpleAccount[];
   namedExpressions?: Record<string, number | string>;
+  // Oldest first. The formula can use its providers
+  library?: FormulaLibraryItemEntity[];
   // The language global preference
   language?: string;
 }): Promise<{ value: FormulaCellValue; issues: FormulaIssue[] }> {
@@ -189,42 +239,71 @@ export async function executeFormula({
     }
   };
 
+  const resolvedProviders = resolveProviders(
+    [formula],
+    library,
+    Object.keys(namedExpressions ?? {}),
+  );
+  resolvedProviders.issues.forEach(addIssue);
+  if (issues.some(issue => issue.severity === 'error')) {
+    return { value: null, issues };
+  }
+
   const formulaQueryContext = createFormulaQueryContext();
+  const evaluate = () =>
+    evaluateFormulaWithContext({
+      formula,
+      formulaQueryContext,
+      locale: formulaLocale,
+      namedExpressions,
+      providers: resolvedProviders.providers,
+    });
 
-  evaluateFormulaWithContext({
-    formula,
-    formulaQueryContext,
-    locale: formulaLocale,
-    namedExpressions,
-    throwOnCellError: false,
-  });
+  let evaluation = evaluate();
+  for (let pass = 1; pass < MAX_EVALUATION_PASSES; pass++) {
+    const fetchCount =
+      (await prefetchFormulaQueries(
+        formulaQueryContext,
+        resolveQuery,
+        addIssue,
+      )) +
+      (await prefetchAccountBalances(formulaQueryContext, accounts, addIssue));
+    if (
+      fetchCount === 0 &&
+      (await prefetchBudgetQueries(formulaQueryContext)) === 0
+    ) {
+      break;
+    }
 
-  await prefetchFormulaQueries(formulaQueryContext, resolveQuery, addIssue);
-  await prefetchAccountBalances(formulaQueryContext, accounts, addIssue);
-
-  formulaQueryContext.budgetQueryRequests.clear();
-  evaluateFormulaWithContext({
-    formula,
-    formulaQueryContext,
-    locale: formulaLocale,
-    namedExpressions,
-    throwOnCellError: false,
-  });
-
-  await prefetchBudgetQueries(formulaQueryContext);
+    formulaQueryContext.budgetQueryRequests.clear();
+    evaluation = evaluate();
+  }
 
   if (issues.some(issue => issue.severity === 'error')) {
     return { value: null, issues };
   }
 
-  const value = evaluateFormulaWithContext({
-    formula,
-    formulaQueryContext,
-    locale: formulaLocale,
-    namedExpressions,
-  });
+  if (evaluation.cellError) {
+    const provider = findProviderWithError(
+      resolvedProviders.providers,
+      evaluation.providerErrors,
+    );
+    if (!provider) {
+      throw new Error(`Formula error: ${evaluation.cellError.type}`);
+    }
+    addIssue({
+      severity: 'error',
+      kind: 'provider-error',
+      name: provider.name,
+      message: t('Provider "{{name}}" gives the error {{error}}', {
+        name: provider.name,
+        error: evaluation.providerErrors.get(provider.name.toUpperCase()),
+      }),
+    });
+    return { value: null, issues };
+  }
 
-  return { value, issues };
+  return { value: evaluation.value, issues };
 }
 
 async function prefetchQueryValues<T>({
@@ -244,7 +323,11 @@ async function prefetchQueryValues<T>({
   addIssue: AddIssue;
   fetchValue: (config: FormulaQueryConfig) => Promise<T>;
 }) {
+  let fetchCount = 0;
   for (const queryName of names) {
+    if (prefetch.has(queryName)) continue;
+    fetchCount++;
+
     const { query, issues } = resolveQuery(queryName);
     issues.forEach(addIssue);
 
@@ -266,16 +349,19 @@ async function prefetchQueryValues<T>({
       prefetch.set(queryName, fallback);
     }
   }
+  return fetchCount;
 }
 
+// Returns the number of names that were not fetched before
 async function prefetchFormulaQueries(
   formulaQueryContext: Required<FormulaQueryContext>,
   resolveQuery: QueryResolver,
   addIssue: AddIssue,
 ) {
   const common = { resolveQuery, addIssue };
+  let fetchCount = 0;
 
-  await prefetchQueryValues({
+  fetchCount += await prefetchQueryValues({
     ...common,
     names: formulaQueryContext.queryNames,
     prefetch: formulaQueryContext.querySumPrefetch,
@@ -284,7 +370,7 @@ async function prefetchFormulaQueries(
       integerToFormulaAmount(await fetchQuerySum(config)),
   });
 
-  await prefetchQueryValues({
+  fetchCount += await prefetchQueryValues({
     ...common,
     names: formulaQueryContext.queryCountNames,
     prefetch: formulaQueryContext.queryCountPrefetch,
@@ -292,7 +378,7 @@ async function prefetchFormulaQueries(
     fetchValue: fetchQueryCount,
   });
 
-  await prefetchQueryValues({
+  fetchCount += await prefetchQueryValues({
     ...common,
     names: formulaQueryContext.queryExtractCategoryNames,
     prefetch: formulaQueryContext.queryExtractCategoriesPrefetch,
@@ -300,7 +386,7 @@ async function prefetchFormulaQueries(
     fetchValue: extractQueryCategories,
   });
 
-  await prefetchQueryValues({
+  fetchCount += await prefetchQueryValues({
     ...common,
     names: formulaQueryContext.queryExtractTimeframeStartNames,
     prefetch: formulaQueryContext.queryExtractTimeframeStartPrefetch,
@@ -308,21 +394,27 @@ async function prefetchFormulaQueries(
     fetchValue: async config => extractQueryTimeframeStart(config),
   });
 
-  await prefetchQueryValues({
+  fetchCount += await prefetchQueryValues({
     ...common,
     names: formulaQueryContext.queryExtractTimeframeEndNames,
     prefetch: formulaQueryContext.queryExtractTimeframeEndPrefetch,
     fallback: monthUtils.currentMonth(),
     fetchValue: async config => extractQueryTimeframeEnd(config),
   });
+
+  return fetchCount;
 }
 
+// Returns the number of accounts that were not fetched before
 async function prefetchAccountBalances(
   formulaQueryContext: Required<FormulaQueryContext>,
   accounts: SimpleAccount[],
   addIssue: AddIssue,
 ) {
+  let fetchCount = 0;
   for (const literal of formulaQueryContext.balanceOfNames) {
+    if (formulaQueryContext.balanceOfPrefetch.has(literal)) continue;
+    fetchCount++;
     formulaQueryContext.balanceOfPrefetch.set(literal, 0);
 
     const account =
@@ -356,6 +448,7 @@ async function prefetchAccountBalances(
       });
     }
   }
+  return fetchCount;
 }
 
 async function fetchAccountBalance(accountId: string): Promise<number> {
@@ -366,11 +459,20 @@ async function fetchAccountBalance(accountId: string): Promise<number> {
   return integerToFormulaAmount(data || 0);
 }
 
+// Returns the number of requests that were not fetched before
 async function prefetchBudgetQueries(
   formulaQueryContext: Required<FormulaQueryContext>,
 ) {
+  let fetchCount = 0;
   for (const request of formulaQueryContext.budgetQueryRequests.values()) {
     const key = createBudgetQueryPrefetchKey(request);
+    if (
+      formulaQueryContext.budgetQueryPrefetch.has(key) ||
+      formulaQueryContext.budgetQueryErrors.has(key)
+    ) {
+      continue;
+    }
+    fetchCount++;
 
     try {
       formulaQueryContext.budgetQueryPrefetch.set(
@@ -392,6 +494,7 @@ async function prefetchBudgetQueries(
       );
     }
   }
+  return fetchCount;
 }
 export async function buildFilteredTransactionsQuery(
   config: FormulaQueryConfig,
