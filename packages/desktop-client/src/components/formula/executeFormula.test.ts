@@ -167,6 +167,18 @@ describe('executeFormula', () => {
     });
   });
 
+  it('gives a table or one value for the automatic output', async () => {
+    expect(await run('=SEQUENCE(2, 1)', [], 'auto')).toEqual({
+      value: null,
+      table: [[1], [2]],
+      issues: [],
+    });
+    expect(await run('=QUERY("a")', [], 'auto')).toEqual({
+      value: 123.45,
+      issues: [],
+    });
+  });
+
   it('gives an error for a table when the output is one value', async () => {
     const result = await run('=SEQUENCE(2, 2)');
 

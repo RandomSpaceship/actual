@@ -102,13 +102,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [colorFormula, setColorFormula] = useState(
     widget?.meta?.colorFormula || '',
   );
-  const [view, setView] = useState<'number' | 'table'>(
-    widget?.meta?.view ?? 'number',
+  const [view, setView] = useState<'auto' | 'number' | 'table'>(
+    widget?.meta?.view ?? 'auto',
   );
   const [tableColumns, setTableColumns] = useState<FormulaTableColumn[]>(
     widget?.meta?.tableColumns ?? [],
   );
-  const isTableView = view === 'table';
 
   const title = widget?.meta?.name || t('Formula');
 
@@ -133,8 +132,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     undefined,
     simpleAccounts,
     timeFrameOverrides,
-    isTableView ? 'table' : 'value',
+    view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
   );
+  const isTableView = view === 'table' || (view === 'auto' && table !== null);
 
   const colorVariables = useMemo(
     () => ({
@@ -395,8 +395,16 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               </div>
               <Select
                 value={view}
-                onChange={(value: 'number' | 'table') => setView(value)}
+                onChange={(value: 'auto' | 'number' | 'table') =>
+                  setView(value)
+                }
                 options={[
+                  [
+                    'auto',
+                    isTableView
+                      ? t('Automatic (table)')
+                      : t('Automatic (one value)'),
+                  ],
                   ['number', t('One value')],
                   ['table', t('Table')],
                 ]}

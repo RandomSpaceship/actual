@@ -242,7 +242,7 @@ Formulas can also subtract one date from the other. `=QUERY_END_DATE("expenses")
 
 ### Group Transactions With `QUERY_GROUP`
 
-`QUERY_GROUP` gives a table with one row for each group of transactions in a query. Use it with the [table view](#show-a-table) of a formula card.
+`QUERY_GROUP` gives a table with one row for each group of transactions in a query. A formula card shows it in the [table view](#show-a-table).
 
 ```text
 =QUERY_GROUP("query", "dimension 1", "dimension 2", "sort")
@@ -480,12 +480,21 @@ Example — compare budgeted vs actual spent for a hard-coded month range:
 
 ### Show a Table
 
-A formula card can show a table in place of one value. Use this with a formula that gives a table, for example `QUERY_GROUP`.
+A formula card can show a table in place of one value. When a formula gives a table, for example with `QUERY_GROUP`, the card shows the table.
+
+The **Display** setting in the card editor has three options:
+
+- **Automatic** (the default): a table for a formula that gives a table, and one value for other formulas.
+- **One value**: always one value. A formula that gives a table shows an error.
+- **Table**: always a table. One value shows as a table with one cell.
+
+Some formulas give one value for some data and a table for other data, for example `FILTER`. For these formulas, set **Display** to **Table**, so that the card does not change its look when the data changes.
+
+To give the columns names and types:
 
 1. Open the card editor.
-2. Set **Display** to **Table**.
-3. Under **Columns**, give each column a name and a type.
-4. Click **Save widget**.
+2. Under **Columns**, give each column a name and a type.
+3. Click **Save widget**.
 
 The column types are:
 
@@ -500,7 +509,7 @@ If no column has a name, the table has no header row. A cell with an error shows
 
 The table view has no font size and no conditional color.
 
-If a formula gives a table but **Display** is **One value**, the card shows an error. Set **Display** to **Table**, or use `INDEX` to get one cell from the table.
+If a formula gives a table but **Display** is **One value**, the card shows an error. Set **Display** to **Automatic** or **Table**, or use `INDEX` to get one cell from the table.
 
 ### Optional: conditional color
 

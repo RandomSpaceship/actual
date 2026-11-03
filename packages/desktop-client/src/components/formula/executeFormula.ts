@@ -51,7 +51,9 @@ export type FormulaTable = FormulaTableCell[][];
 
 // What the caller shows. A 'value' caller gets an error issue for a table
 // result. A 'table' caller gets each result as a table, also a single value.
-export type FormulaOutput = 'value' | 'table';
+// 'auto' gives a table only for a formula that spills, and one value for
+// other formulas
+export type FormulaOutput = 'value' | 'table' | 'auto';
 
 export type SimpleAccount = { id: string; name: string };
 
@@ -399,13 +401,19 @@ export async function executeFormula({
     };
   }
 
+  if (output === 'auto') {
+    return evaluation.table
+      ? { value: null, table: evaluation.table, issues }
+      : { value: evaluation.value, issues };
+  }
+
   if (evaluation.table) {
     addIssue({
       severity: 'error',
       kind: 'table-result',
       name: '',
       message: t(
-        'The formula gives a table, not one value. Set Display to Table, or use INDEX to get one cell, for example INDEX(formula, 1, 2)',
+        'The formula gives a table, not one value. Set Display to Automatic or Table, or use INDEX to get one cell, for example INDEX(formula, 1, 2)',
       ),
     });
     return { value: null, table: evaluation.table, issues };

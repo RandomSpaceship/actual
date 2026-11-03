@@ -470,8 +470,9 @@ export type FormulaWidget = AbstractWidget<
     staticFontSize?: number;
     showTitle?: boolean;
     colorFormula?: string;
-    // 'table' shows each cell of a formula that gives a table
-    view?: 'number' | 'table';
+    // 'auto' (the default) shows a table for a formula that gives a table,
+    // and one value for other formulas
+    view?: 'auto' | 'number' | 'table';
     // Settings for each table column, by position
     tableColumns?: FormulaTableColumn[];
     queriesVersion?: number;

@@ -47,9 +47,7 @@ export function FormulaCard({
   const fontSizeMode = meta?.fontSizeMode || 'dynamic';
   const staticFontSize = meta?.staticFontSize || 32;
   const showTitle = meta?.showTitle ?? true;
-  const isTableView = meta?.view === 'table';
-  // The table view has no colour
-  const colorFormula = isTableView ? '' : meta?.colorFormula || '';
+  const view = meta?.view ?? 'auto';
 
   const simpleAccounts = useMemo(
     () =>
@@ -66,8 +64,11 @@ export function FormulaCard({
     undefined,
     simpleAccounts,
     meta?.timeFrameOverrides,
-    isTableView ? 'table' : 'value',
+    view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
   );
+  const isTableView = view === 'table' || (view === 'auto' && table !== null);
+  // The table view has no colour
+  const colorFormula = isTableView ? '' : meta?.colorFormula || '';
 
   const colorVariables = useMemo(
     () => ({
