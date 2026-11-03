@@ -40,6 +40,17 @@ bootstrapHyperFormula();
 
 type FormulaCellValue = number | string | boolean | null;
 
+// A cell of a table result. An error cell gives the error text, for example
+// #DIV/0!
+export type FormulaTableCell = FormulaCellValue | { error: string };
+
+// The rows of a table result
+export type FormulaTable = FormulaTableCell[][];
+
+// What the caller shows. A 'value' caller gets an error issue for a table
+// result. A 'table' caller gets each result as a table, also a single value.
+export type FormulaOutput = 'value' | 'table';
+
 export type SimpleAccount = { id: string; name: string };
 
 type AddIssue = (issue: FormulaIssue) => void;
@@ -80,11 +91,22 @@ function isHyperFormulaError(
   );
 }
 
+function toTableCell(cellValue: unknown): FormulaTableCell {
+  if (isHyperFormulaError(cellValue)) {
+    return { error: cellValue.value ?? cellValue.type };
+  }
+  return cellValue as FormulaCellValue;
+}
+
 type FormulaEvaluation = {
   value: FormulaCellValue;
+  // Only for a formula that spills into more than one cell
+  table: FormulaTable | null;
   cellError: { type: string; message?: string } | null;
   // The error type of each provider whose value is an error
   providerErrors: Map<string, string>;
+  // The upper-case names of the providers whose formula gives a table
+  tableProviders: Set<string>;
 };
 
 function evaluateFormulaWithContext({
@@ -143,24 +165,48 @@ function evaluateFormulaWithContext({
     });
 
     const providerErrors = new Map<string, string>();
+    const tableProviders = new Set<string>();
     for (const provider of providers) {
       const providerValue = hfInstance.getNamedExpressionValue(provider.name);
-      if (isHyperFormulaError(providerValue)) {
-        providerErrors.set(
-          provider.name.toUpperCase(),
-          providerValue.value ?? providerValue.type,
-        );
+      if (!isHyperFormulaError(providerValue)) continue;
+      providerErrors.set(
+        provider.name.toUpperCase(),
+        providerValue.value ?? providerValue.type,
+      );
+      // A named expression cannot hold a table, so its value is #VALUE!. The
+      // same formula in calculateFormula gives the table.
+      if (
+        providerValue.type === 'VALUE' &&
+        Array.isArray(hfInstance.calculateFormula(provider.formula, sheetId))
+      ) {
+        tableProviders.add(provider.name.toUpperCase());
       }
     }
 
     if (isHyperFormulaError(cellValue)) {
-      return { value: null, cellError: cellValue, providerErrors };
+      return {
+        value: null,
+        table: null,
+        cellError: cellValue,
+        providerErrors,
+        tableProviders,
+      };
     }
 
+    const { width, height } = hfInstance.getSheetDimensions(sheetId);
+    const table =
+      width > 1 || height > 1
+        ? hfInstance
+            .getSheetValues(sheetId)
+            .map(row => row.map(cell => toTableCell(cell)))
+        : null;
+
     return {
-      value: cellValue as FormulaCellValue,
+      value: table ? null : (cellValue as FormulaCellValue),
+      table,
       cellError: null,
       providerErrors,
+      tableProviders,
     };
   } finally {
     hfInstance?.destroy();
@@ -193,8 +239,12 @@ const MAX_EVALUATION_PASSES = 20;
 // Problems with names (an unknown query, account or provider, or providers
 // that use each other) and failed fetches are returned as issues. An error
 // issue replaces the value. A provider whose value is an error also gives an
-// error issue. Other formula errors, and a formula that does not start with
-// "=", throw.
+// error issue. A provider gives one value only, so a provider whose formula
+// gives a table also gives an error issue. Other formula errors, and a formula
+// that does not start with "=", throw.
+//
+// A formula that spills into more than one cell gives a table. For the
+// 'value' output, a table is an error issue.
 export async function executeFormula({
   formula,
   resolveQuery,
@@ -202,6 +252,7 @@ export async function executeFormula({
   namedExpressions,
   library = [],
   language,
+  output = 'value',
 }: {
   formula: string;
   resolveQuery: QueryResolver;
@@ -211,7 +262,13 @@ export async function executeFormula({
   library?: FormulaLibraryItemEntity[];
   // The language global preference
   language?: string;
-}): Promise<{ value: FormulaCellValue; issues: FormulaIssue[] }> {
+  output?: FormulaOutput;
+}): Promise<{
+  value: FormulaCellValue;
+  // Only for a table result, or for each result of the 'table' output
+  table?: FormulaTable;
+  issues: FormulaIssue[];
+}> {
   if (!formula || !formula.startsWith('=')) {
     throw new Error('Formula must start with =');
   }
@@ -288,6 +345,22 @@ export async function executeFormula({
     return { value: null, issues };
   }
 
+  const tableProvider = resolvedProviders.providers.find(provider =>
+    evaluation.tableProviders.has(provider.name.toUpperCase()),
+  );
+  if (tableProvider) {
+    addIssue({
+      severity: 'error',
+      kind: 'provider-table',
+      name: tableProvider.name,
+      message: t(
+        'Provider "{{name}}" gives a table. A provider can give only one value',
+        { name: tableProvider.name },
+      ),
+    });
+    return { value: null, issues };
+  }
+
   if (evaluation.cellError) {
     const provider = findProviderWithError(
       resolvedProviders.providers,
@@ -306,6 +379,26 @@ export async function executeFormula({
       }),
     });
     return { value: null, issues };
+  }
+
+  if (output === 'table') {
+    return {
+      value: evaluation.value,
+      table: evaluation.table ?? [[evaluation.value]],
+      issues,
+    };
+  }
+
+  if (evaluation.table) {
+    addIssue({
+      severity: 'error',
+      kind: 'table-result',
+      name: '',
+      message: t(
+        'The formula gives a table, not one value. Use INDEX to get one cell, for example INDEX(formula, 1, 2)',
+      ),
+    });
+    return { value: null, table: evaluation.table, issues };
   }
 
   return { value: evaluation.value, issues };

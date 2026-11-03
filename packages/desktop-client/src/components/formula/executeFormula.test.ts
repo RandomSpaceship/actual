@@ -3,6 +3,7 @@ import type { FormulaLibraryItemEntity } from '@actual-app/core/types/models';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeFormula } from './executeFormula';
+import type { FormulaOutput } from './executeFormula';
 import { resolveQuery } from './resolveQuery';
 
 vi.mock('@actual-app/core/platform/client/connection', () => ({
@@ -30,13 +31,18 @@ const localQueries = {
   },
 };
 
-function run(formula: string, library: FormulaLibraryItemEntity[] = []) {
+function run(
+  formula: string,
+  library: FormulaLibraryItemEntity[] = [],
+  output?: FormulaOutput,
+) {
   return executeFormula({
     formula,
     resolveQuery: name => resolveQuery(name, { localQueries, library }),
     accounts: [],
     library,
     language: 'en-US',
+    output,
   });
 }
 
@@ -140,5 +146,51 @@ describe('executeFormula', () => {
       issues: [],
     });
     await expect(run('=QUERY_DAYS("a")')).rejects.toThrow('VALUE');
+  });
+
+  it('gives a table for a formula that spills', async () => {
+    expect(await run('={1, 1 / 0; "a", QUERY("a")}', [], 'table')).toEqual({
+      value: null,
+      table: [
+        [1, { error: '#DIV/0!' }],
+        ['a', 123.45],
+      ],
+      issues: [],
+    });
+  });
+
+  it('gives a single value as a table for the table output', async () => {
+    expect(await run('=QUERY("a")', [], 'table')).toEqual({
+      value: 123.45,
+      table: [[123.45]],
+      issues: [],
+    });
+  });
+
+  it('gives an error for a table when the output is one value', async () => {
+    const result = await run('=SEQUENCE(2, 2)');
+
+    expect(result.value).toBeNull();
+    expect(result.issues).toEqual([
+      expect.objectContaining({ severity: 'error', kind: 'table-result' }),
+    ]);
+  });
+
+  it('gives an error for a provider that gives a table', async () => {
+    const result = await run('=SUM(Grid) + Other', [
+      provider('Grid', '=SEQUENCE(2, 2)'),
+      provider('Other', '=1 / 0'),
+    ]);
+
+    expect(result).toEqual({
+      value: null,
+      issues: [
+        expect.objectContaining({
+          kind: 'provider-table',
+          message:
+            'Provider "Grid" gives a table. A provider can give only one value',
+        }),
+      ],
+    });
   });
 });

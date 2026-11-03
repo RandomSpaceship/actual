@@ -23,6 +23,8 @@ export type FormulaIssue = {
     | 'missing-provider'
     | 'provider-cycle'
     | 'provider-error'
+    | 'provider-table'
+    | 'table-result'
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';

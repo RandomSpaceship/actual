@@ -6,7 +6,11 @@ import type { ServerEvents } from '@actual-app/core/types/server-events';
 import { useQuery } from '@tanstack/react-query';
 
 import { executeFormula } from '#components/formula/executeFormula';
-import type { SimpleAccount } from '#components/formula/executeFormula';
+import type {
+  FormulaOutput,
+  FormulaTable,
+  SimpleAccount,
+} from '#components/formula/executeFormula';
 import { resolveQuery } from '#components/formula/resolveQuery';
 import type {
   FormulaIssue,
@@ -41,9 +45,11 @@ export function useFormulaExecution(
   accounts?: SimpleAccount[],
   // Keyed by library item id
   timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>,
+  output: FormulaOutput = 'value',
 ) {
   const [language] = useGlobalPref('language');
   const [result, setResult] = useState<number | string | null>(null);
+  const [table, setTable] = useState<FormulaTable | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<FormulaIssue[]>(NO_ISSUES);
@@ -93,6 +99,7 @@ export function useFormulaExecution(
       // Most cards have no color formula, so this is not worth a log entry
       if (!formula || !formula.startsWith('=')) {
         setResult(null);
+        setTable(null);
         setError('Formula must start with =');
         setIssues(NO_ISSUES);
         setIsLoading(false);
@@ -121,6 +128,7 @@ export function useFormulaExecution(
           namedExpressions: namedExpressionsRef.current,
           library,
           language,
+          output,
         });
 
         if (cancelled) return;
@@ -134,6 +142,7 @@ export function useFormulaExecution(
             ? null
             : (execution.value as number | string | null),
         );
+        setTable(errorMessages.length > 0 ? null : (execution.table ?? null));
         setError(errorMessages.length > 0 ? errorMessages.join('; ') : null);
         setIssues(execution.issues);
       } catch (err) {
@@ -141,6 +150,7 @@ export function useFormulaExecution(
         console.error('Formula execution error:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
         setResult(null);
+        setTable(null);
         setIssues(NO_ISSUES);
       } finally {
         if (!cancelled) {
@@ -164,7 +174,8 @@ export function useFormulaExecution(
     libraryKey,
     timeFrameOverridesKey,
     dataVersion,
+    output,
   ]);
 
-  return { result, isLoading, error, issues };
+  return { result, table, isLoading, error, issues };
 }
