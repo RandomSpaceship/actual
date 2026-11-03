@@ -273,6 +273,7 @@ To see the library queries, turn on **Show library queries** under **Query Defin
 
 - **Edit** opens the library query. A change applies to every card that uses the query.
 - **Copy into card** adds a copy of the query to the card. The copy has the same name, so the card uses its copy and not the library query. Use this to change the query for one card only.
+- **Use a card time frame** gives the card its own time frame for the query. The filters stay the same as in the library. To go back to the time frame of the library query, select **Use the library time frame**.
 
 To move a query from a card to the library, select **Make shared** on the card query. Actual adds the query to the library and removes it from the card. Then select **Save widget**. **Make shared** is not available when the library already has a query with the same name.
 
@@ -294,6 +295,8 @@ Before Actual deletes a query, it shows the cards that use it. After the delete,
 - If two library queries have the same name, formulas use the older query. This can happen when two devices sync. The formula library shows a note on the newer query.
 
 In both cases, the card shows a warning line at the bottom.
+
+A card time frame stays with its library query, also after a rename. If a different library query gets the name later, the card does not use the card time frame, and shows a warning line.
 
 ### Budget queries with `BUDGET_QUERY`
 
