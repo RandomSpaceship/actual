@@ -23,6 +23,15 @@ export function normalizeQueryTimeFrameEnd(dateOrMonth: string) {
     : monthUtils.dayFromDate(dateOrMonth);
 }
 
+// The time frame of a new query: this month, live
+export function newQueryTimeFrame(): TimeFrame {
+  return {
+    start: monthUtils.firstDayOfMonth(monthUtils.currentDay()),
+    end: monthUtils.currentDay(),
+    mode: 'sliding-window',
+  };
+}
+
 export function getTimeFrameModeLabels(t: TFunction) {
   return {
     'sliding-window': t('Live'),

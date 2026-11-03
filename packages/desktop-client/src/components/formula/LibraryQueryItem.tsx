@@ -5,10 +5,16 @@ import { Button } from '@actual-app/components/button';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
+import type {
+  FormulaLibraryQueryEntity,
+  TimeFrame,
+} from '@actual-app/core/types/models';
 
 import { QueryConditionsSummary } from '#components/formula-library/QueryConditionsSummary';
 import { QueryTimeFrameSummary } from '#components/formula-library/QueryTimeFrameSummary';
+
+import { newQueryTimeFrame } from './queryTimeFrame';
+import { QueryTimeFrameControl } from './QueryTimeFrameControl';
 
 type LibraryQueryItemProps = {
   item: FormulaLibraryQueryEntity;
@@ -17,6 +23,11 @@ type LibraryQueryItemProps = {
   onEdit: () => void;
   // Without it, there is no copy button
   onCopyIntoCard?: () => void;
+  // The time frame that this card uses in place of the library one
+  timeFrameOverride?: TimeFrame;
+  // A null time frame removes the override. Without it, the card cannot
+  // set a time frame.
+  onTimeFrameOverrideChange?: (timeFrame: TimeFrame | null) => void;
 };
 
 // A library query in the card editor. It is read-only here: the edit button
@@ -26,8 +37,11 @@ export function LibraryQueryItem({
   isHidden,
   onEdit,
   onCopyIntoCard,
+  timeFrameOverride,
+  onTimeFrameOverrideChange,
 }: LibraryQueryItemProps) {
   const { description, conditions, conditionsOp, timeFrame } = item.data;
+  const isOverridden = Boolean(onTimeFrameOverrideChange && timeFrameOverride);
 
   return (
     <View
@@ -85,10 +99,47 @@ export function LibraryQueryItem({
           conditions={conditions}
           conditionsOp={conditionsOp}
         />
-        <View style={{ flexShrink: 0, textAlign: 'right' }}>
-          <QueryTimeFrameSummary timeFrame={timeFrame} />
-        </View>
+        {!isOverridden && (
+          <View style={{ flexShrink: 0, textAlign: 'right' }}>
+            <QueryTimeFrameSummary timeFrame={timeFrame} />
+          </View>
+        )}
       </View>
+      {onTimeFrameOverrideChange && timeFrameOverride && (
+        <View>
+          <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
+            <Trans>This card uses its own time frame for this query.</Trans>
+          </Text>
+          <QueryTimeFrameControl
+            timeFrame={timeFrameOverride}
+            onChange={onTimeFrameOverrideChange}
+          />
+        </View>
+      )}
+      {onTimeFrameOverrideChange && (
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+          {timeFrameOverride ? (
+            <Button
+              variant="bare"
+              onPress={() => onTimeFrameOverrideChange(null)}
+            >
+              <Trans>Use the library time frame</Trans>
+            </Button>
+          ) : (
+            <Button
+              variant="bare"
+              onPress={() =>
+                onTimeFrameOverrideChange({
+                  ...newQueryTimeFrame(),
+                  ...timeFrame,
+                })
+              }
+            >
+              <Trans>Use a card time frame</Trans>
+            </Button>
+          )}
+        </View>
+      )}
     </View>
   );
 }

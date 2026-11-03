@@ -16,6 +16,7 @@ import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses'
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryQueryEntity,
+  FormulaTimeFrameOverride,
   RuleConditionEntity,
   TimeFrame,
 } from '@actual-app/core/types/models';
@@ -35,6 +36,7 @@ import type { AppDispatch } from '#redux/store';
 
 import { LibraryQueryItem } from './LibraryQueryItem';
 import {
+  newQueryTimeFrame,
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from './queryTimeFrame';
@@ -46,20 +48,22 @@ type QueryConfig = {
   timeFrame?: TimeFrame;
 };
 
-function newQueryTimeFrame(): TimeFrame {
-  return {
-    start: monthUtils.firstDayOfMonth(monthUtils.currentDay()),
-    end: monthUtils.currentDay(),
-    mode: 'sliding-window',
-  };
-}
-
 type QueryManagerProps = {
   queries: Record<string, QueryConfig>;
   onQueriesChange: (queries: Record<string, QueryConfig>) => void;
+  // Keyed by library item id
+  timeFrameOverrides: Record<string, FormulaTimeFrameOverride>;
+  onTimeFrameOverridesChange: (
+    timeFrameOverrides: Record<string, FormulaTimeFrameOverride>,
+  ) => void;
 };
 
-export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
+export function QueryManager({
+  queries,
+  onQueriesChange,
+  timeFrameOverrides,
+  onTimeFrameOverridesChange,
+}: QueryManagerProps) {
   const { t } = useTranslation();
   const [newQueryName, setNewQueryName] = useState('');
   const [isAddingQuery, setIsAddingQuery] = useState(false);
@@ -116,6 +120,12 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
     onQueriesChange(newQueries);
   }
 
+  function findTimeFrameOverride(item: FormulaLibraryQueryEntity) {
+    return Object.hasOwn(timeFrameOverrides, item.id)
+      ? timeFrameOverrides[item.id].timeFrame
+      : undefined;
+  }
+
   function handleCopyIntoCard(item: FormulaLibraryQueryEntity) {
     const { conditions = [], conditionsOp = 'and', timeFrame } = item.data;
     onQueriesChange({
@@ -123,9 +133,27 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
       [item.name]: {
         conditions,
         conditionsOp,
-        timeFrame: { ...newQueryTimeFrame(), ...timeFrame },
+        // The copy keeps the time frame that the card uses now
+        timeFrame: findTimeFrameOverride(item) ?? {
+          ...newQueryTimeFrame(),
+          ...timeFrame,
+        },
       },
     });
+  }
+
+  // A null time frame removes the override
+  function handleTimeFrameOverrideChange(
+    item: FormulaLibraryQueryEntity,
+    timeFrame: TimeFrame | null,
+  ) {
+    const newOverrides = { ...timeFrameOverrides };
+    if (timeFrame) {
+      newOverrides[item.id] = { name: item.name, timeFrame };
+    } else {
+      delete newOverrides[item.id];
+    }
+    onTimeFrameOverridesChange(newOverrides);
   }
 
   async function handleMakeShared(queryName: string) {
@@ -294,6 +322,13 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
                 onCopyIntoCard={
                   findCardQueryName(item.name) === undefined
                     ? () => handleCopyIntoCard(item)
+                    : undefined
+                }
+                timeFrameOverride={findTimeFrameOverride(item)}
+                onTimeFrameOverrideChange={
+                  findCardQueryName(item.name) === undefined
+                    ? timeFrame =>
+                        handleTimeFrameOverrideChange(item, timeFrame)
                     : undefined
                 }
               />

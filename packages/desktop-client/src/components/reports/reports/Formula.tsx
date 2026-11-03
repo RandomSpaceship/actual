@@ -71,6 +71,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const themeColors = useThemeColors();
 
   const [queries, setQueries] = useState(widget?.meta?.queries || {});
+  const [timeFrameOverrides, setTimeFrameOverrides] = useState(
+    widget?.meta?.timeFrameOverrides || {},
+  );
   const {
     data: { list: categories, grouped: categoryGroups } = {
       list: [],
@@ -116,6 +119,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     undefined,
     undefined,
     simpleAccounts,
+    timeFrameOverrides,
   );
 
   const colorVariables = useMemo(
@@ -158,6 +162,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     undefined,
     colorVariables,
     simpleAccounts,
+    timeFrameOverrides,
   );
 
   // For autocomplete and badges: card queries and library queries
@@ -190,6 +195,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           name,
           formula,
           queries,
+          timeFrameOverrides,
           fontSizeMode,
           staticFontSize,
           showTitle,
@@ -220,6 +226,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             ...(widget.meta ?? {}),
             formula,
             queries,
+            timeFrameOverrides,
             fontSizeMode,
             staticFontSize,
             showTitle,
@@ -505,7 +512,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             overflowY: 'auto',
           }}
         >
-          <QueryManager queries={queries} onQueriesChange={setQueries} />
+          <QueryManager
+            queries={queries}
+            onQueriesChange={setQueries}
+            timeFrameOverrides={timeFrameOverrides}
+            onTimeFrameOverridesChange={setTimeFrameOverrides}
+          />
         </View>
       </View>
     </Page>
