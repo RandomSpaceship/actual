@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
+import { useResponsive } from '@actual-app/components/hooks/useResponsive';
 import { SvgDelete } from '@actual-app/components/icons/v0';
 import { Popover } from '@actual-app/components/popover';
 import { Text } from '@actual-app/components/text';
@@ -40,6 +41,7 @@ export function FilterExpression<T extends RuleConditionEntity>({
   onDelete,
 }: FilterExpressionProps<T>) {
   const { t } = useTranslation();
+  const { isNarrowWidth } = useResponsive();
   const [editing, setEditing] = useState(false);
   const triggerRef = useRef(null);
 
@@ -146,7 +148,9 @@ export function FilterExpression<T extends RuleConditionEntity>({
           width: 275,
           padding: 15,
           color: theme.menuItemText,
-          zIndex: '2500 !important',
+          // Narrow screens open autocomplete modals from this popover, so keep it
+          // under them. Elsewhere, keep the default so it shows above a modal.
+          ...(isNarrowWidth && { zIndex: '2500 !important' }),
         }}
         data-testid="filters-menu-tooltip"
       >

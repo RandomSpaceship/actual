@@ -6,6 +6,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
+import { useResponsive } from '@actual-app/components/hooks/useResponsive';
 import { Menu } from '@actual-app/components/menu';
 import { Popover } from '@actual-app/components/popover';
 import { Select } from '@actual-app/components/select';
@@ -609,6 +610,7 @@ export function FilterButton<T extends RuleConditionEntity>({
 }: FilterButtonProps<T>) {
   const { t } = useTranslation();
   const filters = useTransactionFilters();
+  const { isNarrowWidth } = useResponsive();
   const triggerRef = useRef<HTMLDivElement>(null);
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
 
@@ -812,7 +814,9 @@ export function FilterButton<T extends RuleConditionEntity>({
           width: 275,
           padding: 15,
           color: theme.menuItemText,
-          zIndex: '2500 !important',
+          // Narrow screens open autocomplete modals from this popover, so keep it
+          // under them. Elsewhere, keep the default so it shows above a modal.
+          ...(isNarrowWidth && { zIndex: '2500 !important' }),
         }}
         data-testid="filters-menu-tooltip"
       >
