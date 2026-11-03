@@ -493,6 +493,13 @@ export function QueryItem({
         conditionsRef.current = config.conditions;
         conditionsOpRef.current = config.conditionsOp;
         timeRangeRef.current = config.timeFrame.mode;
+        // The filter hook reads the refs only on mount, so give it the new
+        // conditions too. Without this, the filters UI keeps the old ones.
+        filters.onApply({
+          conditions: config.conditions,
+          conditionsOp: config.conditionsOp,
+          id: null,
+        });
 
         setStartDate(
           config.timeFrame.start
