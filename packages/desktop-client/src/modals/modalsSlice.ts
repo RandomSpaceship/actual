@@ -6,6 +6,7 @@ import type {
   BankSyncCredentialSource,
   CategoryEntity,
   CategoryGroupEntity,
+  FormulaLibraryQueryEntity,
   GoCardlessToken,
   NewRuleEntity,
   NewUserEntity,
@@ -604,6 +605,18 @@ export type Modal =
         onCancel?: () => void;
         daysUntilTransaction?: number;
         upcomingDays?: number;
+      };
+    }
+  | {
+      name: 'edit-formula-library-query';
+      options: {
+        item?: FormulaLibraryQueryEntity;
+      };
+    }
+  | {
+      name: 'confirm-formula-library-query-delete';
+      options: {
+        item: FormulaLibraryQueryEntity;
       };
     }
   | {

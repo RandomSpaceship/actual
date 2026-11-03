@@ -29,6 +29,7 @@ import { CommandBar } from './CommandBar';
 import { ContextMenu } from './ContextMenu';
 import { EnableBankingCallback } from './EnableBankingCallback';
 import { FeatureErrorFallback } from './FeatureErrorFallback';
+import { FormulaLibraryPage } from './formula-library/FormulaLibraryPage';
 import { GlobalKeys } from './GlobalKeys';
 import { MobileBankSyncAccountEditPage } from './mobile/banksync/MobileBankSyncAccountEditPage';
 import { MobileNavTabs } from './mobile/MobileNavTabs';
@@ -394,6 +395,14 @@ export function FinancesApp() {
                       }
                     />
                     <Route
+                      path="/formulas"
+                      element={
+                        <SidebarMenuRoute id="formulas">
+                          <FormulaLibraryPage />
+                        </SidebarMenuRoute>
+                      }
+                    />
+                    <Route
                       path="/notifications"
                       element={<NotificationsPage />}
                     />
@@ -457,6 +466,14 @@ export function FinancesApp() {
                             >
                               <NarrowAlternate name="BankSync" />
                             </ErrorBoundary>
+                          </SidebarMenuRoute>
+                        }
+                      />
+                      <Route
+                        path="formulas"
+                        element={
+                          <SidebarMenuRoute id="formulas" isInSettings>
+                            <FormulaLibraryPage />
                           </SidebarMenuRoute>
                         }
                       />

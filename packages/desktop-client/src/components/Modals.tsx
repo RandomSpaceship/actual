@@ -12,6 +12,8 @@ import { closeModal } from '#modals/modalsSlice';
 import { useDispatch } from '#redux';
 
 import { EditSyncAccount } from './banksync/EditSyncAccount';
+import { ConfirmFormulaLibraryQueryDeleteModal } from './formula-library/ConfirmFormulaLibraryQueryDeleteModal';
+import { EditFormulaLibraryQueryModal } from './formula-library/EditFormulaLibraryQueryModal';
 import { AccountAutocompleteModal } from './modals/AccountAutocompleteModal';
 import { AccountGroupsModal } from './modals/AccountGroupsModal';
 import { AccountMenuModal } from './modals/AccountMenuModal';
@@ -186,6 +188,17 @@ export function Modals() {
 
         case 'edit-rule':
           return <EditRuleModal key={key} {...modal.options} />;
+
+        case 'edit-formula-library-query':
+          return <EditFormulaLibraryQueryModal key={key} {...modal.options} />;
+
+        case 'confirm-formula-library-query-delete':
+          return (
+            <ConfirmFormulaLibraryQueryDeleteModal
+              key={key}
+              {...modal.options}
+            />
+          );
 
         case 'merge-unused-payees':
           return <MergeUnusedPayeesModal key={key} {...modal.options} />;
