@@ -11,14 +11,18 @@ import { Input } from '@actual-app/components/input';
 import { Popover } from '@actual-app/components/popover';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
+import { Toggle } from '@actual-app/components/toggle';
 import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
 import { send } from '@actual-app/core/platform/client/connection';
+import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
+  FormulaLibraryQueryEntity,
   RuleConditionEntity,
   TimeFrame,
 } from '@actual-app/core/types/models';
+import { useQuery } from '@tanstack/react-query';
 
 import { AppliedFilters } from '#components/filters/AppliedFilters';
 import { FilterButton } from '#components/filters/FiltersMenu';
@@ -28,13 +32,19 @@ import {
   asMonthSlidingTimeFrame,
   calculateTimeRange,
 } from '#components/reports/reportRanges';
+import {
+  formulaLibraryQueries,
+  useCreateFormulaLibraryItemMutation,
+} from '#formula-library';
 import { useDateFormat } from '#hooks/useDateFormat';
 import { useLanguage } from '#hooks/useLocale';
 import { useRuleConditionFilters } from '#hooks/useRuleConditionFilters';
+import { pushModal } from '#modals/modalsSlice';
 import { addNotification } from '#notifications/notificationsSlice';
 import { useDispatch } from '#redux';
 import type { AppDispatch } from '#redux/store';
 
+import { LibraryQueryItem } from './LibraryQueryItem';
 import {
   getTimeFrameModeLabels,
   normalizeQueryTimeFrameEnd,
@@ -133,6 +143,14 @@ function isPresetTimeRangeMode(
   return !['sliding-window', 'static'].includes(mode);
 }
 
+function newQueryTimeFrame(): TimeFrame {
+  return {
+    start: monthUtils.firstDayOfMonth(monthUtils.currentDay()),
+    end: monthUtils.currentDay(),
+    mode: 'sliding-window',
+  };
+}
+
 type QueryManagerProps = {
   queries: Record<string, QueryConfig>;
   onQueriesChange: (queries: Record<string, QueryConfig>) => void;
@@ -142,7 +160,24 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
   const { t } = useTranslation();
   const [newQueryName, setNewQueryName] = useState('');
   const [isAddingQuery, setIsAddingQuery] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const dispatch = useDispatch();
+  const { data: library = [] } = useQuery(formulaLibraryQueries.list());
+  const createLibraryItem = useCreateFormulaLibraryItemMutation();
+
+  const libraryQueries = library
+    .filter(item => item.type === 'query')
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function findLibraryQuery(name: string) {
+    return libraryQueries.find(item => isSameQueryName(item.name, name));
+  }
+
+  function findCardQueryName(name: string) {
+    return Object.keys(queries).find(queryName =>
+      isSameQueryName(queryName, name),
+    );
+  }
 
   function handleAddQuery() {
     if (!newQueryName.trim()) return;
@@ -164,11 +199,7 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
       [newQueryName]: {
         conditions: [],
         conditionsOp: 'and',
-        timeFrame: {
-          start: monthUtils.firstDayOfMonth(monthUtils.currentDay()),
-          end: monthUtils.currentDay(),
-          mode: 'sliding-window',
-        },
+        timeFrame: newQueryTimeFrame(),
       },
     });
 
@@ -180,6 +211,48 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
     const newQueries = { ...queries };
     delete newQueries[queryName];
     onQueriesChange(newQueries);
+  }
+
+  function handleCopyIntoCard(item: FormulaLibraryQueryEntity) {
+    const { conditions = [], conditionsOp = 'and', timeFrame } = item.data;
+    onQueriesChange({
+      ...queries,
+      [item.name]: {
+        conditions,
+        conditionsOp,
+        timeFrame: { ...newQueryTimeFrame(), ...timeFrame },
+      },
+    });
+  }
+
+  async function handleMakeShared(queryName: string) {
+    const { conditions, conditionsOp, timeFrame } = queries[queryName];
+    await createLibraryItem.mutateAsync({
+      type: 'query',
+      name: queryName,
+      data: { conditions, conditionsOp, timeFrame },
+    });
+    handleRemoveQuery(queryName);
+    setShowLibrary(true);
+    dispatch(
+      addNotification({
+        notification: {
+          type: 'message',
+          message: t(
+            '"{{name}}" is now a library query. Save the widget to remove the card copy.',
+            { name: queryName },
+          ),
+        },
+      }),
+    );
+  }
+
+  function handleEditLibraryQuery(item: FormulaLibraryQueryEntity) {
+    dispatch(
+      pushModal({
+        modal: { name: 'edit-formula-library-query', options: { item } },
+      }),
+    );
   }
 
   function handleUpdateQuery(queryName: string, config: QueryConfig) {
@@ -272,8 +345,56 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
               defaultConfig={config}
               onUpdate={newConfig => handleUpdateQuery(queryName, newConfig)}
               onRemove={() => handleRemoveQuery(queryName)}
+              onMakeShared={
+                findLibraryQuery(queryName)
+                  ? undefined
+                  : () => void handleMakeShared(queryName)
+              }
+              warning={
+                findLibraryQuery(queryName)
+                  ? t('Hides the library query with the same name')
+                  : undefined
+              }
             />
           ))}
+        </View>
+      )}
+
+      {libraryQueries.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <Toggle
+              id="query-manager-show-library"
+              isOn={showLibrary}
+              onToggle={setShowLibrary}
+            />
+            <label htmlFor="query-manager-show-library">
+              <Trans count={libraryQueries.length}>
+                Show library queries ({{ count: libraryQueries.length }})
+              </Trans>
+            </label>
+          </View>
+          {showLibrary &&
+            libraryQueries.map(item => (
+              <LibraryQueryItem
+                key={item.id}
+                item={item}
+                isHidden={findCardQueryName(item.name) !== undefined}
+                onEdit={() => handleEditLibraryQuery(item)}
+                onCopyIntoCard={
+                  findCardQueryName(item.name) === undefined
+                    ? () => handleCopyIntoCard(item)
+                    : undefined
+                }
+              />
+            ))}
         </View>
       )}
     </View>
@@ -289,6 +410,10 @@ type QueryItemProps = {
   onUpdate: (config: QueryConfig) => void;
   // Without it, there is no remove button
   onRemove?: () => void;
+  // Without it, there is no "Make shared" button
+  onMakeShared?: () => void;
+  // A short line under the name
+  warning?: string;
 };
 
 export function QueryItem({
@@ -296,6 +421,8 @@ export function QueryItem({
   defaultConfig,
   onUpdate,
   onRemove,
+  onMakeShared,
+  warning,
 }: QueryItemProps) {
   const language = useLanguage();
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
@@ -641,6 +768,11 @@ export function QueryItem({
           }}
         >
           <View style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
+            {onMakeShared && (
+              <Button variant="bare" onPress={onMakeShared}>
+                <Trans>Make shared</Trans>
+              </Button>
+            )}
             <Button
               variant="bare"
               onPress={handleExport}
@@ -738,6 +870,11 @@ export function QueryItem({
           </View>
         </View>
       </View>
+      {warning && (
+        <Text style={{ color: theme.warningText, fontSize: 12 }}>
+          {warning}
+        </Text>
+      )}
 
       <View style={{ marginBottom: 12 }}>
         <View
