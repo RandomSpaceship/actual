@@ -71,7 +71,9 @@ export function FormulaLibraryRow({
         )}
       </Field>
       <Field width="flex" truncate={false} style={{ padding: '10px 0' }}>
-        <Text style={{ color: theme.pageTextLight }}>{description}</Text>
+        <Text style={{ color: theme.pageTextLight, overflowWrap: 'anywhere' }}>
+          {description}
+        </Text>
       </Field>
       <Field width="flex" truncate={false} style={{ padding: '10px 0' }}>
         {conditions.length === 0 ? (
