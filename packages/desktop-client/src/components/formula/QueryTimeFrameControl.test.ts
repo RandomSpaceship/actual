@@ -7,9 +7,9 @@ import {
   normalizeMonthPickerSelectionForQuery,
   normalizeMonthRangeForPicker,
   shouldIgnoreMonthPickerNoop,
-} from './QueryManager';
+} from './QueryTimeFrameControl';
 
-describe('QueryManager month-only DateRangePicker helpers', () => {
+describe('QueryTimeFrameControl month-only DateRangePicker helpers', () => {
   it('normalizes day-shaped range to month-shaped picker values', () => {
     expect(normalizeMonthRangeForPicker('2026-02-01', '2026-02-17')).toEqual([
       '2026-02',
