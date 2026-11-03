@@ -188,6 +188,68 @@ describe('formula library app', () => {
     expect((await getWidget(shadowedId)).meta?.formula).toBe('=QUERY("food")');
   });
 
+  it('renames the query in the providers that use it', async () => {
+    const id = await app.handlers['formula-library-create']({
+      type: 'query',
+      name: 'food',
+      data: {},
+    });
+    await app.handlers['formula-library-create']({
+      type: 'provider',
+      name: 'Food',
+      data: { formula: '=QUERY("food") * 2 + Food2', description: 'Text' },
+    });
+
+    await app.handlers['formula-library-update']({ id, name: 'groceries' });
+
+    const provider = (await getItems()).find(item => item.type === 'provider');
+    expect(provider?.data).toEqual({
+      formula: '=QUERY("groceries") * 2 + Food2',
+      description: 'Text',
+    });
+  });
+
+  it('renames the provider in the cards it is given and in other providers', async () => {
+    const id = await app.handlers['formula-library-create']({
+      type: 'provider',
+      name: 'Net',
+      data: { formula: '=1' },
+    });
+    await app.handlers['formula-library-create']({
+      type: 'provider',
+      name: 'Yearly',
+      data: { formula: '=net * 12' },
+    });
+    const renamedId = await addFormulaWidget({
+      formula: '=Net + QUERY("Net")',
+      colorFormula: '=IF(Net > 0, "red", "")',
+      // A card query does not hide a provider
+      queries: { Net: {} },
+    });
+    const notCheckedId = await addFormulaWidget({ formula: '=Net' });
+
+    await app.handlers['formula-library-update']({
+      id,
+      name: 'NetIncome',
+      data: { formula: '=2' },
+      renameInWidgetIds: [renamedId],
+    });
+
+    expect(
+      Object.fromEntries(
+        (await getItems()).map(item => [item.name, item.data]),
+      ),
+    ).toEqual({
+      NetIncome: { formula: '=2' },
+      Yearly: { formula: '=NetIncome * 12' },
+    });
+    expect((await getWidget(renamedId)).meta).toMatchObject({
+      formula: '=NetIncome + QUERY("Net")',
+      colorFormula: '=IF(NetIncome > 0, "red", "")',
+    });
+    expect((await getWidget(notCheckedId)).meta?.formula).toBe('=Net');
+  });
+
   it('rejects a rename to a name in use', async () => {
     await app.handlers['formula-library-create']({
       type: 'query',

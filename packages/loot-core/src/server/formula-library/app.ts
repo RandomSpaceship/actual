@@ -7,7 +7,10 @@ import { ValidationError } from '#server/errors';
 import { mutator } from '#server/mutators';
 import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
-import { isValidProviderName } from '#shared/formulas/providerNameUses';
+import {
+  isValidProviderName,
+  renameProviderInFormula,
+} from '#shared/formulas/providerNameUses';
 import {
   isSameQueryName,
   renameQueryInFormula,
@@ -79,7 +82,9 @@ async function createItem({
 
 // A rename changes the formula text of the cards in renameInWidgetIds, in the
 // same batch, so that one undo reverts all of it. A card with a local query
-// that has the old name does not use the library item, so it does not change.
+// that has the old name does not use the library query, so it does not change.
+// The rename also changes every provider that uses the item. An item that an
+// older item with the same name overrides has no uses, so nothing else changes.
 async function updateItem({
   id,
   name,
@@ -89,7 +94,8 @@ async function updateItem({
   Partial<Pick<FormulaLibraryItemEntity, 'name' | 'data'>> & {
     renameInWidgetIds?: string[];
   }): Promise<void> {
-  const item = (await getItems()).find(candidate => candidate.id === id);
+  const items = await getItems();
+  const item = items.find(candidate => candidate.id === id);
   if (!item) {
     throw new ValidationError(`Formula library item ${id} not found`);
   }
@@ -98,6 +104,18 @@ async function updateItem({
   if (isRename) {
     await validateName(item.type, name, id);
   }
+
+  // The oldest item with the name is the one that formulas use
+  const isUsedItem =
+    items.find(
+      candidate =>
+        candidate.type === item.type &&
+        isSameQueryName(candidate.name, item.name),
+    )?.id === id;
+  const rename = (formula: string) =>
+    item.type === 'provider'
+      ? renameProviderInFormula(formula, item.name, name ?? item.name)
+      : renameQueryInFormula(formula, item.name, name ?? item.name);
 
   const widgets =
     isRename && renameInWidgetIds.length > 0
@@ -127,24 +145,43 @@ async function updateItem({
       const localQueryNames = Object.keys(meta?.queries ?? {});
       if (
         !meta ||
-        localQueryNames.some(localName => isSameQueryName(localName, item.name))
+        (item.type === 'query' &&
+          localQueryNames.some(localName =>
+            isSameQueryName(localName, item.name),
+          ))
       ) {
         continue;
       }
-
-      const rename = (formula: string | undefined) =>
-        formula === undefined
-          ? undefined
-          : renameQueryInFormula(formula, item.name, name);
 
       await db.updateWithSchema('dashboard', {
         id: widget.id,
         meta: {
           ...meta,
-          formula: rename(meta.formula),
-          colorFormula: rename(meta.colorFormula),
+          formula:
+            meta.formula === undefined ? undefined : rename(meta.formula),
+          colorFormula:
+            meta.colorFormula === undefined
+              ? undefined
+              : rename(meta.colorFormula),
         },
       });
+    }
+
+    if (!isUsedItem) return;
+
+    for (const provider of items) {
+      if (provider.type !== 'provider') continue;
+      // The item itself has the new name and data already
+      const providerData = provider.id === id && data ? data : provider.data;
+      if (!('formula' in providerData)) continue;
+
+      const formula = rename(providerData.formula);
+      if (formula !== providerData.formula) {
+        await db.updateWithSchema('formula_library', {
+          id: provider.id,
+          data: { ...providerData, formula },
+        });
+      }
     }
   });
 }
