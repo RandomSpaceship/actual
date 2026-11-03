@@ -1,6 +1,7 @@
 import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
 import type {
   FormulaLibraryItemEntity,
+  FormulaTimeFrameOverride,
   RuleConditionEntity,
   TimeFrame,
 } from '@actual-app/core/types/models';
@@ -19,7 +20,8 @@ export type FormulaIssue = {
     | 'missing-account'
     | 'query-failed'
     | 'shadowed'
-    | 'duplicate-name';
+    | 'duplicate-name'
+    | 'stale-override';
   // The query or account name as written in the formula
   name: string;
   message: string;
@@ -44,6 +46,8 @@ export type QueryResolverContext = {
   localQueries: Record<string, FormulaQueryConfig>;
   // Oldest first
   library: FormulaLibraryItemEntity[];
+  // The card's time frames for library queries, keyed by library item id
+  timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>;
 };
 
 // Formula text refers to a query by its name, for example QUERY("food").
@@ -57,11 +61,11 @@ export type QueryResolverContext = {
 // queries the oldest item wins (with a warning), because the order must be
 // the same on every device.
 //
-// Time frame order: the query's own time frame. A dashboard date range
-// (#8996) will go before it, and a card override before that.
+// Time frame order: the card override (library queries only), then the
+// query's own time frame. A dashboard date range (#8996) will go between them.
 export function resolveQuery(
   name: string,
-  { localQueries, library }: QueryResolverContext,
+  { localQueries, library, timeFrameOverrides = {} }: QueryResolverContext,
 ): QueryResolution {
   const localName = Object.hasOwn(localQueries, name)
     ? name
@@ -99,27 +103,53 @@ export function resolveQuery(
   const [libraryItem] = libraryMatches;
   if (libraryItem) {
     const { conditions, conditionsOp, timeFrame } = libraryItem.data;
+    const override = Object.hasOwn(timeFrameOverrides, libraryItem.id)
+      ? timeFrameOverrides[libraryItem.id]
+      : undefined;
+    const issues: FormulaIssue[] = [];
+    if (libraryMatches.length > 1) {
+      issues.push({
+        severity: 'warning',
+        kind: 'duplicate-name',
+        name,
+        message: t(
+          'More than one library query is named "{{name}}". The oldest one is used',
+          { name: libraryItem.name },
+        ),
+      });
+    }
+    // An override made for a library query that no longer has this name
+    // (it was deleted, or an older query with the same name came from sync)
+    if (
+      !override &&
+      Object.entries(timeFrameOverrides).some(
+        ([libraryId, staleOverride]) =>
+          libraryId !== libraryItem.id &&
+          isSameQueryName(staleOverride.name, name),
+      )
+    ) {
+      issues.push({
+        severity: 'warning',
+        kind: 'stale-override',
+        name,
+        message: t(
+          'The card time frame for "{{name}}" is for a different library query',
+          { name: libraryItem.name },
+        ),
+      });
+    }
     return {
       query: {
         name: libraryItem.name,
         source: 'library',
         libraryId: libraryItem.id,
-        config: { conditions, conditionsOp, timeFrame },
+        config: {
+          conditions,
+          conditionsOp,
+          timeFrame: override ? override.timeFrame : timeFrame,
+        },
       },
-      issues:
-        libraryMatches.length > 1
-          ? [
-              {
-                severity: 'warning',
-                kind: 'duplicate-name',
-                name,
-                message: t(
-                  'More than one library query is named "{{name}}". The oldest one is used',
-                  { name: libraryItem.name },
-                ),
-              },
-            ]
-          : [],
+      issues,
     };
   }
 

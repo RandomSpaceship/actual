@@ -459,8 +459,18 @@ export type FormulaWidget = AbstractWidget<
         timeFrame?: TimeFrame;
       }
     >;
+    // Keyed by library item id
+    timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>;
   } | null
 >;
+
+// A card's own time frame for a library query. The name is the library
+// query name when the override was made. It shows when a different library
+// query has that name now.
+export type FormulaTimeFrameOverride = {
+  name: string;
+  timeFrame: TimeFrame;
+};
 
 export type SankeyWidget = AbstractWidget<
   'sankey-card',

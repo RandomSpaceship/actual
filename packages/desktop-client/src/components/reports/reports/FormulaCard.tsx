@@ -62,6 +62,7 @@ export function FormulaCard({
     meta?.queriesVersion,
     undefined,
     simpleAccounts,
+    meta?.timeFrameOverrides,
   );
 
   const colorVariables = useMemo(
@@ -87,6 +88,7 @@ export function FormulaCard({
     meta?.queriesVersion,
     colorVariables,
     simpleAccounts,
+    meta?.timeFrameOverrides,
   );
 
   // Determine the custom color from color formula result

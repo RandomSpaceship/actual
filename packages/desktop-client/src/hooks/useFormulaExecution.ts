@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { listen } from '@actual-app/core/platform/client/connection';
+import type { FormulaTimeFrameOverride } from '@actual-app/core/types/models';
 import type { ServerEvents } from '@actual-app/core/types/server-events';
 import { useQuery } from '@tanstack/react-query';
 
@@ -38,6 +39,8 @@ export function useFormulaExecution(
   queriesVersion?: number,
   namedExpressions?: Record<string, number | string>,
   accounts?: SimpleAccount[],
+  // Keyed by library item id
+  timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>,
 ) {
   const [language] = useGlobalPref('language');
   const [result, setResult] = useState<number | string | null>(null);
@@ -70,6 +73,7 @@ export function useFormulaExecution(
   const namedExpressionsKey = JSON.stringify(namedExpressions ?? null);
   const accountsKey = JSON.stringify(accounts ?? null);
   const libraryKey = JSON.stringify(library ?? null);
+  const timeFrameOverridesKey = JSON.stringify(timeFrameOverrides ?? null);
 
   const queriesRef = useRef(queries);
   queriesRef.current = queries;
@@ -79,6 +83,8 @@ export function useFormulaExecution(
   accountsRef.current = accounts;
   const libraryRef = useRef(library);
   libraryRef.current = library;
+  const timeFrameOverridesRef = useRef(timeFrameOverrides);
+  timeFrameOverridesRef.current = timeFrameOverrides;
 
   useEffect(() => {
     let cancelled = false;
@@ -101,13 +107,15 @@ export function useFormulaExecution(
       }
 
       const localQueries = queriesRef.current ?? {};
+      const timeFrameOverrides = timeFrameOverridesRef.current;
 
       setIsLoading(true);
 
       try {
         const execution = await executeFormula({
           formula,
-          resolveQuery: name => resolveQuery(name, { localQueries, library }),
+          resolveQuery: name =>
+            resolveQuery(name, { localQueries, library, timeFrameOverrides }),
           accounts: accountsRef.current ?? [],
           namedExpressions: namedExpressionsRef.current,
           language,
@@ -152,6 +160,7 @@ export function useFormulaExecution(
     namedExpressionsKey,
     accountsKey,
     libraryKey,
+    timeFrameOverridesKey,
     dataVersion,
   ]);
 

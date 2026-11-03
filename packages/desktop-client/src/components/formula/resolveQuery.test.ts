@@ -122,6 +122,66 @@ describe('resolveQuery', () => {
       ]);
     });
 
+    describe('card time frame overrides', () => {
+      const lastYear = {
+        start: '2025-01-01',
+        end: '2025-12-31',
+        mode: 'lastYear',
+      } as const;
+
+      it('uses the override instead of the library time frame', () => {
+        const { query, issues } = resolveQuery('food', {
+          localQueries: {},
+          library: [libraryFood],
+          timeFrameOverrides: {
+            'library-food': { name: 'Food', timeFrame: lastYear },
+          },
+        });
+
+        expect(query?.config).toEqual({ ...food, timeFrame: lastYear });
+        expect(issues).toEqual([]);
+      });
+
+      it('keeps the override after a rename of the library query', () => {
+        const { query } = resolveQuery('Groceries', {
+          localQueries: {},
+          library: [libraryQuery('library-food', 'Groceries', food)],
+          timeFrameOverrides: {
+            'library-food': { name: 'Food', timeFrame: lastYear },
+          },
+        });
+
+        expect(query?.config.timeFrame).toEqual(lastYear);
+      });
+
+      it('ignores an override for a different library query, with a warning', () => {
+        const { query, issues } = resolveQuery('food', {
+          localQueries: {},
+          library: [libraryFood],
+          timeFrameOverrides: {
+            'deleted-food': { name: 'food', timeFrame: lastYear },
+          },
+        });
+
+        expect(query?.config.timeFrame).toEqual(food.timeFrame);
+        expect(issues).toMatchObject([
+          { severity: 'warning', kind: 'stale-override', name: 'food' },
+        ]);
+      });
+
+      it('does not apply an override to a card query', () => {
+        const { query } = resolveQuery('food', {
+          localQueries: { food },
+          library: [libraryFood],
+          timeFrameOverrides: {
+            'library-food': { name: 'Food', timeFrame: lastYear },
+          },
+        });
+
+        expect(query?.config).toBe(food);
+      });
+    });
+
     it('lists card names, then library names that no card query hides', () => {
       expect(
         listQueryNames({
