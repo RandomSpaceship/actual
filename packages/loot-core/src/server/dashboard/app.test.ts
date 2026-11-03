@@ -1,11 +1,20 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { aqlQuery } from '#server/aql';
 import * as db from '#server/db';
 import { loadMappings } from '#server/db/mappings';
 import { runMutator } from '#server/mutators';
 import { q } from '#shared/query';
-import type { DashboardWidgetEntity } from '#types/models';
+import type {
+  DashboardWidgetEntity,
+  ExportImportDashboard,
+  FormulaLibraryItemEntity,
+  FormulaWidget,
+} from '#types/models';
 
 import { app as dashboardApp, isWidgetType } from './app';
 
@@ -112,5 +121,137 @@ describe('dashboard-update', () => {
     expect((await getTestWidgets(['widget-1']))[0].meta).toEqual({
       content: '## Notes',
     });
+  });
+});
+
+describe('dashboard-import', () => {
+  let importDir: string;
+
+  beforeEach(async () => {
+    await global.emptyDatabase()();
+    await loadMappings();
+    await db.insertWithSchema('dashboard_pages', {
+      id: 'imported-page-id',
+      name: 'Imported',
+    });
+    importDir = mkdtempSync(join(tmpdir(), 'dashboard-import-'));
+  });
+
+  afterEach(() => {
+    rmSync(importDir, { recursive: true, force: true });
+  });
+
+  async function importFile(dashboard: ExportImportDashboard) {
+    const filePath = join(importDir, 'dashboard.json');
+    writeFileSync(filePath, JSON.stringify(dashboard));
+    return runMutator(() =>
+      dashboardApp.handlers['dashboard-import']({
+        filePath,
+        dashboardPageId: 'imported-page-id',
+      }),
+    );
+  }
+
+  async function getLibrary() {
+    const { data } = await aqlQuery(q('formula_library').select('*'));
+    return data as FormulaLibraryItemEntity[];
+  }
+
+  async function getImportedWidgets() {
+    const { data } = await aqlQuery(
+      q('dashboard')
+        .filter({ dashboard_page_id: 'imported-page-id' })
+        .select('*'),
+    );
+    return data as FormulaWidget[];
+  }
+
+  const january = {
+    start: '2024-01-01',
+    end: '2024-01-31',
+    mode: 'static' as const,
+  };
+  const february = {
+    start: '2024-02-01',
+    end: '2024-02-29',
+    mode: 'static' as const,
+  };
+
+  function formulaCard(formula: string, meta: FormulaWidget['meta'] = {}) {
+    return {
+      type: 'formula-card' as const,
+      dashboard_page_id: 'exported-page-id',
+      x: 0,
+      y: 0,
+      width: 4,
+      height: 2,
+      meta: { ...meta, formula },
+    };
+  }
+
+  it('imports the library queries that the formula cards use', async () => {
+    await db.insertWithSchema('formula_library', {
+      id: 'local-food-id',
+      type: 'query',
+      name: 'Food',
+      data: { timeFrame: february },
+      created_at: 1,
+    });
+
+    await importFile({
+      version: 1,
+      widgets: [
+        formulaCard('=QUERY("Rent")', {
+          timeFrameOverrides: {
+            'exported-rent-id': { name: 'Rent', timeFrame: february },
+          },
+        }),
+        formulaCard('=QUERY("Food")'),
+      ],
+      formulaLibrary: [
+        {
+          id: 'exported-rent-id',
+          type: 'query',
+          name: 'Rent',
+          data: { timeFrame: january },
+        },
+        {
+          id: 'exported-food-id',
+          type: 'query',
+          name: 'Food',
+          data: { timeFrame: january },
+        },
+      ],
+    });
+
+    const library = await getLibrary();
+    const rent = library.find(({ name }) => name === 'Rent');
+    expect(library.map(({ name }) => name).sort()).toEqual(['Food', 'Rent']);
+    expect(rent?.id).not.toBe('exported-rent-id');
+    expect(rent?.data).toEqual({ timeFrame: january });
+
+    const widgets = await getImportedWidgets();
+    const rentCard = widgets.find(({ meta }) =>
+      meta?.formula?.includes('Rent'),
+    );
+    const foodCard = widgets.find(({ meta }) =>
+      meta?.formula?.includes('Food'),
+    );
+    expect(rentCard?.meta?.timeFrameOverrides).toEqual({
+      [rent?.id ?? '']: { name: 'Rent', timeFrame: february },
+    });
+    expect(foodCard?.meta?.queries).toEqual({
+      Food: { conditions: [], conditionsOp: 'and', timeFrame: january },
+    });
+  });
+
+  it('rejects a formula library item without a name', async () => {
+    await expect(
+      importFile({
+        version: 1,
+        widgets: [],
+        formulaLibrary: [{ id: 'item-id', type: 'query', name: ' ', data: {} }],
+      }),
+    ).rejects.toThrow('formulaLibrary.0.name');
   });
 });

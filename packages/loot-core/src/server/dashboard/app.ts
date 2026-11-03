@@ -13,12 +13,14 @@ import { reportModel } from '#server/reports/app';
 import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
 import { DEFAULT_DASHBOARD_STATE } from '#shared/dashboard';
+import { planFormulaLibraryImport } from '#shared/formulas/dashboardFormulaLibrary';
 import { q } from '#shared/query';
 import type {
   DashboardWidgetEntity,
   ExportImportCustomReportWidget,
   ExportImportDashboard,
   ExportImportDashboardWidget,
+  FormulaLibraryItemEntity,
 } from '#types/models';
 import type { EverythingButIdOptional, WithOptional } from '#types/util';
 
@@ -101,6 +103,41 @@ const exportModel = {
 
       if (isExportedCustomReportWidget(widget)) {
         reportModel.validate(widget.meta);
+      }
+    });
+
+    if (dashboard.formulaLibrary === undefined) return;
+
+    if (!Array.isArray(dashboard.formulaLibrary)) {
+      throw new ValidationError(
+        'Invalid dashboard.formulaLibrary data type: it must be an array of formula library items.',
+      );
+    }
+
+    dashboard.formulaLibrary.forEach((item, idx) => {
+      requiredFields(`Formula library item #${idx}`, item, [
+        'id',
+        'type',
+        'name',
+        'data',
+      ]);
+
+      if (item.type !== 'query') {
+        throw new ValidationError(
+          `Invalid formulaLibrary.${idx}.type value ${String(item.type)}.`,
+        );
+      }
+
+      if (typeof item.name !== 'string' || item.name.trim() === '') {
+        throw new ValidationError(
+          `Invalid formulaLibrary.${idx}.name value ${String(item.name)}.`,
+        );
+      }
+
+      if (typeof item.data !== 'object' || item.data === null) {
+        throw new ValidationError(
+          `Invalid formulaLibrary.${idx}.data data-type.`,
+        );
       }
     });
   },
@@ -288,13 +325,35 @@ async function importDashboard({
       [dashboardPageId],
     );
 
+    const { data: formulaLibrary } = await aqlQuery(
+      q('formula_library').select('*'),
+    );
+    const formulaLibraryPlan = planFormulaLibraryImport(
+      parsedContent.widgets,
+      parsedContent.formulaLibrary ?? [],
+      formulaLibrary as FormulaLibraryItemEntity[],
+      uuidv4,
+    );
+    const createdAt = Date.now();
+
     await batchMessages(async () => {
       await Promise.all([
         // Delete all widgets
         ...existingWidgets.map(({ id }) => db.delete_('dashboard', id)),
 
+        // Insert new formula library items
+        ...formulaLibraryPlan.itemsToCreate.map(({ id, type, name, data }) =>
+          db.insertWithSchema('formula_library', {
+            id,
+            type,
+            name,
+            data,
+            created_at: createdAt,
+          }),
+        ),
+
         // Insert new widgets
-        ...parsedContent.widgets.map(widget =>
+        ...formulaLibraryPlan.widgets.map(widget =>
           db.insertWithSchema('dashboard', {
             type: widget.type,
             width: widget.width,
