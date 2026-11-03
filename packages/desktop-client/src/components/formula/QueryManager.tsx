@@ -12,7 +12,10 @@ import { theme } from '@actual-app/components/theme';
 import { Toggle } from '@actual-app/components/toggle';
 import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
-import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
+import {
+  findQueryNameReferences,
+  isSameQueryName,
+} from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryQueryEntity,
@@ -56,6 +59,8 @@ type QueryManagerProps = {
   onTimeFrameOverridesChange: (
     timeFrameOverrides: Record<string, FormulaTimeFrameOverride>,
   ) => void;
+  // The card formulas. Only the formulas when the editor opens are used
+  formulas: string[];
 };
 
 export function QueryManager({
@@ -63,11 +68,14 @@ export function QueryManager({
   onQueriesChange,
   timeFrameOverrides,
   onTimeFrameOverridesChange,
+  formulas,
 }: QueryManagerProps) {
   const { t } = useTranslation();
   const [newQueryName, setNewQueryName] = useState('');
   const [isAddingQuery, setIsAddingQuery] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
+  // Null until the user changes the toggle
+  const [showLibrary, setShowLibrary] = useState<boolean | null>(null);
+  const [openingFormulas] = useState(formulas);
   const dispatch = useDispatch();
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
   const createLibraryItem = useCreateFormulaLibraryItemMutation();
@@ -85,6 +93,17 @@ export function QueryManager({
       isSameQueryName(queryName, name),
     );
   }
+
+  // The library queries show at the start if the formulas use one of them
+  const isLibraryShown =
+    showLibrary ??
+    openingFormulas
+      .flatMap(formula => findQueryNameReferences(formula))
+      .some(
+        ({ name }) =>
+          findLibraryQuery(name) !== undefined &&
+          findCardQueryName(name) === undefined,
+      );
 
   function handleAddQuery() {
     if (!newQueryName.trim()) return;
@@ -303,7 +322,7 @@ export function QueryManager({
           >
             <Toggle
               id="query-manager-show-library"
-              isOn={showLibrary}
+              isOn={isLibraryShown}
               onToggle={setShowLibrary}
             />
             <label htmlFor="query-manager-show-library">
@@ -312,7 +331,7 @@ export function QueryManager({
               </Trans>
             </label>
           </View>
-          {showLibrary &&
+          {isLibraryShown &&
             libraryQueries.map(item => (
               <LibraryQueryItem
                 key={item.id}

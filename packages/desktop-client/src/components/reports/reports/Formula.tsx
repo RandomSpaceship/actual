@@ -517,6 +517,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             onQueriesChange={setQueries}
             timeFrameOverrides={timeFrameOverrides}
             onTimeFrameOverridesChange={setTimeFrameOverrides}
+            formulas={[formula, colorFormula]}
           />
         </View>
       </View>
