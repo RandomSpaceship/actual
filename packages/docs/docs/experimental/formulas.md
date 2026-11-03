@@ -299,6 +299,16 @@ In both cases, the card shows a warning line at the bottom.
 
 A card time frame stays with its library query, also after a rename. If a different library query gets the name later, the card does not use the card time frame, and shows a warning line.
 
+#### Export and Import a Dashboard
+
+When you export a dashboard, the file also holds the library queries that its formula cards use. When you import the file, Actual does one of these for each library query in the file:
+
+- If your formula library has a query with the same name, filters, and time frame, the cards use your query.
+- If your formula library has a different query with the same name, each card that uses the name gets a copy of the query from the file. The card query has priority over the library query, so the card shows the same result as before the export.
+- If your formula library has no query with the name, Actual adds the query to your formula library.
+
+The import does not change or delete the queries that are already in your formula library. A card time frame for a library query stays with its query.
+
 ### Budget queries with `BUDGET_QUERY`
 
 `BUDGET_QUERY` reads directly from your **envelope budget** (budgeted amounts, spending, balances, and goals) for a fixed set of categories over a month range.
