@@ -265,6 +265,17 @@ To add a query to the library:
 
 The **Used by** column shows how many cards use each query. Select it to see the cards and their formulas.
 
+#### Use Library Queries in the Card Editor
+
+In the formula editor, the formula autocomplete shows the library queries together with the queries of the card.
+
+To see the library queries, turn on **Show library queries** under **Query Definitions**. Each library query has these buttons:
+
+- **Edit** opens the library query. A change applies to every card that uses the query.
+- **Copy into card** adds a copy of the query to the card. The copy has the same name, so the card uses its copy and not the library query. Use this to change the query for one card only.
+
+To move a query from a card to the library, select **Make shared** on the card query. Actual adds the query to the library and removes it from the card. Then select **Save widget**. **Make shared** is not available when the library already has a query with the same name.
+
 #### Rename a Library Query
 
 When you rename a query that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the query name in the formulas of the selected cards. A card that you clear keeps the old name, and shows an error until you change its formula or add a query with the old name.
