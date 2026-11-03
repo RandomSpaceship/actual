@@ -1,7 +1,7 @@
 import type { FormulaLibraryItemEntity } from '@actual-app/core/types/models';
 import { describe, expect, it } from 'vitest';
 
-import { resolveProviders } from './resolveProviders';
+import { listProviderNames, resolveProviders } from './resolveProviders';
 
 function provider(
   id: string,
@@ -98,5 +98,18 @@ describe('resolveProviders', () => {
     expect(result.issues).toEqual([
       expect.objectContaining({ severity: 'warning', kind: 'duplicate-name' }),
     ]);
+  });
+});
+
+describe('listProviderNames', () => {
+  it('lists each provider name once, with the oldest formula', () => {
+    expect(
+      listProviderNames([
+        provider('old', 'Total', '=1'),
+        provider('new', 'TOTAL', '=2'),
+        provider('net', 'Net', '=3'),
+        { id: 'q', type: 'query', name: 'food', data: {}, created_at: 0 },
+      ]),
+    ).toEqual({ Total: '=1', Net: '=3' });
   });
 });

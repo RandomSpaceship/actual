@@ -34,6 +34,8 @@ type FormulaEditorProps = {
   disabled?: boolean;
   queries?: Record<string, unknown>;
   variables?: Record<string, number | string>;
+  // Keyed by name. The value is the provider formula
+  providers?: Record<string, string>;
   categoryBadges?: Record<string, string>;
   singleLine?: boolean;
   showLineNumbers?: boolean;
@@ -68,6 +70,7 @@ export function FormulaEditor({
   disabled = false,
   queries,
   variables,
+  providers,
   categoryBadges,
   singleLine = false,
   showLineNumbers = true,
@@ -305,6 +308,7 @@ export function FormulaEditor({
         variables,
         openBadgePicker,
         categoryBadges,
+        providers,
       ),
       EditorView.lineWrapping,
       EditorView.editable.of(!disabled),
@@ -320,6 +324,7 @@ export function FormulaEditor({
       variables,
       categoryBadges,
       openBadgePicker,
+      providers,
     ],
   );
 

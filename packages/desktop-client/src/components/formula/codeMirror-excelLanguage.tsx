@@ -54,6 +54,7 @@ import {
   getFunctionCompletions,
   getFunctionSignatureCompletionSection,
   getNamedVariableCompletions,
+  getProviderCompletions,
   getRuleFieldCompletions,
   sortFormulaCompletions,
 } from './formulaCatalog';
@@ -601,8 +602,12 @@ export function excelFormulaAutocomplete(
   queries?: Record<string, unknown>,
   variables?: Record<string, number | string>,
   categoryBadges?: Record<string, string>,
+  // Keyed by name. The value is the provider formula
+  providers?: Record<string, string>,
 ): Extension {
   const functionCompletions = getFunctionCompletions(mode);
+  const providerCompletions =
+    mode === 'query' ? getProviderCompletions(providers) : [];
   const queryCompletions =
     mode === 'query' ? getDynamicReportQueryCompletions(queries) : [];
   const variableCompletions = getNamedVariableCompletions(variables);
@@ -656,6 +661,7 @@ export function excelFormulaAutocomplete(
 
         const baseSuggestions: Completion[] = [
           ...variableCompletions,
+          ...providerCompletions,
           ...budgetDimensionCompletions,
           ...budgetCategoryCompletions,
           ...queryCompletions,
@@ -1176,10 +1182,17 @@ export function excelFormulaExtension(
   variables?: Record<string, number | string>,
   onBadgeClick?: (details: FormulaBadgeClick) => void,
   categoryBadges?: Record<string, string>,
+  providers?: Record<string, string>,
 ): Extension[] {
   return [
     excelFormulaLanguage,
-    excelFormulaAutocomplete(mode, queries, variables, categoryBadges),
+    excelFormulaAutocomplete(
+      mode,
+      queries,
+      variables,
+      categoryBadges,
+      providers,
+    ),
     excelFormulaHover(mode),
     formulaBadgeExtension(
       mode,

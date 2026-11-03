@@ -27,7 +27,10 @@ import {
 } from '#components/common/Modal';
 import { FormField, FormLabel } from '#components/forms';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
-import { resolveProviders } from '#components/formula/resolveProviders';
+import {
+  listProviderNames,
+  resolveProviders,
+} from '#components/formula/resolveProviders';
 import { listQueryNames } from '#components/formula/resolveQuery';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import {
@@ -289,6 +292,11 @@ export function EditFormulaLibraryProviderModal({
                       onChange={setFormula}
                       mode="query"
                       queries={listQueryNames({ localQueries: {}, library })}
+                      providers={listProviderNames(
+                        library.filter(
+                          libraryItem => libraryItem.id !== item?.id,
+                        ),
+                      )}
                       singleLine={false}
                       showLineNumbers
                     />

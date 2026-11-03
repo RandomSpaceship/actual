@@ -101,3 +101,21 @@ export function resolveProviders(
 
   return { providers: [...providers.values()], issues };
 }
+
+// The provider names for autocomplete, with the formula of each. For
+// providers with the same name, only the oldest is in the list.
+export function listProviderNames(
+  // Oldest first
+  library: FormulaLibraryItemEntity[],
+): Record<string, string> {
+  const providers: Record<string, string> = {};
+  for (const item of library) {
+    if (
+      item.type === 'provider' &&
+      !Object.keys(providers).some(name => isSameProviderName(name, item.name))
+    ) {
+      providers[item.name] = item.data.formula;
+    }
+  }
+  return providers;
+}

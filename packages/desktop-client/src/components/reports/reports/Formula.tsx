@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
+import { listProviderNames } from '#components/formula/resolveProviders';
 import { listQueryNames } from '#components/formula/resolveQuery';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
 import { MobilePageHeader, Page, PageHeader } from '#components/Page';
@@ -170,6 +171,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     () => listQueryNames({ localQueries: queries, library }),
     [queries, library],
   );
+  const providerNames = useMemo(() => listProviderNames(library), [library]);
 
   const updateDashboardWidgetMutation = useUpdateDashboardWidgetMutation();
 
@@ -397,6 +399,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 onChange={setFormula}
                 mode="query"
                 queries={queryNames}
+                providers={providerNames}
                 categoryBadges={categoryBadges}
                 singleLine={false}
                 showLineNumbers
@@ -485,6 +488,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   onChange={setColorFormula}
                   mode="query"
                   queries={queryNames}
+                  providers={providerNames}
                   categoryBadges={categoryBadges}
                   singleLine
                   showLineNumbers={false}

@@ -81,6 +81,10 @@ function getVariableCompletionSection(): string {
   return `🔢 ${t('Variables')}`;
 }
 
+function getProviderCompletionSection(): string {
+  return `🧩 ${t('Providers')}`;
+}
+
 export function getFunctionSignatureCompletionSection(): string {
   return `ℹ️ ${t('Function Signature')}`;
 }
@@ -103,6 +107,7 @@ function getFormulaCompletionSectionOrder(): Record<string, number> {
   return {
     [getFunctionSignatureCompletionSection()]: -2,
     [getVariableCompletionSection()]: -1,
+    [getProviderCompletionSection()]: -0.5,
     [categoryConfig.query.section]: categoryConfig.query.order,
     [categoryConfig.math.section]: categoryConfig.math.order,
     [categoryConfig.logical.section]: categoryConfig.logical.order,
@@ -1589,6 +1594,25 @@ export function getNamedVariableCompletions(
       value: String(value),
     }),
     boost: 20,
+  }));
+}
+
+// The library providers, keyed by name. The value is the provider formula
+export function getProviderCompletions(
+  providers?: Record<string, string>,
+): Completion[] {
+  if (!providers) {
+    return [];
+  }
+
+  const providerSection = getProviderCompletionSection();
+
+  return Object.entries(providers).map(([providerName, formula]) => ({
+    label: providerName,
+    type: 'variable',
+    section: providerSection,
+    info: t('Provider: {{formula}}', { formula }),
+    boost: 19,
   }));
 }
 
