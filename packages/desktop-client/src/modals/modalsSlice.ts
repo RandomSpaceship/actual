@@ -6,6 +6,8 @@ import type {
   BankSyncCredentialSource,
   CategoryEntity,
   CategoryGroupEntity,
+  FormulaLibraryItemEntity,
+  FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
   GoCardlessToken,
   NewRuleEntity,
@@ -614,9 +616,15 @@ export type Modal =
       };
     }
   | {
-      name: 'confirm-formula-library-query-delete';
+      name: 'edit-formula-library-provider';
       options: {
-        item: FormulaLibraryQueryEntity;
+        item?: FormulaLibraryProviderEntity;
+      };
+    }
+  | {
+      name: 'confirm-formula-library-item-delete';
+      options: {
+        item: FormulaLibraryItemEntity;
       };
     }
   | {

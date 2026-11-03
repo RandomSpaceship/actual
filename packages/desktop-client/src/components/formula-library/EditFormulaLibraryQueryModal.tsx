@@ -72,7 +72,9 @@ export function EditFormulaLibraryQueryModal({
   );
 
   const trimmedName = name.trim();
-  const uses = item ? findUses(item) : [];
+  const { cards: uses, providers: providerUses } = item
+    ? findUses(item)
+    : { cards: [], providers: [] };
   const isRename = item !== undefined && trimmedName !== item.name;
 
   function validateName() {
@@ -116,7 +118,7 @@ export function EditFormulaLibraryQueryModal({
     setNameError(error);
     if (error) return;
 
-    if (isRename && uses.length > 0) {
+    if (isRename && uses.length + providerUses.length > 0) {
       setRenameWidgetIds(new Set(uses.map(use => use.widgetId)));
       return;
     }
@@ -142,8 +144,17 @@ export function EditFormulaLibraryQueryModal({
                   name.
                 </Trans>
               </Paragraph>
+              {providerUses.length > 0 && (
+                <Paragraph>
+                  <Trans count={providerUses.length}>
+                    {{ count: providerUses.length }} providers use the query.
+                    They change too.
+                  </Trans>
+                </Paragraph>
+              )}
               <FormulaQueryUsesList
                 uses={uses}
+                providers={providerUses}
                 checkedWidgetIds={renameWidgetIds}
                 onCheckedChange={(widgetId, checked) => {
                   const next = new Set(renameWidgetIds);

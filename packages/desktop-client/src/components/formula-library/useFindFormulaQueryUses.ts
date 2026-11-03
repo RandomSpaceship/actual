@@ -1,4 +1,4 @@
-import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
+import type { FormulaLibraryItemEntity } from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
 
 import { formulaLibraryQueries } from '#formula-library';
@@ -6,9 +6,11 @@ import { dashboardQueries } from '#reports';
 
 import {
   findFormulaQueryUses,
-  isOverriddenLibraryQuery,
+  findProviderUses,
+  isOverriddenLibraryItem,
 } from './formulaQueryUses';
 
+// The cards and the providers that use a library item
 export function useFindFormulaQueryUses() {
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
   const { data: widgets = [] } = useQuery(
@@ -18,8 +20,11 @@ export function useFindFormulaQueryUses() {
     dashboardQueries.listDashboardPages(),
   );
 
-  return (item: FormulaLibraryQueryEntity) =>
-    isOverriddenLibraryQuery(item, library)
-      ? []
-      : findFormulaQueryUses(item.name, widgets, dashboardPages);
+  return (item: FormulaLibraryItemEntity) =>
+    isOverriddenLibraryItem(item, library)
+      ? { cards: [], providers: [] }
+      : {
+          cards: findFormulaQueryUses(item, widgets, dashboardPages),
+          providers: findProviderUses(item, library),
+        };
 }

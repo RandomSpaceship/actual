@@ -1,25 +1,25 @@
 import React from 'react';
-import { Dialog, DialogTrigger } from 'react-aria-components';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
 import { SvgTrash } from '@actual-app/components/icons/v1';
-import { Popover } from '@actual-app/components/popover';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
-import { View } from '@actual-app/components/view';
-import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
+import type {
+  FormulaLibraryProviderEntity,
+  FormulaLibraryQueryEntity,
+} from '@actual-app/core/types/models';
 
 import { Cell, Field, Row } from '#components/table';
 
+import { FormulaLibraryUsesCell } from './FormulaLibraryUsesCell';
 import type { FormulaQueryUse } from './formulaQueryUses';
-import { FormulaQueryUsesList } from './FormulaQueryUsesList';
 import { QueryConditionsSummary } from './QueryConditionsSummary';
 import { QueryTimeFrameSummary } from './QueryTimeFrameSummary';
 
 type FormulaLibraryRowProps = {
   item: FormulaLibraryQueryEntity;
-  uses: FormulaQueryUse[];
+  uses: { cards: FormulaQueryUse[]; providers: FormulaLibraryProviderEntity[] };
   // Set when an older item has the same name
   isOverridden: boolean;
   onEdit: (item: FormulaLibraryQueryEntity) => void;
@@ -71,28 +71,7 @@ export function FormulaLibraryRow({
       <Field width={180} truncate={false} style={{ padding: '10px 0' }}>
         <QueryTimeFrameSummary timeFrame={timeFrame} />
       </Field>
-      <Cell width={100} plain style={{ padding: '10px 5px' }}>
-        {uses.length === 0 ? (
-          <Text style={{ color: theme.pageTextSubdued }}>
-            <Trans>Not used</Trans>
-          </Text>
-        ) : (
-          <DialogTrigger>
-            <Button variant="bare">
-              <Trans count={uses.length}>{{ count: uses.length }} cards</Trans>
-            </Button>
-            <Popover placement="bottom end">
-              <Dialog
-                aria-label={t('Cards that use {{name}}', { name: item.name })}
-              >
-                <View style={{ padding: 15, width: 400 }}>
-                  <FormulaQueryUsesList uses={uses} />
-                </View>
-              </Dialog>
-            </Popover>
-          </DialogTrigger>
-        )}
-      </Cell>
+      <FormulaLibraryUsesCell name={item.name} uses={uses} />
       <Cell width={40} plain style={{ padding: '10px 5px' }}>
         <Button
           variant="bare"

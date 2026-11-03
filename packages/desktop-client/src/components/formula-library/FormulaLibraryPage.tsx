@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router';
 
@@ -8,7 +9,11 @@ import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import { getNormalisedString } from '@actual-app/core/shared/normalisation';
-import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
+import type {
+  FormulaLibraryItemEntity,
+  FormulaLibraryProviderEntity,
+  FormulaLibraryQueryEntity,
+} from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
 
 import { Search } from '#components/common/Search';
@@ -18,8 +23,9 @@ import { useFeatureFlag } from '#hooks/useFeatureFlag';
 import { pushModal } from '#modals/modalsSlice';
 import { useDispatch } from '#redux';
 
+import { FormulaLibraryProviderRow } from './FormulaLibraryProviderRow';
 import { FormulaLibraryRow } from './FormulaLibraryRow';
-import { isOverriddenLibraryQuery } from './formulaQueryUses';
+import { isOverriddenLibraryItem } from './formulaQueryUses';
 import { useFindFormulaQueryUses } from './useFindFormulaQueryUses';
 
 export function FormulaLibraryPage() {
@@ -30,21 +36,34 @@ export function FormulaLibraryPage() {
   const findUses = useFindFormulaQueryUses();
   const formulaMode = useFeatureFlag('formulaMode');
 
-  const queries = library.filter(item => item.type === 'query');
-
   const normalisedFilter = getNormalisedString(filter);
-  const filteredQueries = queries
-    .filter(
-      item =>
-        normalisedFilter === '' ||
-        getNormalisedString(item.name).includes(normalisedFilter) ||
-        getNormalisedString(item.data.description ?? '').includes(
-          normalisedFilter,
-        ),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
+  function filterAndSort<Item extends FormulaLibraryItemEntity>(
+    items: Item[],
+    getFilterText: (item: Item) => string[],
+  ) {
+    return items
+      .filter(
+        item =>
+          normalisedFilter === '' ||
+          [item.name, item.data.description ?? '', ...getFilterText(item)].some(
+            text => getNormalisedString(text).includes(normalisedFilter),
+          ),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
 
-  function onEdit(item?: FormulaLibraryQueryEntity) {
+  const queries = library.filter(
+    (item): item is FormulaLibraryQueryEntity => item.type === 'query',
+  );
+  const providers = library.filter(
+    (item): item is FormulaLibraryProviderEntity => item.type === 'provider',
+  );
+  const filteredQueries = filterAndSort(queries, () => []);
+  const filteredProviders = filterAndSort(providers, item => [
+    item.data.formula,
+  ]);
+
+  function onEditQuery(item?: FormulaLibraryQueryEntity) {
     dispatch(
       pushModal({
         modal: { name: 'edit-formula-library-query', options: { item } },
@@ -52,11 +71,19 @@ export function FormulaLibraryPage() {
     );
   }
 
-  function onDelete(item: FormulaLibraryQueryEntity) {
+  function onEditProvider(item?: FormulaLibraryProviderEntity) {
+    dispatch(
+      pushModal({
+        modal: { name: 'edit-formula-library-provider', options: { item } },
+      }),
+    );
+  }
+
+  function onDelete(item: FormulaLibraryItemEntity) {
     dispatch(
       pushModal({
         modal: {
-          name: 'confirm-formula-library-query-delete',
+          name: 'confirm-formula-library-item-delete',
           options: { item },
         },
       }),
@@ -80,52 +107,122 @@ export function FormulaLibraryPage() {
       >
         <Text style={{ color: theme.pageTextLight, flex: 1 }}>
           <Trans>
-            Queries that every formula card can use, for example
-            QUERY("groceries"). A query on a card wins over a library query with
-            the same name.
+            Queries and providers that every formula card can use. A card uses a
+            query by its name in quotes, for example QUERY("groceries"). A query
+            on a card wins over a library query with the same name. A provider
+            is a named formula. A card uses a provider by its name without
+            quotes, for example =NetIncome / 12.
           </Trans>
         </Text>
         <Search
-          placeholder={t('Filter queries...')}
+          placeholder={t('Filter queries and providers...')}
           value={filter}
           onChange={setFilter}
         />
       </View>
+
+      <LibrarySection
+        title={t('Queries')}
+        header={
+          <>
+            <Cell value={t('Filters')} width="flex" />
+            <Cell value={t('Time frame')} width={180} />
+          </>
+        }
+        emptyText={
+          queries.length === 0 ? (
+            <Trans>No library queries</Trans>
+          ) : (
+            <Trans>No queries match the filter</Trans>
+          )
+        }
+        createText={<Trans>Create new query</Trans>}
+        onCreate={() => onEditQuery()}
+      >
+        {filteredQueries.map(item => (
+          <FormulaLibraryRow
+            key={item.id}
+            item={item}
+            uses={findUses(item)}
+            isOverridden={isOverriddenLibraryItem(item, library)}
+            onEdit={onEditQuery}
+            onDelete={onDelete}
+          />
+        ))}
+      </LibrarySection>
+
+      <LibrarySection
+        title={t('Providers')}
+        header={<Cell value={t('Formula')} width="flex" />}
+        emptyText={
+          providers.length === 0 ? (
+            <Trans>No providers</Trans>
+          ) : (
+            <Trans>No providers match the filter</Trans>
+          )
+        }
+        createText={<Trans>Create new provider</Trans>}
+        onCreate={() => onEditProvider()}
+      >
+        {filteredProviders.map(item => (
+          <FormulaLibraryProviderRow
+            key={item.id}
+            item={item}
+            uses={findUses(item)}
+            isOverridden={isOverriddenLibraryItem(item, library)}
+            onEdit={onEditProvider}
+            onDelete={onDelete}
+          />
+        ))}
+      </LibrarySection>
+    </View>
+  );
+}
+
+type LibrarySectionProps = {
+  title: string;
+  // The columns between Description and Used by
+  header: ReactNode;
+  emptyText: ReactNode;
+  createText: ReactNode;
+  onCreate: () => void;
+  children: ReactNode[];
+};
+
+function LibrarySection({
+  title,
+  header,
+  emptyText,
+  createText,
+  onCreate,
+  children,
+}: LibrarySectionProps) {
+  const { t } = useTranslation();
+
+  return (
+    <View>
+      <Text style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>
+        {title}
+      </Text>
       <View style={styles.tableContainer}>
         <TableHeader>
           <Cell value={t('Name')} width={200} />
           <Cell value={t('Description')} width="flex" />
-          <Cell value={t('Filters')} width="flex" />
-          <Cell value={t('Time frame')} width={180} />
+          {header}
           <Cell value={t('Used by')} width={100} />
           <Cell value="" width={40} />
         </TableHeader>
-        {filteredQueries.length === 0 ? (
+        {children.length === 0 ? (
           <View
             style={{
               background: theme.tableBackground,
               fontStyle: 'italic',
             }}
           >
-            <Text style={{ margin: 'auto', padding: '20px' }}>
-              {queries.length === 0 ? (
-                <Trans>No library queries</Trans>
-              ) : (
-                <Trans>No queries match the filter</Trans>
-              )}
-            </Text>
+            <Text style={{ margin: 'auto', padding: '20px' }}>{emptyText}</Text>
           </View>
         ) : (
-          filteredQueries.map(item => (
-            <FormulaLibraryRow
-              key={item.id}
-              item={item}
-              uses={findUses(item)}
-              isOverridden={isOverriddenLibraryQuery(item, library)}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))
+          children
         )}
       </View>
       <View
@@ -135,8 +232,8 @@ export function FormulaLibraryPage() {
           justifyContent: 'flex-end',
         }}
       >
-        <Button variant="primary" onPress={() => onEdit()}>
-          <Trans>Create new query</Trans>
+        <Button variant="primary" onPress={onCreate}>
+          {createText}
         </Button>
       </View>
     </View>

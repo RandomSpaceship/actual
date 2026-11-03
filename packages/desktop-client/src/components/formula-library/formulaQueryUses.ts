@@ -1,3 +1,4 @@
+import { formulaUsesProviderName } from '@actual-app/core/shared/formulas/providerNameUses';
 import {
   formulaUsesQueryName,
   isSameQueryName,
@@ -6,7 +7,7 @@ import type {
   DashboardPageEntity,
   DashboardWidgetEntity,
   FormulaLibraryItemEntity,
-  FormulaLibraryQueryEntity,
+  FormulaLibraryProviderEntity,
   FormulaWidget,
 } from '@actual-app/core/types/models';
 
@@ -25,11 +26,22 @@ function isFormulaWidget(
   return widget.type === 'formula-card';
 }
 
-// The cards that use a library query. A card with a local query of the same
-// name does not use the library query. A name built at run time, for example
-// QUERY("fo"&"od"), is not found.
-export function findFormulaQueryUses(
+function formulaUsesItemName(
+  type: FormulaLibraryItemEntity['type'],
+  formula: string,
   name: string,
+) {
+  return type === 'provider'
+    ? formulaUsesProviderName(formula, name)
+    : formulaUsesQueryName(formula, name);
+}
+
+// The cards that use a library query or provider. A card with a local query of
+// the same name does not use the library query. A query name built at run
+// time, for example QUERY("fo"&"od"), is not found. A card that uses the item
+// only through a provider is not in the list.
+export function findFormulaQueryUses(
+  { type, name }: Pick<FormulaLibraryItemEntity, 'type' | 'name'>,
   widgets: readonly DashboardWidgetEntity[],
   dashboardPages: readonly DashboardPageEntity[],
 ): FormulaQueryUse[] {
@@ -40,6 +52,7 @@ export function findFormulaQueryUses(
 
     const { formula, colorFormula, queries = {} } = widget.meta;
     if (
+      type === 'query' &&
       Object.keys(queries).some(localName => isSameQueryName(localName, name))
     ) {
       continue;
@@ -47,7 +60,7 @@ export function findFormulaQueryUses(
 
     const formulas = [formula, colorFormula].filter(
       (text): text is string =>
-        text !== undefined && formulaUsesQueryName(text, name),
+        text !== undefined && formulaUsesItemName(type, text, name),
     );
     if (formulas.length === 0) continue;
 
@@ -68,16 +81,32 @@ export function findFormulaQueryUses(
   );
 }
 
-// True when an older library query has the same name. Formulas then use the
-// older one, so this item has no uses. The library list is oldest first.
-export function isOverriddenLibraryQuery(
-  item: FormulaLibraryQueryEntity,
+// The library providers whose formula uses a library query or provider
+export function findProviderUses(
+  item: Pick<FormulaLibraryItemEntity, 'id' | 'type' | 'name'>,
+  library: readonly FormulaLibraryItemEntity[],
+): FormulaLibraryProviderEntity[] {
+  return library
+    .filter(
+      (provider): provider is FormulaLibraryProviderEntity =>
+        provider.type === 'provider' &&
+        provider.id !== item.id &&
+        formulaUsesItemName(item.type, provider.data.formula, item.name),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// True when an older library item of the same type has the same name.
+// Formulas then use the older one, so this item has no uses. The library list
+// is oldest first.
+export function isOverriddenLibraryItem(
+  item: FormulaLibraryItemEntity,
   library: readonly FormulaLibraryItemEntity[],
 ) {
   for (const libraryItem of library) {
     if (libraryItem.id === item.id) return false;
     if (
-      libraryItem.type === 'query' &&
+      libraryItem.type === item.type &&
       isSameQueryName(libraryItem.name, item.name)
     ) {
       return true;
