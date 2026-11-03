@@ -254,4 +254,64 @@ describe('dashboard-import', () => {
       }),
     ).rejects.toThrow('formulaLibrary.0.name');
   });
+
+  it('rejects a provider with a bad name or formula', async () => {
+    await expect(
+      importFile({
+        version: 1,
+        widgets: [],
+        formulaLibrary: [
+          {
+            id: 'item-id',
+            type: 'provider',
+            name: 'A1',
+            data: { formula: '=1' },
+          },
+        ],
+      }),
+    ).rejects.toThrow('formulaLibrary.0.name');
+    await expect(
+      importFile({
+        version: 1,
+        widgets: [],
+        formulaLibrary: [
+          {
+            id: 'item-id',
+            type: 'provider',
+            name: 'Net',
+            data: { formula: '1' },
+          },
+        ],
+      }),
+    ).rejects.toThrow('formulaLibrary.0.data.formula');
+  });
+
+  it('imports a provider with a new name when the library has a different one', async () => {
+    await db.insertWithSchema('formula_library', {
+      id: 'local-net-id',
+      type: 'provider',
+      name: 'Net',
+      data: { formula: '=2' },
+      created_at: 1,
+    });
+
+    await importFile({
+      version: 1,
+      widgets: [formulaCard('=Net * 3')],
+      formulaLibrary: [
+        {
+          id: 'net-id',
+          type: 'provider',
+          name: 'Net',
+          data: { formula: '=1' },
+        },
+      ],
+    });
+
+    expect((await getLibrary()).map(({ name, data }) => [name, data])).toEqual([
+      ['Net', { formula: '=2' }],
+      ['Net_2', { formula: '=1' }],
+    ]);
+    expect((await getImportedWidgets())[0].meta?.formula).toBe('=Net_2 * 3');
+  });
 });

@@ -226,3 +226,122 @@ describe('planFormulaLibraryImport', () => {
     ).toBe(widget);
   });
 });
+
+describe('providers in a dashboard export and import', () => {
+  function libraryProvider(
+    id: string,
+    name: string,
+    formula: string,
+    createdAt = 0,
+  ): FormulaLibraryItemEntity {
+    return {
+      id,
+      type: 'provider',
+      name,
+      data: { formula },
+      created_at: createdAt,
+    };
+  }
+
+  function exportedProvider(name: string, formula: string) {
+    return {
+      id: `exported-${name}`,
+      type: 'provider' as const,
+      name,
+      data: { formula },
+    };
+  }
+
+  function createIds() {
+    let count = 0;
+    return () => `new-id-${++count}`;
+  }
+
+  it('exports the providers that a card uses, and the queries that they use', () => {
+    const library = [
+      libraryQuery('food-id', 'Food', 1),
+      libraryQuery('rent-id', 'Rent', 2),
+      libraryProvider('net-id', 'Net', '=Spending * 2'),
+      libraryProvider(
+        'spending-id',
+        'Spending',
+        '=QUERY("food") + QUERY("rent")',
+      ),
+      libraryProvider('unused-id', 'Unused', '=1'),
+    ];
+
+    expect(
+      collectFormulaLibraryForExport(
+        [formulaWidget({ formula: '=net', queries: { rent: {} } })],
+        library,
+      ).map(({ id }) => id),
+    ).toEqual(['food-id', 'net-id', 'spending-id']);
+  });
+
+  it('reuses an identical provider and creates a new one', () => {
+    const plan = planFormulaLibraryImport(
+      [formulaWidget({ formula: '=Net + Other' })],
+      [exportedProvider('Net', '=1'), exportedProvider('Other', '=2')],
+      [libraryProvider('net-id', 'NET', '=1')],
+      createIds(),
+    );
+
+    expect(plan.itemsToCreate).toEqual([
+      { ...exportedProvider('Other', '=2'), id: 'new-id-1' },
+    ]);
+    expect(plan.widgets[0].meta?.formula).toBe('=Net + Other');
+  });
+
+  it('gives a different provider with the same name a new name in the imported formulas', () => {
+    const plan = planFormulaLibraryImport(
+      [
+        formulaWidget({
+          formula: '=Yearly / Net',
+          colorFormula: '=IF(Net > 0, "red", "")',
+        }),
+      ],
+      [exportedProvider('Yearly', '=Net * 12'), exportedProvider('Net', '=1')],
+      [
+        libraryProvider('net-id', 'Net', '=2'),
+        libraryProvider('net-2-id', 'Net_2', '=3'),
+        // The same text as the export, but its Net is a different provider
+        libraryProvider('yearly-id', 'Yearly', '=Net * 12'),
+      ],
+      createIds(),
+    );
+
+    expect(plan.itemsToCreate).toEqual([
+      { ...exportedProvider('Net', '=1'), id: 'new-id-1', name: 'Net_3' },
+      {
+        ...exportedProvider('Yearly', '=Net_3 * 12'),
+        id: 'new-id-2',
+        name: 'Yearly_2',
+      },
+    ]);
+    expect(plan.widgets[0].meta).toMatchObject({
+      formula: '=Yearly_2 / Net_3',
+      colorFormula: '=IF(Net_3 > 0, "red", "")',
+    });
+  });
+
+  it('copies a query into the card when only a provider of the card uses it', () => {
+    const plan = planFormulaLibraryImport(
+      [formulaWidget({ formula: '=Doubled' })],
+      [
+        exportedProvider('Doubled', '=QUERY("food") * 2'),
+        {
+          id: 'exported-food-id',
+          type: 'query',
+          name: 'Food',
+          data: { timeFrame: january },
+        },
+      ],
+      [libraryQuery('local-food-id', 'food', 1, { timeFrame: february })],
+      createIds(),
+    );
+
+    expect(plan.widgets[0].meta?.queries).toEqual({
+      Food: { conditions: [], conditionsOp: 'and', timeFrame: january },
+    });
+  });
+});

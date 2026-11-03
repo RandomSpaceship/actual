@@ -1,5 +1,8 @@
 import type { ForecastSeries, ForecastSource } from './forecast';
-import type { FormulaLibraryQueryEntity } from './formula-library';
+import type {
+  FormulaLibraryProviderEntity,
+  FormulaLibraryQueryEntity,
+} from './formula-library';
 import type { CustomReportEntity } from './reports';
 import type { RuleConditionEntity } from './rule';
 
@@ -403,14 +406,23 @@ export type ExportImportDashboard = {
   // future versions
   version: 1;
   widgets: ExportImportDashboardWidget[];
-  // The library queries that the formula cards use
+  // The library queries and providers that the formula cards use
   formulaLibrary?: ExportImportFormulaLibraryItem[];
 };
 
-export type ExportImportFormulaLibraryItem = Pick<
+export type ExportImportFormulaLibraryQuery = Pick<
   FormulaLibraryQueryEntity,
   'id' | 'type' | 'name' | 'data'
 >;
+
+export type ExportImportFormulaLibraryProvider = Pick<
+  FormulaLibraryProviderEntity,
+  'id' | 'type' | 'name' | 'data'
+>;
+
+export type ExportImportFormulaLibraryItem =
+  | ExportImportFormulaLibraryQuery
+  | ExportImportFormulaLibraryProvider;
 
 export type SummaryWidget = AbstractWidget<
   'summary-card',

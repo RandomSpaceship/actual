@@ -14,6 +14,7 @@ import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
 import { DEFAULT_DASHBOARD_STATE } from '#shared/dashboard';
 import { planFormulaLibraryImport } from '#shared/formulas/dashboardFormulaLibrary';
+import { isValidProviderName } from '#shared/formulas/providerNameUses';
 import { q } from '#shared/query';
 import type {
   DashboardWidgetEntity,
@@ -122,13 +123,19 @@ const exportModel = {
         'data',
       ]);
 
-      if (item.type !== 'query') {
+      // The file can hold any value here
+      const type: unknown = item.type;
+      if (type !== 'query' && type !== 'provider') {
         throw new ValidationError(
-          `Invalid formulaLibrary.${idx}.type value ${String(item.type)}.`,
+          `Invalid formulaLibrary.${idx}.type value ${String(type)}.`,
         );
       }
 
-      if (typeof item.name !== 'string' || item.name.trim() === '') {
+      if (
+        typeof item.name !== 'string' ||
+        item.name.trim() === '' ||
+        (item.type === 'provider' && !isValidProviderName(item.name))
+      ) {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.name value ${String(item.name)}.`,
         );
@@ -137,6 +144,16 @@ const exportModel = {
       if (typeof item.data !== 'object' || item.data === null) {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.data data-type.`,
+        );
+      }
+
+      if (
+        item.type === 'provider' &&
+        (typeof item.data.formula !== 'string' ||
+          !item.data.formula.startsWith('='))
+      ) {
+        throw new ValidationError(
+          `Invalid formulaLibrary.${idx}.data.formula value.`,
         );
       }
     });
