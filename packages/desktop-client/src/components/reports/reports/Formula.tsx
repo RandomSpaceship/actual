@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
@@ -15,6 +15,7 @@ import type {
   FormulaLibraryItemEntity,
   FormulaWidget,
 } from '@actual-app/core/types/models';
+import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
@@ -172,6 +173,27 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     [queries, library],
   );
   const providerNames = useMemo(() => listProviderNames(library), [library]);
+
+  const formulaEditorViewRef = useRef<EditorView | null>(null);
+  // Before the first focus, the cursor is at the start of the formula
+  const hasFormulaEditorFocusRef = useRef(false);
+  function insertIntoFormula(text: string) {
+    const view = formulaEditorViewRef.current;
+    if (!view) {
+      setFormula(formula + text);
+      return;
+    }
+    if (hasFormulaEditorFocusRef.current) {
+      view.dispatch(view.state.replaceSelection(text));
+    } else {
+      const end = view.state.doc.length;
+      view.dispatch({
+        changes: { from: end, insert: text },
+        selection: { anchor: end + text.length },
+      });
+    }
+    view.focus();
+  }
 
   const updateDashboardWidgetMutation = useUpdateDashboardWidgetMutation();
 
@@ -403,6 +425,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 categoryBadges={categoryBadges}
                 singleLine={false}
                 showLineNumbers
+                onCreateEditor={view => {
+                  formulaEditorViewRef.current = view;
+                  view.contentDOM.addEventListener('focus', () => {
+                    hasFormulaEditorFocusRef.current = true;
+                  });
+                }}
               />
             </Suspense>
           </View>
@@ -522,6 +550,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             timeFrameOverrides={timeFrameOverrides}
             onTimeFrameOverridesChange={setTimeFrameOverrides}
             formulas={[formula, colorFormula]}
+            accounts={simpleAccounts}
+            onInsertProvider={insertIntoFormula}
           />
         </View>
       </View>

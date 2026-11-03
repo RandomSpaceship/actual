@@ -39,6 +39,8 @@ type FormulaEditorProps = {
   categoryBadges?: Record<string, string>;
   singleLine?: boolean;
   showLineNumbers?: boolean;
+  // Gives the CodeMirror view, for example to insert text at the cursor
+  onCreateEditor?: ReactCodeMirrorProps['onCreateEditor'];
 };
 
 type BadgePickerState = {
@@ -74,6 +76,7 @@ export function FormulaEditor({
   categoryBadges,
   singleLine = false,
   showLineNumbers = true,
+  onCreateEditor,
 }: FormulaEditorProps) {
   const [activeTheme] = useTheme();
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
@@ -340,6 +343,7 @@ export function FormulaEditor({
         theme={codeMirrorTheme}
         extensions={extensions}
         onChange={onChange}
+        onCreateEditor={onCreateEditor}
         editable={!disabled}
         basicSetup={{
           lineNumbers: showLineNumbers,

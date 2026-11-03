@@ -13,11 +13,16 @@ import { Toggle } from '@actual-app/components/toggle';
 import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
 import {
+  findProviderNameReferences,
+  isSameProviderName,
+} from '@actual-app/core/shared/formulas/providerNameUses';
+import {
   findQueryNameReferences,
   isSameQueryName,
 } from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
+  FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
   FormulaTimeFrameOverride,
   RuleConditionEntity,
@@ -27,6 +32,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { AppliedFilters } from '#components/filters/AppliedFilters';
 import { FilterButton } from '#components/filters/FiltersMenu';
+import type { SimpleAccount } from '#components/formula/executeFormula';
 import {
   formulaLibraryQueries,
   useCreateFormulaLibraryItemMutation,
@@ -37,6 +43,7 @@ import { addNotification } from '#notifications/notificationsSlice';
 import { useDispatch } from '#redux';
 import type { AppDispatch } from '#redux/store';
 
+import { LibraryProviderItem } from './LibraryProviderItem';
 import { LibraryQueryItem } from './LibraryQueryItem';
 import {
   newQueryTimeFrame,
@@ -61,6 +68,10 @@ type QueryManagerProps = {
   ) => void;
   // The card formulas. Only the formulas when the editor opens are used
   formulas: string[];
+  // For the provider values on this card
+  accounts: SimpleAccount[];
+  // Without it, providers have no insert button
+  onInsertProvider?: (name: string) => void;
 };
 
 export function QueryManager({
@@ -69,12 +80,15 @@ export function QueryManager({
   timeFrameOverrides,
   onTimeFrameOverridesChange,
   formulas,
+  accounts,
+  onInsertProvider,
 }: QueryManagerProps) {
   const { t } = useTranslation();
   const [newQueryName, setNewQueryName] = useState('');
   const [isAddingQuery, setIsAddingQuery] = useState(false);
   // Null until the user changes the toggle
   const [showLibrary, setShowLibrary] = useState<boolean | null>(null);
+  const [showProviders, setShowProviders] = useState<boolean | null>(null);
   const [openingFormulas] = useState(formulas);
   const dispatch = useDispatch();
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
@@ -82,6 +96,9 @@ export function QueryManager({
 
   const libraryQueries = library
     .filter(item => item.type === 'query')
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const libraryProviders = library
+    .filter(item => item.type === 'provider')
     .sort((a, b) => a.name.localeCompare(b.name));
 
   function findLibraryQuery(name: string) {
@@ -103,6 +120,15 @@ export function QueryManager({
         ({ name }) =>
           findLibraryQuery(name) !== undefined &&
           findCardQueryName(name) === undefined,
+      );
+
+  // The providers show at the start if the formulas use one of them
+  const areProvidersShown =
+    showProviders ??
+    openingFormulas
+      .flatMap(formula => findProviderNameReferences(formula))
+      .some(({ name }) =>
+        libraryProviders.some(item => isSameProviderName(item.name, name)),
       );
 
   function handleAddQuery() {
@@ -201,6 +227,14 @@ export function QueryManager({
     dispatch(
       pushModal({
         modal: { name: 'edit-formula-library-query', options: { item } },
+      }),
+    );
+  }
+
+  function handleEditProvider(item: FormulaLibraryProviderEntity) {
+    dispatch(
+      pushModal({
+        modal: { name: 'edit-formula-library-provider', options: { item } },
       }),
     );
   }
@@ -348,6 +382,46 @@ export function QueryManager({
                   findCardQueryName(item.name) === undefined
                     ? timeFrame =>
                         handleTimeFrameOverrideChange(item, timeFrame)
+                    : undefined
+                }
+              />
+            ))}
+        </View>
+      )}
+
+      {libraryProviders.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <Toggle
+              id="query-manager-show-providers"
+              isOn={areProvidersShown}
+              onToggle={setShowProviders}
+            />
+            <label htmlFor="query-manager-show-providers">
+              <Trans count={libraryProviders.length}>
+                Show providers ({{ count: libraryProviders.length }})
+              </Trans>
+            </label>
+          </View>
+          {areProvidersShown &&
+            libraryProviders.map(item => (
+              <LibraryProviderItem
+                key={item.id}
+                item={item}
+                queries={queries}
+                timeFrameOverrides={timeFrameOverrides}
+                accounts={accounts}
+                onEdit={() => handleEditProvider(item)}
+                onInsert={
+                  onInsertProvider
+                    ? () => onInsertProvider(item.name)
                     : undefined
                 }
               />
