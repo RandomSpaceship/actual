@@ -207,7 +207,7 @@ The `symbolPosition` argument accepts `"before"` or `"after"`. The `spaceBetween
 Formula cards can reference **named queries** that you define in the right-side panel (**Query Definitions**).
 
 - `QUERY("myQuery")` returns the **sum of transaction amounts** for that query’s filters and date range (returned in normal “money” units, e.g. `-123.45`).
-- If a query name doesn’t exist, it evaluates as **0**.
+- If no query has that name, the card shows an error that names the missing query. The card does not show a value until you fix the name or add the query.
 
 Example:
 
@@ -221,7 +221,7 @@ Formula cards can also reference an account's **current balance** directly, with
 
 - `BALANCE_OF("Checking")` returns the account's current balance, in normal "money" units (e.g. `-123.45`), the same as `QUERY()`.
 - Pass a **quoted account id** for a deterministic match, or a **quoted account name** for an exact name match.
-- If the account isn't found, it evaluates as **0**.
+- If no account matches, the card shows an error that names the missing account.
 
 Example:
 
