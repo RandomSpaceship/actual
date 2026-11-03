@@ -41,7 +41,7 @@ export type QueryGroupDimension = (typeof queryGroupDimensions)[number];
 export const queryGroupSorts = ['budget', 'name', 'asc', 'desc'] as const;
 export type QueryGroupSort = (typeof queryGroupSorts)[number];
 
-// A QUERY_GROUP, QUERY_GROUP_COUNT or QUERY_PIVOT call. 'long' gives one row
+// A QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or QUERY_PIVOT_COUNT call. 'long' gives one row
 // for each group. 'wide' gives a header row, then one row for each key of
 // dimension 1, with one column for each key of dimension 2.
 export type QueryGroupRequest = {
@@ -460,7 +460,11 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
   private queryGroupFor(
     ast: ProcedureAst,
     state: InterpreterState,
-    functionName: 'QUERY_GROUP' | 'QUERY_GROUP_COUNT' | 'QUERY_PIVOT',
+    functionName:
+      | 'QUERY_GROUP'
+      | 'QUERY_GROUP_COUNT'
+      | 'QUERY_PIVOT'
+      | 'QUERY_PIVOT_COUNT',
     measure: QueryGroupRequest['measure'],
     shape: QueryGroupRequest['shape'],
   ) {
@@ -556,6 +560,14 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
 
   queryPivotSize(ast: ProcedureAst): ArraySize {
     return this.queryGroupSizeFor(ast, 'sum', 'wide');
+  }
+
+  queryPivotCount(ast: ProcedureAst, state: InterpreterState) {
+    return this.queryGroupFor(ast, state, 'QUERY_PIVOT_COUNT', 'count', 'wide');
+  }
+
+  queryPivotCountSize(ast: ProcedureAst): ArraySize {
+    return this.queryGroupSizeFor(ast, 'count', 'wide');
   }
 
   budgetQuery(ast: ProcedureAst, state: InterpreterState) {
@@ -817,6 +829,20 @@ CustomFunctionsPlugin.implementedFunctions = {
       },
     ],
   },
+  QUERY_PIVOT_COUNT: {
+    method: 'queryPivotCount',
+    sizeOfResultArrayMethod: 'queryPivotCountSize',
+    parameters: [
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+    ],
+  },
   BUDGET_QUERY: {
     method: 'budgetQuery',
     parameters: [
@@ -901,6 +927,7 @@ export const customFunctionsTranslations = {
     QUERY_GROUP: 'QUERY_GROUP',
     QUERY_GROUP_COUNT: 'QUERY_GROUP_COUNT',
     QUERY_PIVOT: 'QUERY_PIVOT',
+    QUERY_PIVOT_COUNT: 'QUERY_PIVOT_COUNT',
     BUDGET_QUERY: 'BUDGET_QUERY',
     FORMATNUMBER: 'FORMATNUMBER',
     FORMATCURRENCY: 'FORMATCURRENCY',

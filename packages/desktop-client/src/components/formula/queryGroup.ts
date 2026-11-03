@@ -159,7 +159,8 @@ function getWideRows(
   return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
 }
 
-// The rows for a QUERY_GROUP, QUERY_GROUP_COUNT or QUERY_PIVOT call, with the sums as
+// The rows for a QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or
+// QUERY_PIVOT_COUNT call, with the sums as
 // integers. A month or year dimension gives a row with 0 for each period
 // without transactions.
 export async function fetchQueryGroupRows({

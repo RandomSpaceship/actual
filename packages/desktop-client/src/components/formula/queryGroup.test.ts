@@ -56,8 +56,8 @@ function groupedRows({ groupExpressions, selectExpressions }: GroupedQuery) {
   }
   if (groups === JSON.stringify([{ $id: '$category' }, { $month: '$date' }])) {
     return [
-      { key0: 'power', key1: '2024-01', value: -1000 },
-      { key0: 'groceries', key1: '2024-02', value: -3000 },
+      { key0: 'power', key1: '2024-01', value: isCount ? 1 : -1000 },
+      { key0: 'groceries', key1: '2024-02', value: isCount ? 3 : -3000 },
     ];
   }
   if (groups === JSON.stringify([{ $id: '$payee' }])) {
@@ -223,6 +223,17 @@ describe('QUERY_PIVOT', () => {
       ['', '2024-01', '2024-02', '2024-03'],
       ['Groceries', 0, -30, 0],
       ['Power', -10, 0, 0],
+    ]);
+  });
+
+  it('gives counts for QUERY_PIVOT_COUNT', async () => {
+    expect(
+      (await run('=QUERY_PIVOT_COUNT("firstQuarter", "category", "month")'))
+        .table,
+    ).toEqual([
+      ['', '2024-01', '2024-02', '2024-03'],
+      ['Power', 1, 0, 0],
+      ['Groceries', 0, 3, 0],
     ]);
   });
 

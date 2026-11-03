@@ -392,6 +392,36 @@ export function getFormulaFunctionCatalog(): Record<
         },
       ],
     },
+    QUERY_PIVOT_COUNT: {
+      name: 'QUERY_PIVOT_COUNT',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get a table of the number of transactions of a named query, with one row for each key of one dimension and one column for each key of a second dimension. The first row has the column names. The arguments must be text in the formula.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+        {
+          name: 'rows',
+          description: t(
+            'One row for each: category, category group, payee, account, month or year',
+          ),
+        },
+        {
+          name: 'columns',
+          description: t('One column for each: a different dimension'),
+        },
+        {
+          name: 'sort',
+          description: t(
+            'budget (budget order, the default), name, asc or desc (by the row total) (optional)',
+          ),
+        },
+      ],
+    },
     FLOOR: {
       name: 'FLOOR',
       category: 'math',
