@@ -269,7 +269,7 @@ The **Used by** column shows how many cards use each query. Select it to see the
 
 In the formula editor, the formula autocomplete shows the library queries together with the queries of the card.
 
-To see the library queries, turn on **Show library queries** under **Query Definitions**. Each library query has these buttons:
+To see the library queries, turn on **Show library queries** under **Query Definitions**. If the card formula uses a library query when you open the editor, this option is already on. Each library query has these buttons:
 
 - **Edit** opens the library query. A change applies to every card that uses the query.
 - **Copy into card** adds a copy of the query to the card. The copy has the same name, so the card uses its copy and not the library query. Use this to change the query for one card only.
