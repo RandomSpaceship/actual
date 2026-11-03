@@ -36,6 +36,7 @@ import { useDispatch } from '#redux';
 import type { AppDispatch } from '#redux/store';
 
 import {
+  getTimeFrameModeLabels,
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from './queryTimeFrame';
@@ -281,12 +282,16 @@ export function QueryManager({ queries, onQueriesChange }: QueryManagerProps) {
 
 type QueryItemProps = {
   queryName: string;
-  defaultConfig: QueryConfig;
+  // A missing part of the time frame gets a default
+  defaultConfig: Omit<QueryConfig, 'timeFrame'> & {
+    timeFrame?: Partial<TimeFrame>;
+  };
   onUpdate: (config: QueryConfig) => void;
-  onRemove: () => void;
+  // Without it, there is no remove button
+  onRemove?: () => void;
 };
 
-function QueryItem({
+export function QueryItem({
   queryName,
   defaultConfig,
   onUpdate,
@@ -533,17 +538,7 @@ function QueryItem({
 
   const timeRangeMode = timeRangeRef.current as TimeFrame['mode'];
   const isPresetTimeRange = isPresetTimeRangeMode(timeRangeMode);
-  const timeRangeLabels = {
-    'sliding-window': t('Live'),
-    static: t('Static'),
-    full: t('All time'),
-    lastMonth: t('Last month'),
-    lastYear: t('Last year'),
-    yearToDate: t('Year to date'),
-    priorYearToDate: t('Prior year to date'),
-    currentQuarter: t('Current quarter'),
-    previousQuarter: t('Previous quarter'),
-  } satisfies Record<TimeFrame['mode'], string>;
+  const timeRangeLabels = getTimeFrameModeLabels(t);
   const timeRangeLabel = timeRangeLabels[timeRangeMode];
   const presetTimeRangeLabels = {
     full: t('All time transactions'),
@@ -728,9 +723,11 @@ function QueryItem({
                 </Dialog>
               </Popover>
             </DialogTrigger>
-            <Button variant="bare" onPress={onRemove}>
-              <SvgTrash style={{ width: 13, height: 13 }} />
-            </Button>
+            {onRemove && (
+              <Button variant="bare" onPress={onRemove}>
+                <SvgTrash style={{ width: 13, height: 13 }} />
+              </Button>
+            )}
           </View>
         </View>
       </View>

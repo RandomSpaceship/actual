@@ -1,4 +1,6 @@
 import * as monthUtils from '@actual-app/core/shared/months';
+import type { TimeFrame } from '@actual-app/core/types/models';
+import type { TFunction } from 'i18next';
 
 function isMonthString(dateOrMonth: string) {
   // Month format: YYYY-MM
@@ -19,4 +21,18 @@ export function normalizeQueryTimeFrameEnd(dateOrMonth: string) {
   return isMonthString(dateOrMonth)
     ? monthUtils.lastDayOfMonth(dateOrMonth)
     : monthUtils.dayFromDate(dateOrMonth);
+}
+
+export function getTimeFrameModeLabels(t: TFunction) {
+  return {
+    'sliding-window': t('Live'),
+    static: t('Static'),
+    full: t('All time'),
+    lastMonth: t('Last month'),
+    lastYear: t('Last year'),
+    yearToDate: t('Year to date'),
+    priorYearToDate: t('Prior year to date'),
+    currentQuarter: t('Current quarter'),
+    previousQuarter: t('Previous quarter'),
+  } satisfies Record<TimeFrame['mode'], string>;
 }
