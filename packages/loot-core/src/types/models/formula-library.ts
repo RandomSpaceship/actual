@@ -20,5 +20,21 @@ export type FormulaLibraryQueryEntity = {
   tombstone?: boolean;
 };
 
-// Providers will join this union
-export type FormulaLibraryItemEntity = FormulaLibraryQueryEntity;
+export type FormulaLibraryProviderData = {
+  description?: string;
+  // Starts with "="
+  formula: string;
+};
+
+// A named formula. Other formulas use its name without quotes
+export type FormulaLibraryProviderEntity = Omit<
+  FormulaLibraryQueryEntity,
+  'type' | 'data'
+> & {
+  type: 'provider';
+  data: FormulaLibraryProviderData;
+};
+
+export type FormulaLibraryItemEntity =
+  | FormulaLibraryQueryEntity
+  | FormulaLibraryProviderEntity;

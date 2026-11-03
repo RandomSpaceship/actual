@@ -109,6 +109,38 @@ describe('formula library app', () => {
     expect((await getItems()).map(item => item.name)).toEqual(['food']);
   });
 
+  it('keeps provider names apart from query names, and checks the provider name rules', async () => {
+    await app.handlers['formula-library-create']({
+      type: 'query',
+      name: 'NetIncome',
+      data: {},
+    });
+    await app.handlers['formula-library-create']({
+      type: 'provider',
+      name: 'NetIncome',
+      data: { formula: '=QUERY("NetIncome")' },
+    });
+
+    await expect(
+      app.handlers['formula-library-create']({
+        type: 'provider',
+        name: 'Net income',
+        data: { formula: '=1' },
+      }),
+    ).rejects.toThrow(/cannot be a provider name/);
+    await expect(
+      app.handlers['formula-library-create']({
+        type: 'provider',
+        name: 'netincome',
+        data: { formula: '=1' },
+      }),
+    ).rejects.toThrow(/already in use/);
+    expect((await getItems()).map(item => item.type)).toEqual([
+      'query',
+      'provider',
+    ]);
+  });
+
   it('updates the data without a rename', async () => {
     const id = await app.handlers['formula-library-create']({
       type: 'query',

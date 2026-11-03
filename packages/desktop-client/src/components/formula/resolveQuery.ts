@@ -1,6 +1,7 @@
 import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
 import type {
   FormulaLibraryItemEntity,
+  FormulaLibraryQueryEntity,
   FormulaTimeFrameOverride,
   RuleConditionEntity,
   TimeFrame,
@@ -73,7 +74,8 @@ export function resolveQuery(
         isSameQueryName(queryName, name),
       );
   const libraryMatches = library.filter(
-    item => item.type === 'query' && isSameQueryName(item.name, name),
+    (item): item is FormulaLibraryQueryEntity =>
+      item.type === 'query' && isSameQueryName(item.name, name),
   );
 
   if (localName !== undefined) {

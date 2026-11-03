@@ -7,6 +7,7 @@ import { ValidationError } from '#server/errors';
 import { mutator } from '#server/mutators';
 import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
+import { isValidProviderName } from '#shared/formulas/providerNameUses';
 import {
   isSameQueryName,
   renameQueryInFormula,
@@ -38,6 +39,9 @@ async function validateName(
 ) {
   if (name.trim() === '') {
     throw new ValidationError('A formula library item must have a name');
+  }
+  if (type === 'provider' && !isValidProviderName(name)) {
+    throw new ValidationError(`"${name}" cannot be a provider name`);
   }
 
   const items = await getItems();

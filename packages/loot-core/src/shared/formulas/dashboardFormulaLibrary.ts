@@ -5,6 +5,7 @@ import type {
   ExportImportFormulaLibraryItem,
   FormulaLibraryItemEntity,
   FormulaLibraryQueryData,
+  FormulaLibraryQueryEntity,
   FormulaWidget,
   TimeFrame,
 } from '#types/models';
@@ -42,8 +43,10 @@ function findLibraryQuery<
   );
 }
 
-function sortOldestFirst(library: FormulaLibraryItemEntity[]) {
-  return [...library].sort((a, b) => a.created_at - b.created_at);
+function sortQueriesOldestFirst(library: FormulaLibraryItemEntity[]) {
+  return library
+    .filter((item): item is FormulaLibraryQueryEntity => item.type === 'query')
+    .sort((a, b) => a.created_at - b.created_at);
 }
 
 // The library queries that the formula cards use, for a dashboard export
@@ -51,7 +54,7 @@ export function collectFormulaLibraryForExport(
   widgets: { type: string; meta: unknown }[],
   library: FormulaLibraryItemEntity[],
 ): ExportImportFormulaLibraryItem[] {
-  const oldestFirst = sortOldestFirst(library);
+  const oldestFirst = sortQueriesOldestFirst(library);
   const items = new Map<string, ExportImportFormulaLibraryItem>();
 
   for (const { type, meta } of widgets) {
@@ -116,7 +119,7 @@ export function planFormulaLibraryImport<
   createId: () => string,
 ): FormulaLibraryImportPlan<Widget> {
   const oldestFirst: ExportImportFormulaLibraryItem[] =
-    sortOldestFirst(library);
+    sortQueriesOldestFirst(library);
   const itemsToCreate: ExportImportFormulaLibraryItem[] = [];
   const newIds = new Map<string, string>();
   const cardQueryItems = new Map<string, ExportImportFormulaLibraryItem>();
