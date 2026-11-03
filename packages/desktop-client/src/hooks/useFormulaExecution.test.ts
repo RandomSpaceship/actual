@@ -1,6 +1,7 @@
 import {
   clearServer,
   initServer,
+  serverPush,
 } from '@actual-app/core/platform/client/connection';
 import { getCurrency } from '@actual-app/core/shared/currencies';
 import type {
@@ -10,12 +11,10 @@ import type {
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { buildFilteredTransactionsQuery } from '#components/formula/executeFormula';
 import { TestProviders } from '#mocks';
 
-import {
-  buildFilteredTransactionsQuery,
-  useFormulaExecution,
-} from './useFormulaExecution';
+import { useFormulaExecution } from './useFormulaExecution';
 
 vi.mock(
   '@actual-app/core/platform/client/connection',
@@ -289,7 +288,7 @@ describe('BALANCE_OF in query mode', () => {
     expect(balanceQuery).toBeDefined();
   });
 
-  it('returns 0 for an unknown account', async () => {
+  it('gives an error for an unknown account', async () => {
     const { result } = renderHook(
       () =>
         useFormulaExecution('=BALANCE_OF("nope")', {}, 0, undefined, [
@@ -298,7 +297,13 @@ describe('BALANCE_OF in query mode', () => {
       { wrapper: TestProviders },
     );
 
-    await waitFor(() => expect(result.current.result).toBe(0));
+    await waitFor(() =>
+      expect(result.current.error).toBe('Account "nope" not found'),
+    );
+    expect(result.current.result).toBeNull();
+    expect(result.current.issues).toEqual([
+      expect.objectContaining({ kind: 'missing-account', name: 'nope' }),
+    ]);
     expect(queryPayloads).toHaveLength(0);
   });
 });
@@ -383,5 +388,121 @@ describe('formula execution stability', () => {
       expect(result.current.error).toBe('Formula must start with ='),
     );
     expect(result.current.isLoading).toBe(false);
+  });
+});
+
+describe('formula query errors', () => {
+  let failQueries: boolean;
+
+  beforeEach(() => {
+    failQueries = false;
+    initServer({
+      'formula-load-user-preferences': async () => ({
+        currency: getCurrency('USD'),
+        numberFormat: 'comma-dot',
+        decimalPlaces: 2,
+        thousandsSeparator: ',',
+        decimalSeparator: '.',
+        locale: 'en-US',
+        currencySymbolPosition: 'before',
+        currencySpaceBetweenAmountAndSymbol: false,
+      }),
+      'make-filters-from-conditions': async () => ({ filters: [] }),
+      query: async () => {
+        if (failQueries) {
+          throw new Error('query failed');
+        }
+        return { data: 1000, dependencies: [] };
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await clearServer();
+  });
+
+  it('gives an error that names each unknown query', async () => {
+    const { result } = renderHook(
+      () =>
+        useFormulaExecution(
+          '=QUERY("Income") + QUERY("Missing") + QUERY_COUNT("Missing") + QUERY_COUNT("Other")',
+          formulaQueries,
+        ),
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() =>
+      expect(result.current.error).toBe(
+        'Query "Missing" not found; Query "Other" not found',
+      ),
+    );
+    expect(result.current.result).toBeNull();
+  });
+
+  it('finds a query when the name differs only in case', async () => {
+    const { result } = renderHook(
+      () => useFormulaExecution('=QUERY("income")', formulaQueries),
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() => expect(result.current.result).toBe(10));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('gives an error when a query cannot run', async () => {
+    failQueries = true;
+
+    const { result } = renderHook(
+      () => useFormulaExecution('=QUERY("Income")', formulaQueries),
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() =>
+      expect(result.current.error).toBe('Query "Income" could not run'),
+    );
+    expect(result.current.result).toBeNull();
+  });
+});
+
+describe('formula data changes', () => {
+  let queryResult: number;
+
+  beforeEach(() => {
+    queryResult = 1000;
+    initServer({
+      'formula-load-user-preferences': async () => ({
+        currency: getCurrency('USD'),
+        numberFormat: 'comma-dot',
+        decimalPlaces: 2,
+        thousandsSeparator: ',',
+        decimalSeparator: '.',
+        locale: 'en-US',
+        currencySymbolPosition: 'before',
+        currencySpaceBetweenAmountAndSymbol: false,
+      }),
+      'make-filters-from-conditions': async () => ({ filters: [] }),
+      query: async () => ({ data: queryResult, dependencies: [] }),
+    });
+  });
+
+  afterEach(async () => {
+    await clearServer();
+  });
+
+  it('runs again when data that formulas use changes', async () => {
+    const { result } = renderHook(
+      () => useFormulaExecution('=QUERY("Income")', formulaQueries),
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() => expect(result.current.result).toBe(10));
+
+    queryResult = 2500;
+    serverPush('sync-event', { type: 'applied', tables: ['notes'] });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(result.current.result).toBe(10);
+
+    serverPush('sync-event', { type: 'applied', tables: ['transactions'] });
+    await waitFor(() => expect(result.current.result).toBe(25));
   });
 });
