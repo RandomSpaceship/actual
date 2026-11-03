@@ -17,6 +17,7 @@ describe('parseSidebarMenuItems', () => {
       { id: 'tags', hidden: true },
       { id: 'rules', hidden: true },
       { id: 'bank-sync', hidden: true },
+      { id: 'formulas', hidden: true },
     ]);
   });
 
@@ -35,6 +36,7 @@ describe('parseSidebarMenuItems', () => {
       { id: 'tags', hidden: true },
       { id: 'rules', hidden: false },
       { id: 'bank-sync', hidden: true },
+      { id: 'formulas', hidden: true },
     ];
 
     expect(parseSidebarMenuItems(JSON.stringify(saved))).toEqual(saved);
@@ -53,7 +55,7 @@ describe('parseSidebarMenuItems', () => {
     expect(items.filter(item => item.id === 'reports')).toEqual([
       { id: 'reports', hidden: false },
     ]);
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(8);
   });
 
   it('inserts missing pages at their default position', () => {
@@ -72,6 +74,7 @@ describe('parseSidebarMenuItems', () => {
       'tags',
       'rules',
       'bank-sync',
+      'formulas',
     ]);
     expect(items.find(item => item.id === 'reports')?.hidden).toBe(false);
     expect(items.find(item => item.id === 'payees')?.hidden).toBe(true);
@@ -138,9 +141,10 @@ describe('moveSidebarMenuItem', () => {
 });
 
 describe('isInMobileSettingsNav', () => {
-  it('leaves schedules and tags out of the mobile settings menu', () => {
+  it('leaves schedules, tags and formulas out of the mobile settings menu', () => {
     expect(isInMobileSettingsNav('schedules')).toBe(false);
     expect(isInMobileSettingsNav('tags')).toBe(false);
+    expect(isInMobileSettingsNav('formulas')).toBe(false);
     expect(isInMobileSettingsNav('payees')).toBe(true);
     expect(isInMobileSettingsNav('bank-sync')).toBe(true);
   });

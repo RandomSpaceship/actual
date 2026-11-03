@@ -6,6 +6,7 @@ export const SIDEBAR_MENU_ITEM_IDS = [
   'tags',
   'rules',
   'bank-sync',
+  'formulas',
 ] as const;
 
 export type SidebarMenuItemId = (typeof SIDEBAR_MENU_ITEM_IDS)[number];
@@ -21,6 +22,7 @@ const SETTINGS_SECTION_IDS = [
   'tags',
   'rules',
   'bank-sync',
+  'formulas',
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
@@ -40,7 +42,8 @@ export function isSettingsSectionOnMobile(id: SettingsSectionId): boolean {
 }
 
 export function isInMobileSettingsNav(id: SettingsSectionId): boolean {
-  return isSettingsSectionOnMobile(id) && id !== 'tags';
+  // The formula library is desktop only for now
+  return isSettingsSectionOnMobile(id) && id !== 'tags' && id !== 'formulas';
 }
 
 function isHiddenByDefault(id: SidebarMenuItemId): boolean {
