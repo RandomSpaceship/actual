@@ -114,13 +114,20 @@ function isPresetTimeRangeMode(
 type QueryTimeFrameControlProps = {
   timeFrame: TimeFrame;
   onChange: (timeFrame: TimeFrame) => void;
+  // For a library query in a card. With it, the mode button cycles
+  // Library -> Live -> Static -> Library. In the Library state, timeFrame is
+  // the library time frame, and a change gives the card its own time frame.
+  onUseLibraryTimeFrame?: () => void;
+  isLibraryTimeFrame?: boolean;
 };
 
-// The time frame of a query: the Live/Static button, the date range picker,
-// and the name of a preset range
+// The time frame of a query: the mode button, the date range picker, and the
+// name of a preset range
 export function QueryTimeFrameControl({
   timeFrame,
   onChange,
+  onUseLibraryTimeFrame,
+  isLibraryTimeFrame = false,
 }: QueryTimeFrameControlProps) {
   const language = useLanguage();
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
@@ -238,10 +245,25 @@ export function QueryTimeFrameControl({
       >
         <Button
           style={{ minWidth: 50 }}
-          variant={timeRangeMode === 'static' ? 'normal' : 'primary'}
+          variant={
+            isLibraryTimeFrame || timeRangeMode !== 'static'
+              ? 'primary'
+              : 'normal'
+          }
           onPress={() => {
+            if (
+              onUseLibraryTimeFrame &&
+              !isLibraryTimeFrame &&
+              timeRangeMode === 'static'
+            ) {
+              onUseLibraryTimeFrame();
+              return;
+            }
+
             const newMode =
-              timeRangeMode === 'static' ? 'sliding-window' : 'static';
+              isLibraryTimeFrame || timeRangeMode === 'static'
+                ? 'sliding-window'
+                : 'static';
             const [newStart, newEnd] = calculateTimeRange(
               asMonthSlidingTimeFrame({
                 start: startDate,
@@ -253,7 +275,7 @@ export function QueryTimeFrameControl({
             onChange({ start: newStart, end: newEnd, mode: newMode });
           }}
         >
-          {timeRangeLabel}
+          {isLibraryTimeFrame ? t('Library') : timeRangeLabel}
         </Button>
         {isDateRangePickerReady ? (
           <DateRangePicker

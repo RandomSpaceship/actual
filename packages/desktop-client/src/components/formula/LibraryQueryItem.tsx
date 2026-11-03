@@ -26,7 +26,7 @@ type LibraryQueryItemProps = {
   // The time frame that this card uses in place of the library one
   timeFrameOverride?: TimeFrame;
   // A null time frame removes the override. Without it, the card cannot
-  // set a time frame.
+  // set a time frame, and the library time frame shows as text.
   onTimeFrameOverrideChange?: (timeFrame: TimeFrame | null) => void;
 };
 
@@ -41,7 +41,6 @@ export function LibraryQueryItem({
   onTimeFrameOverrideChange,
 }: LibraryQueryItemProps) {
   const { description, conditions, conditionsOp, timeFrame } = item.data;
-  const isOverridden = Boolean(onTimeFrameOverrideChange && timeFrameOverride);
 
   return (
     <View
@@ -99,45 +98,27 @@ export function LibraryQueryItem({
           conditions={conditions}
           conditionsOp={conditionsOp}
         />
-        {!isOverridden && (
+        {!onTimeFrameOverrideChange && (
           <View style={{ flexShrink: 0, textAlign: 'right' }}>
             <QueryTimeFrameSummary timeFrame={timeFrame} />
           </View>
         )}
       </View>
-      {onTimeFrameOverrideChange && timeFrameOverride && (
-        <View>
-          <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
-            <Trans>This card uses its own time frame for this query.</Trans>
-          </Text>
-          <QueryTimeFrameControl
-            timeFrame={timeFrameOverride}
-            onChange={onTimeFrameOverrideChange}
-          />
-        </View>
-      )}
       {onTimeFrameOverrideChange && (
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-          {timeFrameOverride ? (
-            <Button
-              variant="bare"
-              onPress={() => onTimeFrameOverrideChange(null)}
-            >
-              <Trans>Use the library time frame</Trans>
-            </Button>
-          ) : (
-            <Button
-              variant="bare"
-              onPress={() =>
-                onTimeFrameOverrideChange({
-                  ...newQueryTimeFrame(),
-                  ...timeFrame,
-                })
-              }
-            >
-              <Trans>Use a card time frame</Trans>
-            </Button>
+        <View>
+          {timeFrameOverride && (
+            <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
+              <Trans>This card uses its own time frame for this query.</Trans>
+            </Text>
           )}
+          <QueryTimeFrameControl
+            timeFrame={
+              timeFrameOverride ?? { ...newQueryTimeFrame(), ...timeFrame }
+            }
+            onChange={onTimeFrameOverrideChange}
+            isLibraryTimeFrame={!timeFrameOverride}
+            onUseLibraryTimeFrame={() => onTimeFrameOverrideChange(null)}
+          />
         </View>
       )}
     </View>
