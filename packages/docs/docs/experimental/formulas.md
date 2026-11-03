@@ -245,6 +245,43 @@ In the Formula editor page, use **Query Definitions**:
 
 <img width="1196" alt="The formula editor with two named queries in the Query Definitions panel, numbered by step" src="/img/experimental/formulas/formulas-editor-and-queries@2x.webp" />
 
+### Share Queries With the Formula Library
+
+A query that you define on a card works only on that card. To use the same query on many cards, add it to the **Formula library**. Every formula card can then use it with `QUERY("name")`, `QUERY_COUNT("name")` and the `QUERY_EXTRACT_*` functions.
+
+To open the formula library, go to **Settings** > **Formula library**. This page shows only when Excel formula mode is on.
+
+:::note
+The formula library is available on desktop only.
+:::
+
+To add a query to the library:
+
+1. Select **Create new query**.
+2. Type a name. Names are not case-sensitive, so `Food` and `food` are the same name. Two library queries cannot have the same name.
+3. Optionally, type a description.
+4. Set the date range and the filters, the same as for a query on a card.
+5. Select **Save**.
+
+The **Used by** column shows how many cards use each query. Select it to see the cards and their formulas.
+
+#### Rename a Library Query
+
+When you rename a query that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the query name in the formulas of the selected cards. A card that you clear keeps the old name, and shows an error until you change its formula or add a query with the old name.
+
+To reverse a rename and the formula changes that it made, use undo once.
+
+Actual cannot change a name that a formula builds from parts, for example `QUERY("fo" & "od")`. The list of cards does not show these formulas.
+
+#### Delete a Library Query
+
+Before Actual deletes a query, it shows the cards that use it. After the delete, these cards show an error until you change their formulas or add a query with the same name.
+
+#### When Two Queries Have the Same Name
+
+- If a card has its own query with the same name as a library query, the card uses its own query.
+- If two library queries have the same name, formulas use the older query. This can happen when two devices sync. The formula library shows a note on the newer query.
+
 ### Budget queries with `BUDGET_QUERY`
 
 `BUDGET_QUERY` reads directly from your **envelope budget** (budgeted amounts, spending, balances, and goals) for a fixed set of categories over a month range.
