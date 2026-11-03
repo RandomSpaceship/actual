@@ -20,7 +20,10 @@ import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
-import { FormulaTable } from '#components/formula/FormulaTable';
+import {
+  FormulaTable,
+  getFormulaTableColumnNames,
+} from '#components/formula/FormulaTable';
 import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColumnSettings';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
@@ -107,6 +110,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   );
   const [tableColumns, setTableColumns] = useState<FormulaTableColumn[]>(
     widget?.meta?.tableColumns ?? [],
+  );
+  const [tableHeaderRow, setTableHeaderRow] = useState(
+    widget?.meta?.tableHeaderRow ?? false,
   );
 
   const title = widget?.meta?.name || t('Formula');
@@ -239,6 +245,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           colorFormula,
           view,
           tableColumns,
+          tableHeaderRow,
         },
       },
     });
@@ -272,6 +279,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             colorFormula,
             view,
             tableColumns,
+            tableHeaderRow,
           },
         },
       },
@@ -445,6 +453,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 <FormulaTable
                   table={table}
                   columns={tableColumns}
+                  headerRow={tableHeaderRow}
                   style={{ flex: 1, padding: 10 }}
                 />
               ) : (
@@ -502,6 +511,13 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 columnCount={table?.[0]?.length ?? 0}
                 columns={tableColumns}
                 onChange={setTableColumns}
+                headerRow={tableHeaderRow}
+                onHeaderRowChange={setTableHeaderRow}
+                headerRowNames={getFormulaTableColumnNames(
+                  table ?? [],
+                  [],
+                  true,
+                )}
               />
             </View>
           ) : (

@@ -475,6 +475,8 @@ export type FormulaWidget = AbstractWidget<
     view?: 'auto' | 'number' | 'table';
     // Settings for each table column, by position
     tableColumns?: FormulaTableColumn[];
+    // The first row of the table gives the column names
+    tableHeaderRow?: boolean;
     queriesVersion?: number;
     queries?: Record<
       string,

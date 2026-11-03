@@ -129,6 +129,7 @@ export function FormulaCard({
           <FormulaTable
             table={table}
             columns={meta?.tableColumns}
+            headerRow={meta?.tableHeaderRow}
             style={{
               flex: 1,
               padding: showTitle ? '0 10px 10px' : 10,

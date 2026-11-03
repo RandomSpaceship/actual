@@ -22,12 +22,15 @@ import type { FormulaTable as FormulaTableData } from './executeFormula';
 type FormulaTableProps = {
   table: FormulaTableData;
   columns?: FormulaTableColumn[];
+  // Show the first row as the header row
+  headerRow?: boolean;
   style?: CSSProperties;
 };
 
 export function FormulaTable({
   table,
   columns = [],
+  headerRow = false,
   style,
 }: FormulaTableProps) {
   const { t } = useTranslation();
@@ -35,8 +38,10 @@ export function FormulaTable({
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
   const locale = useLocale();
 
-  const columnTypes = getFormulaTableColumnTypes(table, columns);
-  const hasHeader = columns.some(column => column.name);
+  const bodyRows = headerRow ? table.slice(1) : table;
+  const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
+  const headerNames = getFormulaTableColumnNames(table, columns, headerRow);
+  const hasHeader = headerNames.some(name => name !== '');
 
   function formatCell(
     value: string | number | boolean | null,
@@ -102,14 +107,17 @@ export function FormulaTable({
                     borderBottom: `1px solid ${theme.tableBorder}`,
                   }}
                 >
-                  {columns[columnIndex]?.name ?? ''}
+                  {/* A month in the header row shows as a date */}
+                  {headerRow && !columns[columnIndex]?.name
+                    ? formatDate(headerNames[columnIndex], dateFormat, locale)
+                    : headerNames[columnIndex]}
                 </th>
               ))}
             </tr>
           </thead>
         )}
         <tbody>
-          {table.map((row, rowIndex) => (
+          {bodyRows.map((row, rowIndex) => (
             <tr
               key={rowIndex}
               style={{
@@ -159,21 +167,41 @@ export function FormulaTable({
 }
 
 // The type of each column. A column without a type shows as money when all of
-// its cells are numbers, and as text when they are not.
+// its cells are numbers, and as text when they are not. A header row does not
+// count.
 export function getFormulaTableColumnTypes(
   table: FormulaTableData,
   columns: FormulaTableColumn[],
+  headerRow = false,
 ): FormulaTableColumnType[] {
   const width = Math.max(0, ...table.map(row => row.length));
+  const bodyRows = headerRow ? table.slice(1) : table;
   return Array.from({ length: width }, (_, columnIndex) => {
     const setType = columns[columnIndex]?.type;
     if (setType) return setType;
-    const values = table
+    const values = bodyRows
       .map(row => row[columnIndex] ?? null)
       .filter(cell => cell !== null && !isErrorCell(cell));
     return values.length > 0 && values.every(value => typeof value === 'number')
       ? 'money'
       : 'text';
+  });
+}
+
+// The name of each column. A name in the column settings wins over the
+// header row.
+export function getFormulaTableColumnNames(
+  table: FormulaTableData,
+  columns: FormulaTableColumn[],
+  headerRow = false,
+): string[] {
+  const width = Math.max(0, ...table.map(row => row.length));
+  return Array.from({ length: width }, (_, columnIndex) => {
+    const setName = columns[columnIndex]?.name;
+    if (setName) return setName;
+    const headerCell = headerRow ? (table[0]?.[columnIndex] ?? null) : null;
+    if (headerCell === null) return '';
+    return isErrorCell(headerCell) ? headerCell.error : String(headerCell);
   });
 }
 
