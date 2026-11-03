@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getFormulaTableColumnNames,
   getFormulaTableColumnTypes,
+  isFormulaTableHeaderRowShown,
 } from './FormulaTable';
 
 describe('getFormulaTableColumnTypes', () => {
@@ -63,5 +64,49 @@ describe('getFormulaTableColumnNames', () => {
     expect(
       getFormulaTableColumnNames(table, [{ name: 'Category' }, {}], true),
     ).toEqual(['Category', '2024-01', '2024-02']);
+  });
+});
+
+describe('isFormulaTableHeaderRowShown', () => {
+  it('finds the header row of a pivot table', () => {
+    expect(
+      isFormulaTableHeaderRowShown([
+        ['', '2024-01', '2024-02'],
+        ['Rent', -50, -50],
+      ]),
+    ).toBe(true);
+  });
+
+  it('finds no header row in group rows or in text', () => {
+    expect(
+      isFormulaTableHeaderRowShown([
+        ['Rent', '2024-01', -50],
+        ['Power', '2024-01', -20],
+      ]),
+    ).toBe(false);
+    expect(
+      isFormulaTableHeaderRowShown([
+        ['Rent', 'Bills'],
+        ['Power', 'Bills'],
+      ]),
+    ).toBe(false);
+    expect(isFormulaTableHeaderRowShown([['Rent', 'Amount']])).toBe(false);
+  });
+
+  it('obeys the setting', () => {
+    const table = [
+      ['Rent', -50],
+      ['Power', -20],
+    ];
+    expect(isFormulaTableHeaderRowShown(table, 'first-row')).toBe(true);
+    expect(
+      isFormulaTableHeaderRowShown(
+        [
+          ['', 'Amount'],
+          ['Rent', -50],
+        ],
+        'none',
+      ),
+    ).toBe(false);
   });
 });

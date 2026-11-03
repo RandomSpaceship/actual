@@ -7,7 +7,10 @@ import type {
   FormulaWidget,
 } from '@actual-app/core/types/models';
 
-import { FormulaTable } from '#components/formula/FormulaTable';
+import {
+  FormulaTable,
+  isFormulaTableHeaderRowShown,
+} from '#components/formula/FormulaTable';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import { ReportCard } from '#components/reports/ReportCard';
@@ -129,7 +132,7 @@ export function FormulaCard({
           <FormulaTable
             table={table}
             columns={meta?.tableColumns}
-            headerRow={meta?.tableHeaderRow}
+            headerRow={isFormulaTableHeaderRowShown(table, meta?.tableHeader)}
             style={{
               flex: 1,
               padding: showTitle ? '0 10px 10px' : 10,

@@ -14,6 +14,7 @@ import { View } from '@actual-app/components/view';
 import type {
   FormulaLibraryItemEntity,
   FormulaTableColumn,
+  FormulaTableHeader,
   FormulaWidget,
 } from '@actual-app/core/types/models';
 import type { EditorView } from '@codemirror/view';
@@ -23,6 +24,7 @@ import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import {
   FormulaTable,
   getFormulaTableColumnNames,
+  isFormulaTableHeaderRowShown,
 } from '#components/formula/FormulaTable';
 import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColumnSettings';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
@@ -111,8 +113,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [tableColumns, setTableColumns] = useState<FormulaTableColumn[]>(
     widget?.meta?.tableColumns ?? [],
   );
-  const [tableHeaderRow, setTableHeaderRow] = useState(
-    widget?.meta?.tableHeaderRow ?? false,
+  const [tableHeader, setTableHeader] = useState<FormulaTableHeader>(
+    widget?.meta?.tableHeader ?? 'auto',
   );
 
   const title = widget?.meta?.name || t('Formula');
@@ -141,6 +143,10 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
   );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
+  const isHeaderRowShown = isFormulaTableHeaderRowShown(
+    table ?? [],
+    tableHeader,
+  );
 
   const colorVariables = useMemo(
     () => ({
@@ -245,7 +251,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           colorFormula,
           view,
           tableColumns,
-          tableHeaderRow,
+          tableHeader,
         },
       },
     });
@@ -279,7 +285,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             colorFormula,
             view,
             tableColumns,
-            tableHeaderRow,
+            tableHeader,
           },
         },
       },
@@ -453,7 +459,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 <FormulaTable
                   table={table}
                   columns={tableColumns}
-                  headerRow={tableHeaderRow}
+                  headerRow={isHeaderRowShown}
                   style={{ flex: 1, padding: 10 }}
                 />
               ) : (
@@ -511,8 +517,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 columnCount={table?.[0]?.length ?? 0}
                 columns={tableColumns}
                 onChange={setTableColumns}
-                headerRow={tableHeaderRow}
-                onHeaderRowChange={setTableHeaderRow}
+                header={tableHeader}
+                onHeaderChange={setTableHeader}
+                isHeaderRowShown={isHeaderRowShown}
                 headerRowNames={getFormulaTableColumnNames(
                   table ?? [],
                   [],

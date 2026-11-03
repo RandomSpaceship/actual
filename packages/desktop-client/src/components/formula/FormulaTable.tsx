@@ -9,6 +9,7 @@ import { amountToInteger } from '@actual-app/core/shared/util';
 import type {
   FormulaTableColumn,
   FormulaTableColumnType,
+  FormulaTableHeader,
 } from '@actual-app/core/types/models';
 
 import { FinancialText } from '#components/FinancialText';
@@ -186,6 +187,27 @@ export function getFormulaTableColumnTypes(
       ? 'money'
       : 'text';
   });
+}
+
+// For 'auto', the first row is the header row when it has no numbers, and a
+// column has text in the first row and only numbers below it. QUERY_PIVOT
+// gives such a table. QUERY_GROUP does not, because each row has a number.
+export function isFormulaTableHeaderRowShown(
+  table: FormulaTableData,
+  setting: FormulaTableHeader = 'auto',
+): boolean {
+  if (setting !== 'auto') return setting === 'first-row';
+  const [firstRow, ...bodyRows] = table;
+  if (!firstRow || bodyRows.length === 0) return false;
+  if (firstRow.some(cell => typeof cell !== 'string' && cell !== null)) {
+    return false;
+  }
+  return firstRow.some(
+    (cell, columnIndex) =>
+      typeof cell === 'string' &&
+      cell !== '' &&
+      bodyRows.every(row => typeof row[columnIndex] === 'number'),
+  );
 }
 
 // The name of each column. A name in the column settings wins over the

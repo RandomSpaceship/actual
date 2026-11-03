@@ -3,19 +3,21 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Input } from '@actual-app/components/input';
 import { Select } from '@actual-app/components/select';
 import { theme } from '@actual-app/components/theme';
-import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
 import type {
   FormulaTableColumn,
   FormulaTableColumnType,
+  FormulaTableHeader,
 } from '@actual-app/core/types/models';
 
 type FormulaTableColumnSettingsProps = {
   columnCount: number;
   columns: FormulaTableColumn[];
   onChange: (columns: FormulaTableColumn[]) => void;
-  headerRow: boolean;
-  onHeaderRowChange: (headerRow: boolean) => void;
+  header: FormulaTableHeader;
+  onHeaderChange: (header: FormulaTableHeader) => void;
+  // The table shows its first row as the header row
+  isHeaderRowShown: boolean;
   // The names in the first row, for the placeholders
   headerRowNames: string[];
 };
@@ -24,8 +26,9 @@ export function FormulaTableColumnSettings({
   columnCount,
   columns,
   onChange,
-  headerRow,
-  onHeaderRowChange,
+  header,
+  onHeaderChange,
+  isHeaderRowShown,
   headerRowNames,
 }: FormulaTableColumnSettingsProps) {
   const { t } = useTranslation();
@@ -63,13 +66,22 @@ export function FormulaTableColumnSettings({
           marginBottom: 5,
         }}
       >
-        <label htmlFor="formula-table-header-row" style={labelStyle}>
-          <Trans>First row is the header:</Trans>
-        </label>
-        <Toggle
-          id="formula-table-header-row"
-          isOn={headerRow}
-          onToggle={onHeaderRowChange}
+        <View style={labelStyle}>
+          <Trans>Header row:</Trans>
+        </View>
+        <Select
+          value={header}
+          onChange={(value: FormulaTableHeader) => onHeaderChange(value)}
+          options={[
+            [
+              'auto',
+              isHeaderRowShown
+                ? t('Automatic (first row)')
+                : t('Automatic (column names)'),
+            ],
+            ['first-row', t('First row')],
+            ['none', t('Column names only')],
+          ]}
         />
       </View>
       <View style={labelStyle}>
@@ -96,7 +108,8 @@ export function FormulaTableColumnSettings({
                 columnNumber,
               })}
               placeholder={
-                (headerRow && headerRowNames[columnIndex]) || t('No name')
+                (isHeaderRowShown && headerRowNames[columnIndex]) ||
+                t('No name')
               }
               value={column.name ?? ''}
               onChangeValue={name => updateColumn(columnIndex, { name })}

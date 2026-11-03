@@ -475,8 +475,9 @@ export type FormulaWidget = AbstractWidget<
     view?: 'auto' | 'number' | 'table';
     // Settings for each table column, by position
     tableColumns?: FormulaTableColumn[];
-    // The first row of the table gives the column names
-    tableHeaderRow?: boolean;
+    // 'first-row' uses the first row of the table as the header row. 'auto'
+    // (the default) does so when the first row looks like column names.
+    tableHeader?: FormulaTableHeader;
     queriesVersion?: number;
     queries?: Record<
       string,
@@ -507,6 +508,7 @@ export type FormulaTableColumnType =
   | 'text';
 
 // Without a type, a column of numbers shows as money, and other columns as text
+export type FormulaTableHeader = 'auto' | 'first-row' | 'none';
 export type FormulaTableColumn = {
   name?: string;
   type?: FormulaTableColumnType;
