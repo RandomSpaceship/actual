@@ -132,7 +132,34 @@ async function getDimensionKeys(
   };
 }
 
-// The rows for a QUERY_GROUP or QUERY_GROUP_COUNT call, with the sums as
+// A header row with the column names, then one row for each key of dimension
+// 1. A cell without transactions is 0. asc and desc sort the rows by the row
+// total. The columns stay in budget order (or name order).
+function getWideRows(
+  [rowKeys, columnKeys]: DimensionKeys[],
+  values: Map<string, number>,
+  sort: QueryGroupRequest['sort'],
+): QueryGroupRow[] {
+  const rows = rowKeys.order.map(rowKey => {
+    const cells = columnKeys.order.map(
+      columnKey => values.get(JSON.stringify([rowKey, columnKey])) ?? 0,
+    );
+    const total = cells.reduce((sum, cell) => sum + cell, 0);
+    return { name: rowKeys.names.get(rowKey) ?? rowKey, cells, total };
+  });
+  if (sort === 'asc' || sort === 'desc') {
+    // A tie keeps budget order, because the sort is stable
+    const direction = sort === 'asc' ? 1 : -1;
+    rows.sort((a, b) => direction * (a.total - b.total));
+  }
+  const headerRow = [
+    '',
+    ...columnKeys.order.map(key => columnKeys.names.get(key) ?? key),
+  ];
+  return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
+}
+
+// The rows for a QUERY_GROUP, QUERY_GROUP_COUNT or QUERY_PIVOT call, with the sums as
 // integers. A month or year dimension gives a row with 0 for each period
 // without transactions.
 export async function fetchQueryGroupRows({
@@ -180,6 +207,10 @@ export async function fetchQueryGroupRows({
         (names.get(a) ?? a).localeCompare(names.get(b) ?? b),
       );
     }
+  }
+
+  if (request.shape === 'wide') {
+    return getWideRows(dimensionKeys, values, sort);
   }
 
   // With a period dimension, each combination gets a row. Without one, only

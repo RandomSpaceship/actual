@@ -10,6 +10,7 @@ const QUERY_NAME_FUNCTIONS = new Set([
   'QUERY_DAYS',
   'QUERY_GROUP',
   'QUERY_GROUP_COUNT',
+  'QUERY_PIVOT',
 ]);
 
 export type QueryNameReference = {

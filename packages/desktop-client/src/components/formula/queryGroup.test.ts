@@ -195,3 +195,49 @@ describe('QUERY_GROUP', () => {
     ]);
   });
 });
+
+describe('QUERY_PIVOT', () => {
+  it('gives a header row and a column for each month', async () => {
+    expect(
+      (await run('=QUERY_PIVOT("firstQuarter", "category", "month")')).table,
+    ).toEqual([
+      ['', '2024-01', '2024-02', '2024-03'],
+      ['Power', -10, 0, 0],
+      ['Groceries', 0, -30, 0],
+    ]);
+  });
+
+  it('sorts the rows by the row total', async () => {
+    expect(
+      (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "desc")'))
+        .table,
+    ).toEqual([
+      ['', '2024-01', '2024-02', '2024-03'],
+      ['Power', -10, 0, 0],
+      ['Groceries', 0, -30, 0],
+    ]);
+    expect(
+      (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "asc")'))
+        .table,
+    ).toEqual([
+      ['', '2024-01', '2024-02', '2024-03'],
+      ['Groceries', 0, -30, 0],
+      ['Power', -10, 0, 0],
+    ]);
+  });
+
+  it('works inside other functions', async () => {
+    expect(
+      await run(
+        '=INDEX(QUERY_PIVOT("firstQuarter", "category", "month"), 3, 3)',
+        'value',
+      ),
+    ).toEqual({ value: -30, issues: [] });
+  });
+
+  it('gives an error without a dimension for the columns', async () => {
+    await expect(run('=QUERY_PIVOT("all", "category", "")')).rejects.toThrow(
+      'Give a dimension for the columns',
+    );
+  });
+});

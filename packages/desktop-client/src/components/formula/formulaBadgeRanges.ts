@@ -111,6 +111,7 @@ const queryNameFunctions = new Set([
   'QUERY_DAYS',
   'QUERY_GROUP',
   'QUERY_GROUP_COUNT',
+  'QUERY_PIVOT',
 ]);
 
 const budgetDimensions = new Set<string>(budgetQueryDimensions);

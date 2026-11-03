@@ -553,11 +553,13 @@ async function prefetchQueryGroups(
       });
       formulaQueryContext.queryGroupPrefetch.set(
         key,
+        // The names are text, so each number is a sum or a count
         request.measure === 'sum'
-          ? rows.map(row => [
-              ...row.slice(0, -1),
-              integerToFormulaAmount(Number(row[row.length - 1])),
-            ])
+          ? rows.map(row =>
+              row.map(cell =>
+                typeof cell === 'number' ? integerToFormulaAmount(cell) : cell,
+              ),
+            )
           : rows,
       );
     } catch (err) {

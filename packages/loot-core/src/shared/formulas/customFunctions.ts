@@ -41,15 +41,19 @@ export type QueryGroupDimension = (typeof queryGroupDimensions)[number];
 export const queryGroupSorts = ['budget', 'name', 'asc', 'desc'] as const;
 export type QueryGroupSort = (typeof queryGroupSorts)[number];
 
-// A QUERY_GROUP or QUERY_GROUP_COUNT call
+// A QUERY_GROUP, QUERY_GROUP_COUNT or QUERY_PIVOT call. 'long' gives one row
+// for each group. 'wide' gives a header row, then one row for each key of
+// dimension 1, with one column for each key of dimension 2.
 export type QueryGroupRequest = {
   queryName: string;
   dimensions: QueryGroupDimension[];
   sort: QueryGroupSort;
   measure: 'sum' | 'count';
+  shape: 'long' | 'wide';
 };
 
-// The name of each dimension, then the sum or the count
+// Long: the name of each dimension, then the sum or the count. Wide: the
+// name of the row, then the sum for each column.
 export type QueryGroupRow = Array<string | number>;
 
 export type FormulaQueryContext = {
@@ -140,15 +144,19 @@ function parseQueryGroupDimension(value: string) {
   );
 }
 
-// An empty dimension 2 or sort gives the default. Returns an error message
-// for a bad argument.
+// An empty dimension 2 or sort gives the default. A wide table must have
+// dimension 2. Returns an error message for a bad argument.
 export function createQueryGroupRequest(
   queryName: string,
   dimension1: string,
   dimension2: string,
   sort: string,
   measure: QueryGroupRequest['measure'],
+  shape: QueryGroupRequest['shape'] = 'long',
 ): QueryGroupRequest | string {
+  if (shape === 'wide' && dimension2 === '') {
+    return 'Give a dimension for the columns, for example "month"';
+  }
   const dimensions: QueryGroupDimension[] = [];
   for (const value of dimension2 === ''
     ? [dimension1]
@@ -169,7 +177,7 @@ export function createQueryGroupRequest(
     return `Unknown sort "${sort}". Use one of: ${queryGroupSorts.join(', ')}`;
   }
 
-  return { queryName, dimensions, sort: parsedSort, measure };
+  return { queryName, dimensions, sort: parsedSort, measure, shape };
 }
 
 // HyperFormula needs the table size before it runs the function, so the
@@ -188,14 +196,19 @@ export function createQueryGroupPrefetchKey(request: QueryGroupRequest) {
 }
 
 // A query without transactions gives one row with empty names and 0, because
-// a table cannot have zero rows
-function queryGroupRowsToRange(
+// a table cannot have zero rows. A wide table also keeps its header row.
+function getQueryGroupRowsOrEmpty(
   request: QueryGroupRequest,
-  rows: QueryGroupRow[],
-): SimpleRangeValue {
-  return SimpleRangeValue.onlyValues(
-    rows.length > 0 ? rows : [[...request.dimensions.map(() => ''), 0]],
-  );
+  rows: QueryGroupRow[] | undefined,
+): QueryGroupRow[] {
+  if (rows && rows.length > 0) return rows;
+  if (request.shape === 'wide') {
+    return [
+      ['', ''],
+      ['', 0],
+    ];
+  }
+  return [[...request.dimensions.map(() => ''), 0]];
 }
 
 function categoryRangeToIds(categories: SimpleRangeValue): string[] {
@@ -447,8 +460,9 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
   private queryGroupFor(
     ast: ProcedureAst,
     state: InterpreterState,
-    functionName: 'QUERY_GROUP' | 'QUERY_GROUP_COUNT',
+    functionName: 'QUERY_GROUP' | 'QUERY_GROUP_COUNT' | 'QUERY_PIVOT',
     measure: QueryGroupRequest['measure'],
+    shape: QueryGroupRequest['shape'],
   ) {
     if (!getLiteralArgs(ast)) {
       return new CellError(
@@ -472,6 +486,7 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
           dimension2,
           sort,
           measure,
+          shape,
         );
         if (typeof request === 'string') {
           return new CellError(ErrorType.VALUE, request);
@@ -479,9 +494,8 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
         const ctx = this.getFormulaQueryContext();
         const key = createQueryGroupPrefetchKey(request);
         ctx?.queryGroupRequests?.set(key, request);
-        return queryGroupRowsToRange(
-          request,
-          ctx?.queryGroupPrefetch?.get(key) ?? [],
+        return SimpleRangeValue.onlyValues(
+          getQueryGroupRowsOrEmpty(request, ctx?.queryGroupPrefetch?.get(key)),
         );
       },
     );
@@ -492,6 +506,7 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
   private queryGroupSizeFor(
     ast: ProcedureAst,
     measure: QueryGroupRequest['measure'],
+    shape: QueryGroupRequest['shape'],
   ): ArraySize {
     const args = getLiteralArgs(ast);
     if (!args || args.length < 2 || args.length > 4) {
@@ -505,33 +520,42 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
       dimension2,
       sort,
       measure,
+      shape,
     );
     if (typeof request === 'string') {
       return ArraySize.scalar();
     }
-    const rowCount = this.getFormulaQueryContext()?.queryGroupPrefetch?.get(
-      createQueryGroupPrefetchKey(request),
-    )?.length;
-    return new ArraySize(
-      request.dimensions.length + 1,
-      Math.max(rowCount ?? 1, 1),
+    const rows = getQueryGroupRowsOrEmpty(
+      request,
+      this.getFormulaQueryContext()?.queryGroupPrefetch?.get(
+        createQueryGroupPrefetchKey(request),
+      ),
     );
+    return new ArraySize(rows[0].length, rows.length);
   }
 
   queryGroup(ast: ProcedureAst, state: InterpreterState) {
-    return this.queryGroupFor(ast, state, 'QUERY_GROUP', 'sum');
+    return this.queryGroupFor(ast, state, 'QUERY_GROUP', 'sum', 'long');
   }
 
   queryGroupSize(ast: ProcedureAst): ArraySize {
-    return this.queryGroupSizeFor(ast, 'sum');
+    return this.queryGroupSizeFor(ast, 'sum', 'long');
   }
 
   queryGroupCount(ast: ProcedureAst, state: InterpreterState) {
-    return this.queryGroupFor(ast, state, 'QUERY_GROUP_COUNT', 'count');
+    return this.queryGroupFor(ast, state, 'QUERY_GROUP_COUNT', 'count', 'long');
   }
 
   queryGroupCountSize(ast: ProcedureAst): ArraySize {
-    return this.queryGroupSizeFor(ast, 'count');
+    return this.queryGroupSizeFor(ast, 'count', 'long');
+  }
+
+  queryPivot(ast: ProcedureAst, state: InterpreterState) {
+    return this.queryGroupFor(ast, state, 'QUERY_PIVOT', 'sum', 'wide');
+  }
+
+  queryPivotSize(ast: ProcedureAst): ArraySize {
+    return this.queryGroupSizeFor(ast, 'sum', 'wide');
   }
 
   budgetQuery(ast: ProcedureAst, state: InterpreterState) {
@@ -779,6 +803,20 @@ CustomFunctionsPlugin.implementedFunctions = {
       },
     ],
   },
+  QUERY_PIVOT: {
+    method: 'queryPivot',
+    sizeOfResultArrayMethod: 'queryPivotSize',
+    parameters: [
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+    ],
+  },
   BUDGET_QUERY: {
     method: 'budgetQuery',
     parameters: [
@@ -862,6 +900,7 @@ export const customFunctionsTranslations = {
     QUERY_DAYS: 'QUERY_DAYS',
     QUERY_GROUP: 'QUERY_GROUP',
     QUERY_GROUP_COUNT: 'QUERY_GROUP_COUNT',
+    QUERY_PIVOT: 'QUERY_PIVOT',
     BUDGET_QUERY: 'BUDGET_QUERY',
     FORMATNUMBER: 'FORMATNUMBER',
     FORMATCURRENCY: 'FORMATCURRENCY',
