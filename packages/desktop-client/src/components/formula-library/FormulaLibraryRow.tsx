@@ -8,17 +8,14 @@ import { Popover } from '@actual-app/components/popover';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import * as monthUtils from '@actual-app/core/shared/months';
 import type { FormulaLibraryQueryEntity } from '@actual-app/core/types/models';
 
-import { getTimeFrameModeLabels } from '#components/formula/queryTimeFrame';
-import { ConditionExpression } from '#components/rules/ConditionExpression';
 import { Cell, Field, Row } from '#components/table';
-import { useDateFormat } from '#hooks/useDateFormat';
-import { friendlyOp } from '#util/rule';
 
 import type { FormulaQueryUse } from './formulaQueryUses';
 import { FormulaQueryUsesList } from './FormulaQueryUsesList';
+import { QueryConditionsSummary } from './QueryConditionsSummary';
+import { QueryTimeFrameSummary } from './QueryTimeFrameSummary';
 
 type FormulaLibraryRowProps = {
   item: FormulaLibraryQueryEntity;
@@ -37,17 +34,7 @@ export function FormulaLibraryRow({
   onDelete,
 }: FormulaLibraryRowProps) {
   const { t } = useTranslation();
-  const dateFormat = useDateFormat() || 'MM/dd/yyyy';
-  const { description, conditions = [], conditionsOp, timeFrame } = item.data;
-
-  const timeFrameMode = timeFrame?.mode ?? 'sliding-window';
-  const timeFrameLabel = getTimeFrameModeLabels(t)[timeFrameMode];
-  const dates =
-    (timeFrameMode === 'static' || timeFrameMode === 'sliding-window') &&
-    timeFrame?.start &&
-    timeFrame?.end
-      ? { start: timeFrame.start, end: timeFrame.end }
-      : null;
+  const { description, conditions, conditionsOp, timeFrame } = item.data;
 
   return (
     <Row
@@ -76,37 +63,13 @@ export function FormulaLibraryRow({
         </Text>
       </Field>
       <Field width="flex" truncate={false} style={{ padding: '10px 0' }}>
-        {conditions.length === 0 ? (
-          <Text style={{ color: theme.pageTextSubdued }}>
-            <Trans>All transactions</Trans>
-          </Text>
-        ) : (
-          <View style={{ alignItems: 'flex-start' }}>
-            {conditions.map((condition, index) => (
-              <ConditionExpression
-                key={index}
-                field={condition.field}
-                op={condition.op}
-                inline
-                value={condition.value}
-                options={condition.options}
-                prefix={
-                  index > 0 ? friendlyOp(conditionsOp ?? 'and') : undefined
-                }
-                style={index !== 0 ? { marginTop: 3 } : undefined}
-              />
-            ))}
-          </View>
-        )}
+        <QueryConditionsSummary
+          conditions={conditions}
+          conditionsOp={conditionsOp}
+        />
       </Field>
       <Field width={180} truncate={false} style={{ padding: '10px 0' }}>
-        <Text>{timeFrameLabel}</Text>
-        {dates && (
-          <Text style={{ color: theme.pageTextSubdued }}>
-            {monthUtils.format(dates.start, dateFormat)} –{' '}
-            {monthUtils.format(dates.end, dateFormat)}
-          </Text>
-        )}
+        <QueryTimeFrameSummary timeFrame={timeFrame} />
       </Field>
       <Cell width={100} plain style={{ padding: '10px 5px' }}>
         {uses.length === 0 ? (
