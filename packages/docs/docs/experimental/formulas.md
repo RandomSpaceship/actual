@@ -142,9 +142,12 @@ If a function isn’t listed here, it still might work. Actual uses HyperFormula
 | `QUARTILE`                      | Query        | Returns the quartile of a dataset.                                                                                                                                    | `=QUARTILE(A1:A100, 1)`                                                                                                       | —                                                                                                               |
 | `QUERY`                         | Query        | Execute a query and return the result.                                                                                                                                | `=QUERY("expenses")`                                                                                                          | —                                                                                                               |
 | `QUERY_COUNT`                   | Query        | Execute a query and return the number of matching rows.                                                                                                               | `=QUERY_COUNT("expenses")`                                                                                                    | —                                                                                                               |
+| `QUERY_DAYS`                    | Query        | Returns the number of days that a named query includes, with the first and last day counted.                                                                          | `=QUERY_DAYS("expenses")`                                                                                                     | —                                                                                                               |
+| `QUERY_END_DATE`                | Query        | Returns the last day that a named query includes, as `YYYY-MM-DD` text.                                                                                               | `=QUERY_END_DATE("expenses")`                                                                                                 | —                                                                                                               |
 | `QUERY_EXTRACT_CATEGORIES`      | Query        | Determines which categories to include based on a named query's category filters; used as the `categories` argument in `BUDGET_QUERY`.                                | `=QUERY_EXTRACT_CATEGORIES("expenses")`                                                                                       | —                                                                                                               |
 | `QUERY_EXTRACT_TIMEFRAME_END`   | Query        | Extracts the end month from a named query's date range; used as the `endMonth` argument in `BUDGET_QUERY`.                                                            | `=QUERY_EXTRACT_TIMEFRAME_END("expenses")`                                                                                    | —                                                                                                               |
 | `QUERY_EXTRACT_TIMEFRAME_START` | Query        | Extracts the start month from a named query's date range; used as the `startMonth` argument in `BUDGET_QUERY`.                                                        | `=QUERY_EXTRACT_TIMEFRAME_START("expenses")`                                                                                  | —                                                                                                               |
+| `QUERY_START_DATE`              | Query        | Returns the first day that a named query includes, as `YYYY-MM-DD` text.                                                                                              | `=QUERY_START_DATE("expenses")`                                                                                               | —                                                                                                               |
 | `RANK`                          | Query        | Returns the rank of a number in a list.                                                                                                                               | `=RANK(10, A1:A10, 0)`                                                                                                        | —                                                                                                               |
 | `RATE`                          | Query        | Calculates interest rate per period.                                                                                                                                  | `=RATE(60, -200, 10000)`                                                                                                      | —                                                                                                               |
 | `REPLACE`                       | Query, Rules | Replaces substring at specified position.                                                                                                                             | `=REPLACE(notes, 1, 5, "")`                                                                                                   | —                                                                                                               |
@@ -214,6 +217,26 @@ Example:
 ```text
 =QUERY("income") - QUERY("expenses")
 ```
+
+### Get the Days of a Query
+
+Three functions give the days that a query includes. They use the same days as the query filter.
+
+- `QUERY_START_DATE("myQuery")` gives the first day, as text in the form `YYYY-MM-DD`.
+- `QUERY_END_DATE("myQuery")` gives the last day, in the same form.
+- `QUERY_DAYS("myQuery")` gives the number of days, with the first and the last day counted.
+
+A date range in months includes all of each month. For example, a query for this month ends on the last day of the month, also when that day is in the future.
+
+If the query has no date range, `QUERY_START_DATE` and `QUERY_END_DATE` give empty text, and `QUERY_DAYS` gives an error.
+
+This example gives the average amount for each day of the query:
+
+```text
+=QUERY("expenses") / QUERY_DAYS("expenses")
+```
+
+Formulas can also subtract one date from the other. `=QUERY_END_DATE("expenses") - QUERY_START_DATE("expenses") + 1` gives the same value as `QUERY_DAYS("expenses")`.
 
 ### Account balances with `BALANCE_OF("name")`
 
