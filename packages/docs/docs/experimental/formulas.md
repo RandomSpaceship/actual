@@ -282,6 +282,8 @@ Before Actual deletes a query, it shows the cards that use it. After the delete,
 - If a card has its own query with the same name as a library query, the card uses its own query.
 - If two library queries have the same name, formulas use the older query. This can happen when two devices sync. The formula library shows a note on the newer query.
 
+In both cases, the card shows a warning line at the bottom.
+
 ### Budget queries with `BUDGET_QUERY`
 
 `BUDGET_QUERY` reads directly from your **envelope budget** (budgeted amounts, spending, balances, and goals) for a fixed set of categories over a month range.

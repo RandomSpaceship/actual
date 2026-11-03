@@ -7,6 +7,7 @@ import type {
   FormulaWidget,
 } from '@actual-app/core/types/models';
 
+import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import { ReportCard } from '#components/reports/ReportCard';
 import { ReportCardName } from '#components/reports/ReportCardName';
@@ -55,7 +56,7 @@ export function FormulaCard({
     [accounts],
   );
 
-  const { result, isLoading, error } = useFormulaExecution(
+  const { result, isLoading, error, issues } = useFormulaExecution(
     formula,
     meta?.queries ?? EMPTY_QUERIES,
     meta?.queriesVersion,
@@ -76,7 +77,11 @@ export function FormulaCard({
     }),
     [result, themeColors],
   );
-  const { result: colorResult, error: colorError } = useFormulaExecution(
+  const {
+    result: colorResult,
+    error: colorError,
+    issues: colorIssues,
+  } = useFormulaExecution(
     colorFormula,
     meta?.queries ?? EMPTY_QUERIES,
     meta?.queriesVersion,
@@ -133,6 +138,7 @@ export function FormulaCard({
             customColor={customColor}
           />
         </View>
+        <FormulaWarnings issues={[...issues, ...colorIssues]} />
       </View>
     </ReportCard>
   );

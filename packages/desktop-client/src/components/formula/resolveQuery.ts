@@ -87,7 +87,7 @@ export function resolveQuery(
                 kind: 'shadowed',
                 name,
                 message: t(
-                  'The card query "{{name}}" is used, not the library query with the same name',
+                  'The card query "{{name}}" hides the library query',
                   { name: localName },
                 ),
               },

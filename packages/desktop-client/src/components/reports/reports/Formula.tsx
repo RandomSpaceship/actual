@@ -14,6 +14,7 @@ import { View } from '@actual-app/components/view';
 import type { FormulaWidget } from '@actual-app/core/types/models';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
+import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
 import { MobilePageHeader, Page, PageHeader } from '#components/Page';
@@ -99,6 +100,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     result,
     isLoading: isExecuting,
     error,
+    issues,
   } = useFormulaExecution(
     formula,
     queriesRef.current,
@@ -137,7 +139,11 @@ function FormulaInner({ widget }: FormulaInnerProps) {
         }),
     );
   }, [categories, categoryGroups]);
-  const { result: colorResult, error: colorError } = useFormulaExecution(
+  const {
+    result: colorResult,
+    error: colorError,
+    issues: colorIssues,
+  } = useFormulaExecution(
     colorFormula,
     queriesRef.current,
     queriesVersion,
@@ -352,6 +358,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 customColor={customColor}
               />
             </View>
+            <FormulaWarnings issues={[...issues, ...colorIssues]} />
           </View>
           <View
             style={{
