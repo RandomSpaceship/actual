@@ -273,7 +273,8 @@ To see the library queries, turn on **Show library queries** under **Query Defin
 
 - **Edit** opens the library query. A change applies to every card that uses the query.
 - **Copy into card** adds a copy of the query to the card. The copy has the same name, so the card uses its copy and not the library query. Use this to change the query for one card only.
-- **Use a card time frame** gives the card its own time frame for the query. The filters stay the same as in the library. To go back to the time frame of the library query, select **Use the library time frame**.
+
+Each library query also has a time frame button. The button starts at **Library**, which means that the card uses the time frame of the library query. To give the card its own time frame for the query, select the button, or select a date range. The filters stay the same as in the library. The button then changes between **Live** and **Static**. To go back to the time frame of the library query, select the button until it shows **Library**.
 
 To move a query from a card to the library, select **Make shared** on the card query. Actual adds the query to the library and removes it from the card. Then select **Save widget**. **Make shared** is not available when the library already has a query with the same name.
 
