@@ -36,6 +36,8 @@ import {
 } from '#components/reports/reportRanges';
 import { bootstrapHyperFormula } from '#util/bootstrapHyperFormula';
 
+import { fetchQueryGroupRows } from './queryGroup';
+
 bootstrapHyperFormula();
 
 type FormulaCellValue = number | string | boolean | null;
@@ -80,6 +82,8 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     balanceOfPrefetch: new Map(),
     budgetQueryPrefetch: new Map(),
     budgetQueryErrors: new Map(),
+    queryGroupRequests: new Map(),
+    queryGroupPrefetch: new Map(),
   };
 }
 
@@ -329,7 +333,8 @@ export async function executeFormula({
         resolveQuery,
         addIssue,
       )) +
-      (await prefetchAccountBalances(formulaQueryContext, accounts, addIssue));
+      (await prefetchAccountBalances(formulaQueryContext, accounts, addIssue)) +
+      (await prefetchQueryGroups(formulaQueryContext, resolveQuery, addIssue));
     if (
       fetchCount === 0 &&
       (await prefetchBudgetQueries(formulaQueryContext)) === 0
@@ -367,7 +372,12 @@ export async function executeFormula({
       evaluation.providerErrors,
     );
     if (!provider) {
-      throw new Error(`Formula error: ${evaluation.cellError.type}`);
+      const { type, message } = evaluation.cellError;
+      throw new Error(
+        message
+          ? `Formula error: ${type}. ${message}`
+          : `Formula error: ${type}`,
+      );
     }
     addIssue({
       severity: 'error',
@@ -508,6 +518,52 @@ async function prefetchFormulaQueries(
     fetchValue: async config => getQueryDateRange(config),
   });
 
+  return fetchCount;
+}
+
+// Returns the number of requests that were not fetched before
+async function prefetchQueryGroups(
+  formulaQueryContext: Required<FormulaQueryContext>,
+  resolveQuery: QueryResolver,
+  addIssue: AddIssue,
+) {
+  let fetchCount = 0;
+  for (const [key, request] of formulaQueryContext.queryGroupRequests) {
+    if (formulaQueryContext.queryGroupPrefetch.has(key)) continue;
+    fetchCount++;
+    formulaQueryContext.queryGroupPrefetch.set(key, []);
+
+    const { query, issues } = resolveQuery(request.queryName);
+    issues.forEach(addIssue);
+    if (!query) continue;
+
+    try {
+      const rows = await fetchQueryGroupRows({
+        transactionsQuery: await buildFilteredTransactionsQuery(query.config),
+        request,
+        dateRange: getQueryDateRange(query.config),
+      });
+      formulaQueryContext.queryGroupPrefetch.set(
+        key,
+        request.measure === 'sum'
+          ? rows.map(row => [
+              ...row.slice(0, -1),
+              integerToFormulaAmount(Number(row[row.length - 1])),
+            ])
+          : rows,
+      );
+    } catch (err) {
+      console.error(`Error running query "${request.queryName}":`, err);
+      addIssue({
+        severity: 'error',
+        kind: 'query-failed',
+        name: request.queryName,
+        message: t('Query "{{name}}" could not run', {
+          name: request.queryName,
+        }),
+      });
+    }
+  }
   return fetchCount;
 }
 

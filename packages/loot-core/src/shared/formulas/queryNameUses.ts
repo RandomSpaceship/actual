@@ -8,6 +8,8 @@ const QUERY_NAME_FUNCTIONS = new Set([
   'QUERY_START_DATE',
   'QUERY_END_DATE',
   'QUERY_DAYS',
+  'QUERY_GROUP',
+  'QUERY_GROUP_COUNT',
 ]);
 
 export type QueryNameReference = {

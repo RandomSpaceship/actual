@@ -737,3 +737,58 @@ describe('Formula Card - Integration Tests with Queries', () => {
     });
   });
 });
+
+// The grouped queries that QUERY_GROUP builds in desktop-client
+// (components/formula/queryGroup.ts)
+describe('QUERY_GROUP queries', () => {
+  async function runGroupedQuery(expressions: Array<Record<string, unknown>>) {
+    const { data } = await aqlQuery(
+      q('transactions')
+        .groupBy(expressions)
+        .select([
+          ...expressions.map((expression, index) => ({
+            [`key${index}`]: expression,
+          })),
+          { value: { $sum: '$amount' } },
+          { count: { $count: '$id' } },
+        ]),
+    );
+    return data;
+  }
+
+  it('groups by category group and month, and by year', async () => {
+    const accountId = await db.insertAccount({ name: 'Checking' });
+    const groupId = await db.insertCategoryGroup({ name: 'Bills' });
+    const categoryId = await db.insertCategory({
+      name: 'Rent',
+      cat_group: groupId,
+    });
+    for (const [date, amount, category] of [
+      ['2024-01-05', -1000, categoryId],
+      ['2024-01-20', -500, categoryId],
+      ['2024-03-01', -200, null],
+    ] as const) {
+      await db.insertTransaction({
+        account: accountId,
+        amount,
+        date,
+        category,
+      });
+    }
+
+    expect(
+      await runGroupedQuery([{ $id: '$category.group' }, { $month: '$date' }]),
+    ).toEqual(
+      expect.arrayContaining([
+        { key0: groupId, key1: '2024-01', value: -1500, count: 2 },
+        { key0: null, key1: '2024-03', value: -200, count: 1 },
+      ]),
+    );
+    expect(await runGroupedQuery([{ $year: '$date' }])).toEqual([
+      { key0: '2024', value: -1700, count: 3 },
+    ]);
+    expect(await runGroupedQuery([{ $id: '$account' }])).toEqual([
+      { key0: accountId, value: -1700, count: 3 },
+    ]);
+  });
+});

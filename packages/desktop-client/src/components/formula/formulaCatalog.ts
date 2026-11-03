@@ -302,6 +302,66 @@ export function getFormulaFunctionCatalog(): Record<
         },
       ],
     },
+    QUERY_GROUP: {
+      name: 'QUERY_GROUP',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get a table with one row for each group of a named query, and the sum of each group. The arguments must be text in the formula.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+        {
+          name: 'dimension1',
+          description: t(
+            'Group by: category, category group, payee, account, month or year',
+          ),
+        },
+        {
+          name: 'dimension2',
+          description: t('A second group (optional)'),
+        },
+        {
+          name: 'sort',
+          description: t(
+            'budget (budget order, the default), name, asc or desc (by value) (optional)',
+          ),
+        },
+      ],
+    },
+    QUERY_GROUP_COUNT: {
+      name: 'QUERY_GROUP_COUNT',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get a table with one row for each group of a named query, and the number of transactions of each group. The arguments must be text in the formula.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved query (string)'),
+        },
+        {
+          name: 'dimension1',
+          description: t(
+            'Group by: category, category group, payee, account, month or year',
+          ),
+        },
+        {
+          name: 'dimension2',
+          description: t('A second group (optional)'),
+        },
+        {
+          name: 'sort',
+          description: t(
+            'budget (budget order, the default), name, asc or desc (by value) (optional)',
+          ),
+        },
+      ],
+    },
     FLOOR: {
       name: 'FLOOR',
       category: 'math',

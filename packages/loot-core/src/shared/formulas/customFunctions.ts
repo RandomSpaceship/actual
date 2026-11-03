@@ -28,6 +28,30 @@ export type BudgetQueryRequest = {
 // null: the query has no time frame.
 export type QueryDateRange = { start: string; end: string; days: number };
 
+export const queryGroupDimensions = [
+  'category',
+  'category_group',
+  'payee',
+  'account',
+  'month',
+  'year',
+] as const;
+export type QueryGroupDimension = (typeof queryGroupDimensions)[number];
+
+export const queryGroupSorts = ['budget', 'name', 'asc', 'desc'] as const;
+export type QueryGroupSort = (typeof queryGroupSorts)[number];
+
+// A QUERY_GROUP or QUERY_GROUP_COUNT call
+export type QueryGroupRequest = {
+  queryName: string;
+  dimensions: QueryGroupDimension[];
+  sort: QueryGroupSort;
+  measure: 'sum' | 'count';
+};
+
+// The name of each dimension, then the sum or the count
+export type QueryGroupRow = Array<string | number>;
+
 export type FormulaQueryContext = {
   queryNames?: Set<string>;
   queryCountNames?: Set<string>;
@@ -46,6 +70,9 @@ export type FormulaQueryContext = {
   balanceOfPrefetch?: Map<string, number>;
   budgetQueryPrefetch?: Map<string, number>;
   budgetQueryErrors?: Map<string, string>;
+  // Keyed by createQueryGroupPrefetchKey
+  queryGroupRequests?: Map<string, QueryGroupRequest>;
+  queryGroupPrefetch?: Map<string, QueryGroupRow[]>;
 };
 
 type CustomFunctionsContext = {
@@ -103,6 +130,72 @@ export function createBudgetQueryPrefetchKey({
     startMonth,
     endMonth,
   });
+}
+
+// "Category group", "category_group" and "CategoryGroup" are the same
+function parseQueryGroupDimension(value: string) {
+  const normalized = value.toLowerCase().replace(/[\s_-]/g, '');
+  return queryGroupDimensions.find(
+    dimension => dimension.replace('_', '') === normalized,
+  );
+}
+
+// An empty dimension 2 or sort gives the default. Returns an error message
+// for a bad argument.
+export function createQueryGroupRequest(
+  queryName: string,
+  dimension1: string,
+  dimension2: string,
+  sort: string,
+  measure: QueryGroupRequest['measure'],
+): QueryGroupRequest | string {
+  const dimensions: QueryGroupDimension[] = [];
+  for (const value of dimension2 === ''
+    ? [dimension1]
+    : [dimension1, dimension2]) {
+    const dimension = parseQueryGroupDimension(value);
+    if (!dimension) {
+      return `Unknown dimension "${value}". Use one of: ${queryGroupDimensions.join(', ')}`;
+    }
+    if (dimensions.includes(dimension)) {
+      return `The dimension "${value}" is in the formula two times`;
+    }
+    dimensions.push(dimension);
+  }
+
+  const sortValue = sort === '' ? 'budget' : sort.toLowerCase();
+  const parsedSort = queryGroupSorts.find(candidate => candidate === sortValue);
+  if (!parsedSort) {
+    return `Unknown sort "${sort}". Use one of: ${queryGroupSorts.join(', ')}`;
+  }
+
+  return { queryName, dimensions, sort: parsedSort, measure };
+}
+
+// HyperFormula needs the table size before it runs the function, so the
+// arguments must be text in the formula. undefined: an argument is not text.
+function getLiteralArgs(ast: ProcedureAst) {
+  const args = ast.args.map(arg => {
+    if (arg.type === 'STRING') return arg.value;
+    if (arg.type === 'EMPTY') return '';
+    return undefined;
+  });
+  return args.every(arg => arg !== undefined) ? args : undefined;
+}
+
+export function createQueryGroupPrefetchKey(request: QueryGroupRequest) {
+  return JSON.stringify(request);
+}
+
+// A query without transactions gives one row with empty names and 0, because
+// a table cannot have zero rows
+function queryGroupRowsToRange(
+  request: QueryGroupRequest,
+  rows: QueryGroupRow[],
+): SimpleRangeValue {
+  return SimpleRangeValue.onlyValues(
+    rows.length > 0 ? rows : [[...request.dimensions.map(() => ''), 0]],
+  );
 }
 
 function categoryRangeToIds(categories: SimpleRangeValue): string[] {
@@ -351,6 +444,96 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
     );
   }
 
+  private queryGroupFor(
+    ast: ProcedureAst,
+    state: InterpreterState,
+    functionName: 'QUERY_GROUP' | 'QUERY_GROUP_COUNT',
+    measure: QueryGroupRequest['measure'],
+  ) {
+    if (!getLiteralArgs(ast)) {
+      return new CellError(
+        ErrorType.VALUE,
+        `The arguments of ${functionName} must be text in the formula, for example "category"`,
+      );
+    }
+    return this.runFunction(
+      ast.args,
+      state,
+      this.metadata(functionName),
+      (
+        queryName: string,
+        dimension1: string,
+        dimension2: string,
+        sort: string,
+      ) => {
+        const request = createQueryGroupRequest(
+          queryName,
+          dimension1,
+          dimension2,
+          sort,
+          measure,
+        );
+        if (typeof request === 'string') {
+          return new CellError(ErrorType.VALUE, request);
+        }
+        const ctx = this.getFormulaQueryContext();
+        const key = createQueryGroupPrefetchKey(request);
+        ctx?.queryGroupRequests?.set(key, request);
+        return queryGroupRowsToRange(
+          request,
+          ctx?.queryGroupPrefetch?.get(key) ?? [],
+        );
+      },
+    );
+  }
+
+  // The size comes from the fetched rows. A bad argument gives one cell for
+  // the error.
+  private queryGroupSizeFor(
+    ast: ProcedureAst,
+    measure: QueryGroupRequest['measure'],
+  ): ArraySize {
+    const args = getLiteralArgs(ast);
+    if (!args || args.length < 2 || args.length > 4) {
+      return ArraySize.scalar();
+    }
+    const [queryName, dimension1, dimension2 = '', sort = ''] = args;
+
+    const request = createQueryGroupRequest(
+      queryName,
+      dimension1,
+      dimension2,
+      sort,
+      measure,
+    );
+    if (typeof request === 'string') {
+      return ArraySize.scalar();
+    }
+    const rowCount = this.getFormulaQueryContext()?.queryGroupPrefetch?.get(
+      createQueryGroupPrefetchKey(request),
+    )?.length;
+    return new ArraySize(
+      request.dimensions.length + 1,
+      Math.max(rowCount ?? 1, 1),
+    );
+  }
+
+  queryGroup(ast: ProcedureAst, state: InterpreterState) {
+    return this.queryGroupFor(ast, state, 'QUERY_GROUP', 'sum');
+  }
+
+  queryGroupSize(ast: ProcedureAst): ArraySize {
+    return this.queryGroupSizeFor(ast, 'sum');
+  }
+
+  queryGroupCount(ast: ProcedureAst, state: InterpreterState) {
+    return this.queryGroupFor(ast, state, 'QUERY_GROUP_COUNT', 'count');
+  }
+
+  queryGroupCountSize(ast: ProcedureAst): ArraySize {
+    return this.queryGroupSizeFor(ast, 'count');
+  }
+
   budgetQuery(ast: ProcedureAst, state: InterpreterState) {
     return this.runFunction(
       ast.args,
@@ -560,6 +743,42 @@ CustomFunctionsPlugin.implementedFunctions = {
     method: 'queryDays',
     parameters: [{ argumentType: FunctionArgumentType.STRING }],
   },
+  QUERY_GROUP: {
+    method: 'queryGroup',
+    sizeOfResultArrayMethod: 'queryGroupSize',
+    parameters: [
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+    ],
+  },
+  QUERY_GROUP_COUNT: {
+    method: 'queryGroupCount',
+    sizeOfResultArrayMethod: 'queryGroupCountSize',
+    parameters: [
+      { argumentType: FunctionArgumentType.STRING },
+      { argumentType: FunctionArgumentType.STRING },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+      {
+        argumentType: FunctionArgumentType.STRING,
+        optionalArg: true,
+        defaultValue: '',
+      },
+    ],
+  },
   BUDGET_QUERY: {
     method: 'budgetQuery',
     parameters: [
@@ -641,6 +860,8 @@ export const customFunctionsTranslations = {
     QUERY_START_DATE: 'QUERY_START_DATE',
     QUERY_END_DATE: 'QUERY_END_DATE',
     QUERY_DAYS: 'QUERY_DAYS',
+    QUERY_GROUP: 'QUERY_GROUP',
+    QUERY_GROUP_COUNT: 'QUERY_GROUP_COUNT',
     BUDGET_QUERY: 'BUDGET_QUERY',
     FORMATNUMBER: 'FORMATNUMBER',
     FORMATCURRENCY: 'FORMATCURRENCY',
