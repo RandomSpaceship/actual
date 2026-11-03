@@ -13,12 +13,15 @@ import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
 import type {
   FormulaLibraryItemEntity,
+  FormulaTableColumn,
   FormulaWidget,
 } from '@actual-app/core/types/models';
 import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
+import { FormulaTable } from '#components/formula/FormulaTable';
+import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColumnSettings';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
 import { listProviderNames } from '#components/formula/resolveProviders';
@@ -99,6 +102,13 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [colorFormula, setColorFormula] = useState(
     widget?.meta?.colorFormula || '',
   );
+  const [view, setView] = useState<'number' | 'table'>(
+    widget?.meta?.view ?? 'number',
+  );
+  const [tableColumns, setTableColumns] = useState<FormulaTableColumn[]>(
+    widget?.meta?.tableColumns ?? [],
+  );
+  const isTableView = view === 'table';
 
   const title = widget?.meta?.name || t('Formula');
 
@@ -112,6 +122,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
 
   const {
     result,
+    table,
     isLoading: isExecuting,
     error,
     issues,
@@ -122,6 +133,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     undefined,
     simpleAccounts,
     timeFrameOverrides,
+    isTableView ? 'table' : 'value',
   );
 
   const colorVariables = useMemo(
@@ -159,7 +171,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     error: colorError,
     issues: colorIssues,
   } = useFormulaExecution(
-    colorFormula,
+    // The table view has no colour
+    isTableView ? '' : colorFormula,
     queries,
     undefined,
     colorVariables,
@@ -224,6 +237,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           staticFontSize,
           showTitle,
           colorFormula,
+          view,
+          tableColumns,
         },
       },
     });
@@ -255,6 +270,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             staticFontSize,
             showTitle,
             colorFormula,
+            view,
+            tableColumns,
           },
         },
       },
@@ -339,23 +356,52 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             flexDirection: 'column',
           }}
         >
-          <View style={{ padding: 20, paddingBottom: 0 }}>
-            <div
-              style={{
-                fontSize: 13,
-                color: theme.pageTextSubdued,
-                marginBottom: 5,
-              }}
-            >
-              <label htmlFor="formula-show-title">
-                <Trans>Show title:</Trans>
-              </label>
-            </div>
-            <Toggle
-              id="formula-show-title"
-              isOn={showTitle}
-              onToggle={setShowTitle}
-            />
+          <View
+            style={{
+              padding: 20,
+              paddingBottom: 0,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 20,
+            }}
+          >
+            <View>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: theme.pageTextSubdued,
+                  marginBottom: 5,
+                }}
+              >
+                <label htmlFor="formula-show-title">
+                  <Trans>Show title:</Trans>
+                </label>
+              </div>
+              <Toggle
+                id="formula-show-title"
+                isOn={showTitle}
+                onToggle={setShowTitle}
+              />
+            </View>
+            <View>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: theme.pageTextSubdued,
+                  marginBottom: 5,
+                }}
+              >
+                <Trans>Display:</Trans>
+              </div>
+              <Select
+                value={view}
+                onChange={(value: 'number' | 'table') => setView(value)}
+                options={[
+                  ['number', t('One value')],
+                  ['table', t('Table')],
+                ]}
+              />
+            </View>
           </View>
           <View
             style={{
@@ -376,7 +422,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             </div>
             <View
               style={{
-                height: 120,
+                height: isTableView ? 240 : 120,
                 width: '100%',
                 overflow: 'auto',
                 backgroundColor: theme.cardBackground,
@@ -387,14 +433,22 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 },
               }}
             >
-              <FormulaResult
-                value={result}
-                error={error}
-                loading={isExecuting}
-                fontSizeMode={fontSizeMode}
-                staticFontSize={staticFontSize}
-                customColor={customColor}
-              />
+              {isTableView && table && !error ? (
+                <FormulaTable
+                  table={table}
+                  columns={tableColumns}
+                  style={{ flex: 1, padding: 10 }}
+                />
+              ) : (
+                <FormulaResult
+                  value={result}
+                  error={error}
+                  loading={isExecuting}
+                  fontSizeMode={fontSizeMode}
+                  staticFontSize={staticFontSize}
+                  customColor={customColor}
+                />
+              )}
             </View>
             <FormulaWarnings issues={[...issues, ...colorIssues]} />
           </View>
@@ -434,39 +488,74 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               />
             </Suspense>
           </View>
-          <View
-            style={{
-              padding: '0 20px 20px 20px',
-              display: 'flex',
-              flexDirection: 'row',
-              gap: 20,
-              alignItems: 'flex-end',
-            }}
-          >
-            <View>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: theme.pageTextSubdued,
-                  marginBottom: 5,
-                }}
-              >
-                <Trans>Font size:</Trans>
-              </div>
-              <Select
-                value={fontSizeMode}
-                onChange={(value: 'dynamic' | 'static') =>
-                  setFontSizeMode(value)
-                }
-                options={[
-                  ['dynamic', t('Dynamic')],
-                  ['static', t('Static')],
-                ]}
+          {isTableView ? (
+            <View style={{ padding: '0 20px 20px 20px' }}>
+              <FormulaTableColumnSettings
+                columnCount={table?.[0]?.length ?? 0}
+                columns={tableColumns}
+                onChange={setTableColumns}
               />
             </View>
+          ) : (
+            <>
+              <View
+                style={{
+                  padding: '0 20px 20px 20px',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: 20,
+                  alignItems: 'flex-end',
+                }}
+              >
+                <View>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: theme.pageTextSubdued,
+                      marginBottom: 5,
+                    }}
+                  >
+                    <Trans>Font size:</Trans>
+                  </div>
+                  <Select
+                    value={fontSizeMode}
+                    onChange={(value: 'dynamic' | 'static') =>
+                      setFontSizeMode(value)
+                    }
+                    options={[
+                      ['dynamic', t('Dynamic')],
+                      ['static', t('Static')],
+                    ]}
+                  />
+                </View>
 
-            {fontSizeMode === 'static' && (
-              <View>
+                {fontSizeMode === 'static' && (
+                  <View>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: theme.pageTextSubdued,
+                        marginBottom: 5,
+                      }}
+                    >
+                      <Trans>Font size (px):</Trans>
+                    </div>
+                    <Input
+                      type="number"
+                      value={String(staticFontSize)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        setStaticFontSize(Number(e.target.value))
+                      }
+                    />
+                  </View>
+                )}
+              </View>
+              <View
+                style={{
+                  padding: 20,
+                  marginBottom: 20,
+                }}
+              >
                 <div
                   style={{
                     fontSize: 13,
@@ -474,69 +563,46 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                     marginBottom: 5,
                   }}
                 >
-                  <Trans>Font size (px):</Trans>
+                  <Trans>Conditional color (optional):</Trans>
                 </div>
-                <Input
-                  type="number"
-                  value={String(staticFontSize)}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setStaticFontSize(Number(e.target.value))
-                  }
-                />
+                <View
+                  style={{
+                    border: `1px solid ${theme.formInputBorder}`,
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    backgroundColor: theme.tableBackground,
+                  }}
+                >
+                  <Suspense fallback={<div style={{ height: 32 }} />}>
+                    <FormulaEditor
+                      value={colorFormula}
+                      variables={colorVariables}
+                      onChange={setColorFormula}
+                      mode="query"
+                      queries={queryNames}
+                      providers={providerNames}
+                      categoryBadges={categoryBadges}
+                      singleLine
+                      showLineNumbers={false}
+                    />
+                  </Suspense>
+                </View>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: theme.pageTextSubdued,
+                    marginTop: 5,
+                  }}
+                >
+                  <Trans>
+                    Formula that returns a color (e.g., &ldquo;red&rdquo;,
+                    &ldquo;#ff0000&rdquo;). Leave blank for default. Use RESULT
+                    variable to access the main formula result.
+                  </Trans>
+                </div>
               </View>
-            )}
-          </View>
-          <View
-            style={{
-              padding: 20,
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                color: theme.pageTextSubdued,
-                marginBottom: 5,
-              }}
-            >
-              <Trans>Conditional color (optional):</Trans>
-            </div>
-            <View
-              style={{
-                border: `1px solid ${theme.formInputBorder}`,
-                borderRadius: 4,
-                overflow: 'hidden',
-                backgroundColor: theme.tableBackground,
-              }}
-            >
-              <Suspense fallback={<div style={{ height: 32 }} />}>
-                <FormulaEditor
-                  value={colorFormula}
-                  variables={colorVariables}
-                  onChange={setColorFormula}
-                  mode="query"
-                  queries={queryNames}
-                  providers={providerNames}
-                  categoryBadges={categoryBadges}
-                  singleLine
-                  showLineNumbers={false}
-                />
-              </Suspense>
-            </View>
-            <div
-              style={{
-                fontSize: 11,
-                color: theme.pageTextSubdued,
-                marginTop: 5,
-              }}
-            >
-              <Trans>
-                Formula that returns a color (e.g., &ldquo;red&rdquo;,
-                &ldquo;#ff0000&rdquo;). Leave blank for default. Use RESULT
-                variable to access the main formula result.
-              </Trans>
-            </div>
-          </View>
+            </>
+          )}
         </View>
 
         <View

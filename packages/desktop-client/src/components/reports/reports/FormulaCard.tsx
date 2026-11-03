@@ -7,6 +7,7 @@ import type {
   FormulaWidget,
 } from '@actual-app/core/types/models';
 
+import { FormulaTable } from '#components/formula/FormulaTable';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import { ReportCard } from '#components/reports/ReportCard';
@@ -46,7 +47,9 @@ export function FormulaCard({
   const fontSizeMode = meta?.fontSizeMode || 'dynamic';
   const staticFontSize = meta?.staticFontSize || 32;
   const showTitle = meta?.showTitle ?? true;
-  const colorFormula = meta?.colorFormula || '';
+  const isTableView = meta?.view === 'table';
+  // The table view has no colour
+  const colorFormula = isTableView ? '' : meta?.colorFormula || '';
 
   const simpleAccounts = useMemo(
     () =>
@@ -56,13 +59,14 @@ export function FormulaCard({
     [accounts],
   );
 
-  const { result, isLoading, error, issues } = useFormulaExecution(
+  const { result, table, isLoading, error, issues } = useFormulaExecution(
     formula,
     meta?.queries ?? EMPTY_QUERIES,
     meta?.queriesVersion,
     undefined,
     simpleAccounts,
     meta?.timeFrameOverrides,
+    isTableView ? 'table' : 'value',
   );
 
   const colorVariables = useMemo(
@@ -120,26 +124,37 @@ export function FormulaCard({
             />
           </View>
         )}
-        <View
-          style={{
-            justifyContent: 'center',
-            alignItems: 'center',
-            flexGrow: 1,
-            flexShrink: 1,
-          }}
-        >
-          <FormulaResult
-            value={result}
-            error={error}
-            // Only fall back to the skeleton when there is nothing to show yet;
-            // a refresh should leave the previous value in place rather than
-            // blanking the card.
-            loading={isLoading && result === null && !error}
-            fontSizeMode={fontSizeMode}
-            staticFontSize={staticFontSize}
-            customColor={customColor}
+        {isTableView && table && !error ? (
+          <FormulaTable
+            table={table}
+            columns={meta?.tableColumns}
+            style={{
+              flex: 1,
+              padding: showTitle ? '0 10px 10px' : 10,
+            }}
           />
-        </View>
+        ) : (
+          <View
+            style={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexGrow: 1,
+              flexShrink: 1,
+            }}
+          >
+            <FormulaResult
+              value={result}
+              error={error}
+              // Only fall back to the skeleton when there is nothing to show yet;
+              // a refresh should leave the previous value in place rather than
+              // blanking the card.
+              loading={isLoading && result === null && !error}
+              fontSizeMode={fontSizeMode}
+              staticFontSize={staticFontSize}
+              customColor={customColor}
+            />
+          </View>
+        )}
         <FormulaWarnings issues={[...issues, ...colorIssues]} />
       </View>
     </ReportCard>

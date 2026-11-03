@@ -470,6 +470,10 @@ export type FormulaWidget = AbstractWidget<
     staticFontSize?: number;
     showTitle?: boolean;
     colorFormula?: string;
+    // 'table' shows each cell of a formula that gives a table
+    view?: 'number' | 'table';
+    // Settings for each table column, by position
+    tableColumns?: FormulaTableColumn[];
     queriesVersion?: number;
     queries?: Record<
       string,
@@ -490,6 +494,19 @@ export type FormulaWidget = AbstractWidget<
 export type FormulaTimeFrameOverride = {
   name: string;
   timeFrame: TimeFrame;
+};
+
+export type FormulaTableColumnType =
+  | 'money'
+  | 'percent'
+  | 'number'
+  | 'date'
+  | 'text';
+
+// Without a type, a column of numbers shows as money, and other columns as text
+export type FormulaTableColumn = {
+  name?: string;
+  type?: FormulaTableColumnType;
 };
 
 export type SankeyWidget = AbstractWidget<

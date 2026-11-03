@@ -405,7 +405,7 @@ export async function executeFormula({
       kind: 'table-result',
       name: '',
       message: t(
-        'The formula gives a table, not one value. Use INDEX to get one cell, for example INDEX(formula, 1, 2)',
+        'The formula gives a table, not one value. Set Display to Table, or use INDEX to get one cell, for example INDEX(formula, 1, 2)',
       ),
     });
     return { value: null, table: evaluation.table, issues };
