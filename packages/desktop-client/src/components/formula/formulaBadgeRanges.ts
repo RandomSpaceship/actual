@@ -1,3 +1,4 @@
+import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
 import { HyperFormula } from 'hyperformula';
 
 import { bootstrapHyperFormula } from '#util/bootstrapHyperFormula';
@@ -376,7 +377,7 @@ function getStringContextBadgeRangesFromAst({
   queries?: Record<string, unknown>;
   categoryBadges?: Record<string, string>;
 }) {
-  const queryNames = new Set(Object.keys(queries ?? {}));
+  const queryNames = Object.keys(queries ?? {});
   const stringNodeRanges = getStringNodeRanges(ast, stringTokens);
   const badgeRanges: FormulaBadgeRange[] = [];
 
@@ -396,7 +397,8 @@ function getStringContextBadgeRangesFromAst({
       if (firstArg?.type !== 'STRING' || typeof firstArg.value !== 'string') {
         return;
       }
-      if (!queryNames.has(firstArg.value)) {
+      const queryName = firstArg.value;
+      if (!queryNames.some(name => isSameQueryName(name, queryName))) {
         return;
       }
 
