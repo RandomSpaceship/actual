@@ -150,6 +150,7 @@ If a function isn’t listed here, it still might work. Actual uses HyperFormula
 | `QUERY_GROUP`                   | Query        | Returns a table with one row for each group of transactions in a named query, with the total amount of each group. See [Group Transactions With `QUERY_GROUP`](#group-transactions-with-query_group).                                  | `=QUERY_GROUP("expenses", "category", "month")`                                                                               | Dimension 2 and sort                                                                                            |
 | `QUERY_GROUP_COUNT`             | Query        | Returns the same table as `QUERY_GROUP`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_GROUP_COUNT("expenses", "payee")`                                                                                     | Dimension 2 and sort                                                                                            |
 | `QUERY_PIVOT`                   | Query        | Returns a table with one row for each group of one dimension and one column for each group of a second dimension. The first row has the column names. See [Make a Wide Table With `QUERY_PIVOT`](#make-a-wide-table-with-query_pivot). | `=QUERY_PIVOT("expenses", "category", "month")`                                                                               | Sort                                                                                                            |
+| `QUERY_PIVOT_COUNT`             | Query        | Returns the same table as `QUERY_PIVOT`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_PIVOT_COUNT("expenses", "payee", "month")`                                                                            | Sort                                                                                                            |
 | `QUERY_START_DATE`              | Query        | Returns the first day that a named query includes, as `YYYY-MM-DD` text.                                                                                                                                                               | `=QUERY_START_DATE("expenses")`                                                                                               | —                                                                                                               |
 | `RANK`                          | Query        | Returns the rank of a number in a list.                                                                                                                                                                                                | `=RANK(10, A1:A10, 0)`                                                                                                        | —                                                                                                               |
 | `RATE`                          | Query        | Calculates interest rate per period.                                                                                                                                                                                                   | `=RATE(60, -200, 10000)`                                                                                                      | —                                                                                                               |
@@ -296,9 +297,9 @@ This example gives the spending of each category, with one column for each month
 =QUERY_PIVOT("expenses", "category", "month")
 ```
 
-The first row has the names of the columns, for example the months. The first cell of this row is empty. A cell without transactions shows 0.
+The first row has the names of the columns, for example the months. The first cell of this row is empty. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
-In the card editor, turn on **First row is the header** to show the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. To give the first column a name, type it under **Columns**.
+The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. To give the first column a name, type it under **Columns**.
 
 With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", "month"), 2, 2)` gives the amount of the first category in the first month.
 
@@ -531,7 +532,13 @@ The column types are:
 - **Text**: the value as it is.
 - **Automatic** (the default): **Money** for a column of numbers, and **Text** for other columns.
 
-If no column has a name, the table has no header row. Turn on **First row is the header** to use the first row of the table as the header row. A name under **Columns** replaces the name from the first row. A cell with an error shows the error, for example `#DIV/0!`. On a narrow card, scroll the table to the side to see all of the columns.
+The **Header row** setting has three options:
+
+- **Automatic** (the default): the first row of the table is the header row when the first row has no numbers, and a column has text in the first row and only numbers below it. A table from `QUERY_PIVOT` gets a header row this way. A table from `QUERY_GROUP` does not.
+- **First row**: the first row of the table is always the header row.
+- **Column names only**: the header row has only the names under **Columns**.
+
+A name under **Columns** replaces the name from the first row. If the table has no header row and no column has a name, the table shows no header row. A cell with an error shows the error, for example `#DIV/0!`. On a narrow card, scroll the table to the side to see all of the columns.
 
 The table view has no font size and no conditional color.
 
