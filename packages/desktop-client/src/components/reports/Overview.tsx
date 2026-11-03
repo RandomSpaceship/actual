@@ -14,6 +14,7 @@ import { Menu } from '@actual-app/components/menu';
 import { Popover } from '@actual-app/components/popover';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
+import { collectFormulaLibraryForExport } from '@actual-app/core/shared/formulas/dashboardFormulaLibrary';
 import type {
   CustomReportWidget,
   DashboardPageEntity,
@@ -21,9 +22,11 @@ import type {
   ExportImportDashboard,
   MarkdownWidget,
 } from '@actual-app/core/types/models';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { MOBILE_NAV_HEIGHT } from '#components/mobile/MobileNavTabs';
 import { MobilePageHeader, Page } from '#components/Page';
+import { formulaLibraryQueries } from '#formula-library';
 import { useAccounts } from '#hooks/useAccounts';
 import {
   useDashboardPages,
@@ -298,33 +301,41 @@ export function Overview({ dashboard }: OverviewProps) {
     });
   };
 
+  const queryClient = useQueryClient();
+
   const onExport = async () => {
+    const widgets = desktopLayout.map(item => {
+      const widget = widgetMap.get(item.i);
+
+      if (!widget) {
+        throw new Error(`Unable to query widget: ${item.i}`);
+      }
+
+      if (widget.type === 'custom-report') {
+        const customReport = customReportMap.get(widget.meta.id);
+
+        if (!customReport) {
+          throw new Error(`Custom report not found for widget: ${item.i}`);
+        }
+
+        return {
+          ...widget,
+          meta: customReport,
+          id: undefined,
+          tombstone: undefined,
+        };
+      }
+
+      return { ...widget, id: undefined, tombstone: undefined };
+    });
+    const formulaLibrary = collectFormulaLibraryForExport(
+      widgets,
+      await queryClient.fetchQuery(formulaLibraryQueries.list()),
+    );
     const data = {
       version: 1,
-      widgets: desktopLayout.map(item => {
-        const widget = widgetMap.get(item.i);
-
-        if (!widget) {
-          throw new Error(`Unable to query widget: ${item.i}`);
-        }
-
-        if (widget.type === 'custom-report') {
-          const customReport = customReportMap.get(widget.meta.id);
-
-          if (!customReport) {
-            throw new Error(`Custom report not found for widget: ${item.i}`);
-          }
-
-          return {
-            ...widget,
-            meta: customReport,
-            id: undefined,
-            tombstone: undefined,
-          };
-        }
-
-        return { ...widget, id: undefined, tombstone: undefined };
-      }),
+      widgets,
+      ...(formulaLibrary.length > 0 && { formulaLibrary }),
     } satisfies ExportImportDashboard;
 
     try {
