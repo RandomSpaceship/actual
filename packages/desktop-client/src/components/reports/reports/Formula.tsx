@@ -868,8 +868,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           )}
         </View>
 
+        {/* A fixed width, so that a wide provider table scrolls in its own
+            box and does not make the column wider */}
         <View
           style={{
+            width: 440,
+            flexShrink: 0,
             overflowY: 'auto',
           }}
         >
