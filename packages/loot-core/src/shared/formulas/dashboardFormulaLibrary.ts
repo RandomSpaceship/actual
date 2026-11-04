@@ -224,9 +224,15 @@ function isSameAqlQueryData(
 ) {
   return (
     isSameAqlText(a.aql, b.aql) &&
-    (a.dateField ?? undefined) === (b.dateField ?? undefined) &&
+    // null (no date field) is not the same as undefined (the table default)
+    a.dateField === b.dateField &&
     Boolean(a.isCount) === Boolean(b.isCount) &&
-    isEqual(a.timeFrame, b.timeFrame)
+    isEqual(a.timeFrame, b.timeFrame) &&
+    isEqual(
+      a.moneyColumns === undefined ? undefined : [...a.moneyColumns].sort(),
+      b.moneyColumns === undefined ? undefined : [...b.moneyColumns].sort(),
+    ) &&
+    a.rowLimit === b.rowLimit
   );
 }
 

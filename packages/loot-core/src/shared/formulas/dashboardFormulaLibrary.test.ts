@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  FormulaLibraryAqlQueryData,
   FormulaLibraryItemEntity,
   FormulaWidget,
   TimeFrame,
@@ -482,6 +483,43 @@ describe('AQL queries in a dashboard export and import', () => {
     expect(plan.widgets[0].meta?.timeFrameOverrides).toEqual({
       'local-coffee-id': { name: 'coffee', timeFrame: february },
     });
+  });
+
+  it('compares the settings of an AQL query, not only its text', () => {
+    const widgets = [formulaWidget({ formula: '=QUERY_TABLE("coffee")' })];
+    function isUsedAgain(
+      exportedData: Partial<FormulaLibraryAqlQueryData>,
+      localData: Partial<FormulaLibraryAqlQueryData>,
+    ) {
+      const plan = planFormulaLibraryImport(
+        widgets,
+        [{ ...exportedCoffee, data: { aql: coffeeAql, ...exportedData } }],
+        [
+          {
+            id: 'local-coffee-id',
+            type: 'aql-query',
+            name: 'coffee',
+            data: { aql: coffeeAql, ...localData },
+            created_at: 1,
+          },
+        ],
+        createIds(),
+      );
+      return plan.itemsToCreate.length === 0;
+    }
+
+    // No date field is not the default date field
+    expect(isUsedAgain({ dateField: null }, {})).toBe(false);
+    expect(isUsedAgain({ dateField: null }, { dateField: null })).toBe(true);
+    // The order of the money columns does not count
+    expect(
+      isUsedAgain(
+        { moneyColumns: ['total', 'count'] },
+        { moneyColumns: ['count', 'total'] },
+      ),
+    ).toBe(true);
+    expect(isUsedAgain({ moneyColumns: [] }, {})).toBe(false);
+    expect(isUsedAgain({ rowLimit: 100 }, {})).toBe(false);
   });
 
   it('gives a different AQL query with the same name a new name in the imported formulas', () => {
