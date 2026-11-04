@@ -38,6 +38,7 @@ Click the card to open the editor (where you can save the widget).
 
 - **Start with `=`** (example: `=SUM(1, 2, 3)`)
 - You can use typical Excel-style functions (autocomplete and hover help are built into the editor).
+- The result does not change while you type. To see the result, click **Run** or press **Ctrl+Enter** (**Cmd+Enter** on a Mac). A change to a query also waits for **Run**. **Save widget** runs the formula before it saves it.
 
 ## Function reference
 
@@ -328,9 +329,10 @@ In rule formulas, `BALANCE_OF` instead returns the running balance **at a specif
 In the Formula editor page, use **Query Definitions**:
 
 1. **Add Query** and give it a name (the name is what you reference in `QUERY("...")`)
-2. Set the date range:
+2. Set the date range. The menu next to the dates has these options:
    - **Live**: keeps the range moving (e.g. “last 3 months”)
    - **Static**: fixed start/end dates
+   - A range from the date picker, for example **Year to date**, also shows in the menu.
 3. Add **Filters** (same style as report filters)
 
 <img width="1196" alt="The formula editor with two named queries in the Query Definitions panel, numbered by step" src="/img/experimental/formulas/formulas-editor-and-queries@2x.webp" />
@@ -364,7 +366,7 @@ To see the library queries, turn on **Show library queries** under **Query Defin
 - **Edit** opens the library query. A change applies to every card that uses the query.
 - **Copy into card** adds a copy of the query to the card. The copy has the same name, so the card uses its copy and not the library query. Use this to change the query for one card only.
 
-Each library query also has a time frame button. The button starts at **Library**, which means that the card uses the time frame of the library query. To give the card its own time frame for the query, select the button, or select a date range. The filters stay the same as in the library. The button then changes between **Live** and **Static**. To go back to the time frame of the library query, select the button until it shows **Library**.
+Each library query also has a time frame menu. The menu starts at **Library**, which means that the card uses the time frame of the library query. To give the card its own time frame for the query, select **Live** or **Static** in the menu, or select a date range. The filters stay the same as in the library. To go back to the time frame of the library query, select **Library** in the menu.
 
 To move a query from a card to the library, select **Make shared** on the card query. Actual adds the query to the library and removes it from the card. Then select **Save widget**. **Make shared** is not available when the library already has a query with the same name.
 
@@ -518,6 +520,8 @@ The **Display** setting in the card editor has three options:
 - **Table**: always a table. One value shows as a table with one cell.
 
 Some formulas give one value for some data and a table for other data, for example `FILTER`. For these formulas, set **Display** to **Table**, so that the card does not change its look when the data changes.
+
+A table shows at most 500 rows and 60 columns. A larger table shows a warning on the card and in the editor. Functions such as `INDEX` and the totals still use all of the table.
 
 To give the columns names and types:
 
