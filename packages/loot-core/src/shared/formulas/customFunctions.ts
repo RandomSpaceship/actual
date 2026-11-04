@@ -33,7 +33,10 @@ export const queryGroupDimensions = [
   'category_group',
   'payee',
   'account',
+  'day',
+  'week',
   'month',
+  'quarter',
   'year',
 ] as const;
 export type QueryGroupDimension = (typeof queryGroupDimensions)[number];

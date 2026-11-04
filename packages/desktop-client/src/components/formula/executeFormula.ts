@@ -6,6 +6,8 @@ import {
 import type {
   FormulaQueryContext,
   QueryDateRange,
+  QueryGroupRequest,
+  QueryGroupRow,
 } from '@actual-app/core/shared/formulas/customFunctions';
 import * as monthUtils from '@actual-app/core/shared/months';
 import { q } from '@actual-app/core/shared/query';
@@ -558,6 +560,7 @@ async function prefetchQueryGroups(
         request,
         dateRange: getQueryDateRange(query.config),
       });
+      addLargeTableIssue(request, rows, addIssue);
       formulaQueryContext.queryGroupPrefetch.set(
         key,
         // The names are text, so each number is a sum or a count
@@ -582,6 +585,42 @@ async function prefetchQueryGroups(
     }
   }
   return fetchCount;
+}
+
+// Over these sizes, a table is hard to read on a card and slow to show
+const largeTableRows = 50;
+const largeTableColumns = 20;
+
+function addLargeTableIssue(
+  request: QueryGroupRequest,
+  rows: QueryGroupRow[],
+  addIssue: AddIssue,
+) {
+  // A wide table has a header row and a name column
+  const isWide = request.shape === 'wide';
+  const rowCount = isWide ? rows.length - 1 : rows.length;
+  const columnCount = isWide ? (rows[0]?.length ?? 1) - 1 : 0;
+  if (rowCount <= largeTableRows && columnCount <= largeTableColumns) return;
+  addIssue({
+    severity: 'warning',
+    kind: 'large-table',
+    name: request.queryName,
+    message: isWide
+      ? t(
+          'The table for query "{{name}}" has {{rowCount}} rows and {{columnCount}} columns. A table with more than {{largeTableRows}} rows or {{largeTableColumns}} columns is hard to read and slow to show.',
+          {
+            name: request.queryName,
+            rowCount,
+            columnCount,
+            largeTableRows,
+            largeTableColumns,
+          },
+        )
+      : t(
+          'The table for query "{{name}}" has {{rowCount}} rows. A table with more than {{largeTableRows}} rows is hard to read and slow to show.',
+          { name: request.queryName, rowCount, largeTableRows },
+        ),
+  });
 }
 
 // Returns the number of accounts that were not fetched before

@@ -317,7 +317,7 @@ export function getFormulaFunctionCatalog(): Record<
         {
           name: 'dimension1',
           description: t(
-            'Group by: category, category group, payee, account, month or year',
+            'Group by: category, category group, payee, account, day, week, month, quarter or year',
           ),
         },
         {
@@ -347,7 +347,7 @@ export function getFormulaFunctionCatalog(): Record<
         {
           name: 'dimension1',
           description: t(
-            'Group by: category, category group, payee, account, month or year',
+            'Group by: category, category group, payee, account, day, week, month, quarter or year',
           ),
         },
         {
@@ -377,7 +377,7 @@ export function getFormulaFunctionCatalog(): Record<
         {
           name: 'rows',
           description: t(
-            'One row for each: category, category group, payee, account, month or year',
+            'One row for each: category, category group, payee, account, day, week, month, quarter or year',
           ),
         },
         {
@@ -407,7 +407,7 @@ export function getFormulaFunctionCatalog(): Record<
         {
           name: 'rows',
           description: t(
-            'One row for each: category, category group, payee, account, month or year',
+            'One row for each: category, category group, payee, account, day, week, month, quarter or year',
           ),
         },
         {

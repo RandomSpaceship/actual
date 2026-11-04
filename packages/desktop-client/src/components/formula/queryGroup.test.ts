@@ -60,6 +60,17 @@ function groupedRows({ groupExpressions, selectExpressions }: GroupedQuery) {
       { key0: 'groceries', key1: '2024-02', value: isCount ? 3 : -3000 },
     ];
   }
+  if (groups === JSON.stringify([{ $day: '$date' }])) {
+    // A Monday and a Wednesday, then the Tuesday after
+    return [
+      { key0: '2024-01-01', value: -500 },
+      { key0: '2024-01-03', value: -700 },
+      { key0: '2024-01-09', value: -100 },
+    ];
+  }
+  if (groups === JSON.stringify([{ $id: '$category' }, { $day: '$date' }])) {
+    return [{ key0: 'power', key1: '2024-01-01', value: -500 }];
+  }
   if (groups === JSON.stringify([{ $id: '$payee' }])) {
     return [
       { key0: 'transfer-payee', value: 700 },
@@ -147,6 +158,48 @@ describe('QUERY_GROUP', () => {
       ['Power', '2024-01', -10],
       ['Power', '2024-02', 0],
       ['Power', '2024-03', 0],
+    ]);
+  });
+
+  it('gives a row for each day, week or quarter', async () => {
+    const days = (await run('=QUERY_GROUP("all", "day")')).table;
+    expect(days).toHaveLength(9);
+    expect(days?.slice(0, 3)).toEqual([
+      ['2024-01-01', -5],
+      ['2024-01-02', 0],
+      ['2024-01-03', -7],
+    ]);
+    // The week starts on Sunday when the preference is not set
+    expect((await run('=QUERY_GROUP("all", "week")')).table).toEqual([
+      ['2023-12-31', -12],
+      ['2024-01-07', -1],
+    ]);
+    expect(
+      (await run('=QUERY_GROUP("firstQuarter", "quarter")')).table,
+    ).toEqual([['Q1 2024', -30]]);
+  });
+
+  it('starts the week on the day that the preference gives', async () => {
+    const mockedSend = vi.mocked(send).getMockImplementation();
+    vi.mocked(send).mockImplementation((async (name: string, query: unknown) =>
+      name === 'preferences/get'
+        ? { firstDayOfWeekIdx: '1' }
+        : mockedSend?.(
+            name as never,
+            query as never,
+          )) as unknown as typeof send);
+    expect((await run('=QUERY_GROUP("all", "week")')).table).toEqual([
+      ['2024-01-01', -12],
+      ['2024-01-08', -1],
+    ]);
+  });
+
+  it('gives a warning for a table with more than 50 rows', async () => {
+    const result = await run('=QUERY_GROUP("firstQuarter", "day")');
+
+    expect(result.table).toHaveLength(91);
+    expect(result.issues).toEqual([
+      expect.objectContaining({ severity: 'warning', kind: 'large-table' }),
     ]);
   });
 
@@ -244,6 +297,15 @@ describe('QUERY_PIVOT', () => {
         'value',
       ),
     ).toEqual({ value: -30, issues: [] });
+  });
+
+  it('gives a warning for a table with more than 20 columns', async () => {
+    const result = await run('=QUERY_PIVOT("firstQuarter", "category", "day")');
+
+    expect(result.table?.[0]).toHaveLength(92);
+    expect(result.issues).toEqual([
+      expect.objectContaining({ severity: 'warning', kind: 'large-table' }),
+    ]);
   });
 
   it('gives an error without a dimension for the columns', async () => {

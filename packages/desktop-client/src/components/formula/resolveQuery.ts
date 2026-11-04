@@ -25,6 +25,8 @@ export type FormulaIssue = {
     | 'provider-error'
     | 'provider-table'
     | 'table-result'
+    // Only the editor shows it
+    | 'large-table'
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';

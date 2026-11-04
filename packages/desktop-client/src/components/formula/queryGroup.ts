@@ -7,19 +7,52 @@ import type {
 } from '@actual-app/core/shared/formulas/customFunctions';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type { ObjectExpression, Query } from '@actual-app/core/shared/query';
+import type { SyncedPrefs } from '@actual-app/core/types/prefs';
 import { t } from 'i18next';
 
+// AQL has no week or quarter, so a week groups by day and a quarter by
+// month. groupPeriodKey then puts each key in its week or quarter.
 const dimensionExpressions: Record<QueryGroupDimension, ObjectExpression> = {
   category: { $id: '$category' },
   category_group: { $id: '$category.group' },
   payee: { $id: '$payee' },
   account: { $id: '$account' },
+  day: { $day: '$date' },
+  week: { $day: '$date' },
   month: { $month: '$date' },
+  quarter: { $month: '$date' },
   year: { $year: '$date' },
 };
 
-function isPeriodDimension(dimension: QueryGroupDimension) {
-  return dimension === 'month' || dimension === 'year';
+type PeriodDimension = 'day' | 'week' | 'month' | 'quarter' | 'year';
+
+function isPeriodDimension(
+  dimension: QueryGroupDimension,
+): dimension is PeriodDimension {
+  return (
+    dimension === 'day' ||
+    dimension === 'week' ||
+    dimension === 'month' ||
+    dimension === 'quarter' ||
+    dimension === 'year'
+  );
+}
+
+type FirstDayOfWeekIdx = SyncedPrefs['firstDayOfWeekIdx'];
+
+// The key of the period that a database key is in: the first day of the
+// week, or the first month of the quarter
+function groupPeriodKey(
+  dimension: QueryGroupDimension,
+  key: string,
+  firstDayOfWeekIdx: FirstDayOfWeekIdx,
+): string {
+  if (key === '') return key;
+  if (dimension === 'week') {
+    return monthUtils.weekFromDate(key, firstDayOfWeekIdx);
+  }
+  if (dimension === 'quarter') return monthUtils.quarterFromDate(key);
+  return key;
 }
 
 // The keys of one dimension, in budget order, and their names. The key of a
@@ -84,31 +117,60 @@ async function loadEntityKeys(
 // Each period from the start to the end of the query time frame. Without a
 // time frame, from the first to the last period with transactions.
 function getPeriodKeys(
-  dimension: 'month' | 'year',
+  dimension: PeriodDimension,
   dateRange: QueryDateRange | null,
   seenKeys: string[],
+  firstDayOfWeekIdx: FirstDayOfWeekIdx,
 ): string[] {
   const sortedKeys = [...seenKeys].sort();
-  const start = dateRange
-    ? dimension === 'month'
-      ? monthUtils.monthFromDate(dateRange.start)
-      : monthUtils.yearFromDate(dateRange.start)
-    : sortedKeys[0];
+  const toKey = (date: string) => {
+    switch (dimension) {
+      case 'day':
+        return date;
+      case 'week':
+        return monthUtils.weekFromDate(date, firstDayOfWeekIdx);
+      case 'month':
+        return monthUtils.monthFromDate(date);
+      case 'quarter':
+        return monthUtils.quarterFromDate(date);
+      default:
+        return monthUtils.yearFromDate(date);
+    }
+  };
+  const start = dateRange ? toKey(dateRange.start) : sortedKeys[0];
   const end = dateRange
-    ? dimension === 'month'
-      ? monthUtils.monthFromDate(dateRange.end)
-      : monthUtils.yearFromDate(dateRange.end)
+    ? toKey(dateRange.end)
     : sortedKeys[sortedKeys.length - 1];
   if (start === undefined || end === undefined) return [];
 
-  if (dimension === 'month') {
-    return monthUtils.rangeInclusive(start, end);
+  switch (dimension) {
+    case 'day':
+      return monthUtils.dayRangeInclusive(start, end);
+    case 'week':
+      return monthUtils.weekRangeInclusive(start, end, firstDayOfWeekIdx);
+    case 'month':
+      return monthUtils.rangeInclusive(start, end);
+    case 'quarter':
+      return monthUtils.quarterRangeInclusive(start, end);
+    default: {
+      const years: string[] = [];
+      for (let year = Number(start); year <= Number(end); year++) {
+        years.push(String(year));
+      }
+      return years;
+    }
   }
-  const years: string[] = [];
-  for (let year = Number(start); year <= Number(end); year++) {
-    years.push(String(year));
-  }
-  return years;
+}
+
+// The name of a period key. A quarter key is its first month, so it gets a
+// name of its own, for example "Q1 2024".
+function getPeriodName(dimension: PeriodDimension, key: string): string {
+  if (dimension !== 'quarter') return key;
+  const quarter = Math.floor(monthUtils.getMonthIndex(key) / 3) + 1;
+  return t('Q{{quarter}} {{year}}', {
+    quarter,
+    year: monthUtils.getYear(key),
+  });
 }
 
 // The keys that the table shows for one dimension, in budget order
@@ -116,10 +178,19 @@ async function getDimensionKeys(
   dimension: QueryGroupDimension,
   seenKeys: string[],
   dateRange: QueryDateRange | null,
+  firstDayOfWeekIdx: FirstDayOfWeekIdx,
 ): Promise<DimensionKeys> {
-  if (dimension === 'month' || dimension === 'year') {
-    const order = getPeriodKeys(dimension, dateRange, seenKeys);
-    return { order, names: new Map(order.map(key => [key, key])) };
+  if (isPeriodDimension(dimension)) {
+    const order = getPeriodKeys(
+      dimension,
+      dateRange,
+      seenKeys,
+      firstDayOfWeekIdx,
+    );
+    return {
+      order,
+      names: new Map(order.map(key => [key, getPeriodName(dimension, key)])),
+    };
   }
 
   const { order, names } = await loadEntityKeys(dimension);
@@ -171,8 +242,14 @@ function getDimensionTitle(dimension: QueryGroupDimension): string {
       return t('Payee');
     case 'account':
       return t('Account');
+    case 'day':
+      return t('Day');
+    case 'week':
+      return t('Week');
     case 'month':
       return t('Month');
+    case 'quarter':
+      return t('Quarter');
     case 'year':
       return t('Year');
     default:
@@ -204,20 +281,33 @@ export async function fetchQueryGroupRows({
     { value: measure === 'sum' ? { $sum: '$amount' } : { $count: '$id' } },
   ]);
   const { data } = await send('query', groupedQuery.serialize());
+  const firstDayOfWeekIdx = dimensions.includes('week')
+    ? ((await send('preferences/get'))?.firstDayOfWeekIdx ?? '0')
+    : '0';
   const groups = (data as Array<Record<string, unknown>>).map(group => ({
-    keys: dimensions.map((_, index) => String(group[`key${index}`] ?? '')),
+    keys: dimensions.map((dimension, index) =>
+      groupPeriodKey(
+        dimension,
+        String(group[`key${index}`] ?? ''),
+        firstDayOfWeekIdx,
+      ),
+    ),
     value: Number(group.value) || 0,
   }));
 
-  const values = new Map(
-    groups.map(group => [JSON.stringify(group.keys), group.value]),
-  );
+  // The days of a week, or the months of a quarter, add up
+  const values = new Map<string, number>();
+  for (const group of groups) {
+    const key = JSON.stringify(group.keys);
+    values.set(key, (values.get(key) ?? 0) + group.value);
+  }
   const dimensionKeys = await Promise.all(
     dimensions.map((dimension, index) =>
       getDimensionKeys(
         dimension,
         [...new Set(groups.map(group => group.keys[index]))],
         dateRange,
+        firstDayOfWeekIdx,
       ),
     ),
   );

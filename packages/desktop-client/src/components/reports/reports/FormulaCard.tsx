@@ -161,7 +161,13 @@ export function FormulaCard({
             />
           </View>
         )}
-        <FormulaWarnings issues={[...issues, ...colorIssues]} />
+        {/* The size warning is for the editor, because a card can show a
+            big table on purpose */}
+        <FormulaWarnings
+          issues={[...issues, ...colorIssues].filter(
+            issue => issue.kind !== 'large-table',
+          )}
+        />
       </View>
     </ReportCard>
   );
