@@ -4,16 +4,20 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@actual-app/components/button';
 import { Input } from '@actual-app/components/input';
 import { Paragraph } from '@actual-app/components/paragraph';
+import { Select } from '@actual-app/components/select';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
+import { parseAqlQuery } from '@actual-app/core/shared/formulas/aqlQuery';
 import {
   isNamedQueryItem,
   isSameQueryName,
 } from '@actual-app/core/shared/formulas/queryNameUses';
+import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryAqlQueryData,
   FormulaLibraryAqlQueryEntity,
+  TimeFrame,
 } from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
 
@@ -24,7 +28,12 @@ import {
   ModalCloseButton,
   ModalHeader,
 } from '#components/common/Modal';
-import { FormField, FormLabel } from '#components/forms';
+import { Checkbox, FormField, FormLabel } from '#components/forms';
+import {
+  getAqlDateField,
+  getAqlDateFields,
+} from '#components/formula/aqlSource';
+import { QueryTimeFrameControl } from '#components/formula/QueryTimeFrameControl';
 import {
   formulaLibraryQueries,
   useCreateFormulaLibraryItemMutation,
@@ -32,6 +41,7 @@ import {
 } from '#formula-library';
 
 import { describeAqlQuery } from './aqlQueryKind';
+import { AqlQueryPreview } from './AqlQueryPreview';
 import { FormulaQueryUsesList } from './FormulaQueryUsesList';
 import { useFindFormulaQueryUses } from './useFindFormulaQueryUses';
 
@@ -65,6 +75,10 @@ export function EditFormulaLibraryAqlQueryModal({
   const [name, setName] = useState(item?.name ?? '');
   const [description, setDescription] = useState(item?.data.description ?? '');
   const [aql, setAql] = useState(item?.data.aql ?? NEW_AQL);
+  // undefined: the default of the table
+  const [dateField, setDateField] = useState(item?.data.dateField);
+  const [timeFrame, setTimeFrame] = useState(item?.data.timeFrame);
+  const [isCount, setIsCount] = useState(item?.data.isCount ?? false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [isAqlErrorShown, setIsAqlErrorShown] = useState(false);
   // Set when a rename needs the user to choose the cards to change
@@ -78,6 +92,18 @@ export function EditFormulaLibraryAqlQueryModal({
     : { cards: [], providers: [] };
   const isRename = item !== undefined && trimmedName !== item.name;
   const aqlDescription = describeAqlQuery(aql);
+  const { query: parsedQuery } = parseAqlQuery(aql);
+  const dateFields = parsedQuery ? getAqlDateFields(parsedQuery.table) : [];
+  const shownDateField = getAqlDateField({ text: aql, dateField });
+  // All time, until you choose a time frame
+  const shownTimeFrame: TimeFrame = {
+    start: monthUtils.firstDayOfMonth(monthUtils.currentDay()),
+    end: monthUtils.currentDay(),
+    mode: 'full',
+    ...timeFrame,
+  };
+  const isCountShown =
+    parsedQuery?.kind === 'value' && !parsedQuery.isCountCalculation;
 
   function validateName() {
     if (trimmedName === '') {
@@ -102,6 +128,9 @@ export function EditFormulaLibraryAqlQueryModal({
       ...item?.data,
       aql,
       description: description.trim() === '' ? undefined : description.trim(),
+      dateField,
+      timeFrame,
+      isCount: isCountShown && isCount ? true : undefined,
     };
 
     if (item) {
@@ -252,6 +281,77 @@ export function EditFormulaLibraryAqlQueryModal({
                 >
                   {aqlDescription.error ?? aqlDescription.label}
                 </Text>
+              </FormField>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-end',
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                {dateFields.length > 0 && (
+                  <FormField>
+                    <FormLabel
+                      title={t('Date field for the time frame')}
+                      htmlFor="formula-aql-date-field"
+                    />
+                    <Select
+                      id="formula-aql-date-field"
+                      value={shownDateField ?? ''}
+                      options={[
+                        ['', t('None')],
+                        ...dateFields.map((field): [string, string] => [
+                          field,
+                          field,
+                        ]),
+                      ]}
+                      onChange={value =>
+                        setDateField(value === '' ? null : value)
+                      }
+                    />
+                  </FormField>
+                )}
+                {shownDateField !== null && dateFields.length > 0 && (
+                  <FormField>
+                    <FormLabel title={t('Time frame')} />
+                    <QueryTimeFrameControl
+                      timeFrame={shownTimeFrame}
+                      onChange={setTimeFrame}
+                    />
+                  </FormField>
+                )}
+                {isCountShown && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingBottom: 6,
+                    }}
+                  >
+                    <Checkbox
+                      id="formula-aql-is-count"
+                      checked={isCount}
+                      onChange={() => setIsCount(!isCount)}
+                    />
+                    <label htmlFor="formula-aql-is-count">
+                      <Trans>The value is a count, not an amount</Trans>
+                    </label>
+                  </View>
+                )}
+              </View>
+              <FormField style={{ marginBottom: 10 }}>
+                <FormLabel title={t('Result')} />
+                <AqlQueryPreview
+                  aql={{
+                    text: aql,
+                    dateField,
+                    isCount: isCountShown && isCount,
+                  }}
+                  timeFrame={shownDateField === null ? undefined : timeFrame}
+                />
               </FormField>
               <Text
                 style={{

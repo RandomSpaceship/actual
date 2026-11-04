@@ -180,6 +180,39 @@ describe('resolveQuery', () => {
 
         expect(query?.config).toBe(food);
       });
+
+      it('warns about an override for an AQL query without a date field', () => {
+        const aqlItem = (dateField?: string | null) => ({
+          id: 'library-aql',
+          type: 'aql-query' as const,
+          name: 'payees',
+          data: { aql: '{"table": "payees"}', dateField },
+          created_at: 0,
+        });
+        const timeFrameOverrides = {
+          'library-aql': { name: 'payees', timeFrame: lastYear },
+        };
+
+        const { query, issues } = resolveQuery('payees', {
+          localQueries: {},
+          library: [aqlItem()],
+          timeFrameOverrides,
+        });
+        expect(query?.config).toEqual({
+          aql: { text: '{"table": "payees"}', dateField: undefined },
+          timeFrame: lastYear,
+        });
+        expect(issues).toMatchObject([
+          { severity: 'warning', kind: 'stale-override', name: 'payees' },
+        ]);
+        expect(
+          resolveQuery('payees', {
+            localQueries: {},
+            library: [aqlItem('next_date')],
+            timeFrameOverrides,
+          }).issues,
+        ).toEqual([]);
+      });
     });
 
     it('lists card names, then library names that no card query hides', () => {

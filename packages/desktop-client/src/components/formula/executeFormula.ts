@@ -897,7 +897,9 @@ async function prefetchBudgetQueries(
 
 // The days that the query filter includes, or null if the query has no time
 // frame. The time frame of an AQL query applies only with a date field.
-function getQueryDateRange(config: FormulaQueryConfig): QueryDateRange | null {
+export function getQueryDateRange(
+  config: FormulaQueryConfig,
+): QueryDateRange | null {
   const timeFrame = config.timeFrame;
   if (!timeFrame || !timeFrame.mode) {
     return null;

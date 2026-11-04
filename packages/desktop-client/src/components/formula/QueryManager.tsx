@@ -25,6 +25,7 @@ import {
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryAqlQueryEntity,
+  FormulaLibraryNamedQueryEntity,
   FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
@@ -188,7 +189,7 @@ export function QueryManager({
     onQueriesChange(newQueries);
   }
 
-  function findTimeFrameOverride(item: FormulaLibraryQueryEntity) {
+  function findTimeFrameOverride(item: FormulaLibraryNamedQueryEntity) {
     return Object.hasOwn(timeFrameOverrides, item.id)
       ? timeFrameOverrides[item.id].timeFrame
       : undefined;
@@ -212,7 +213,7 @@ export function QueryManager({
 
   // A null time frame removes the override
   function handleTimeFrameOverrideChange(
-    item: FormulaLibraryQueryEntity,
+    item: FormulaLibraryNamedQueryEntity,
     timeFrame: TimeFrame | null,
   ) {
     const newOverrides = { ...timeFrameOverrides };
@@ -515,6 +516,13 @@ export function QueryManager({
                   item={item}
                   isHidden={findCardQueryName(item.name) !== undefined}
                   onEdit={() => handleEditLibraryAqlQuery(item)}
+                  timeFrameOverride={findTimeFrameOverride(item)}
+                  onTimeFrameOverrideChange={
+                    findCardQueryName(item.name) === undefined
+                      ? timeFrame =>
+                          handleTimeFrameOverrideChange(item, timeFrame)
+                      : undefined
+                  }
                 />
               ) : (
                 <LibraryQueryItem

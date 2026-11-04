@@ -10,11 +10,13 @@ import type {
   FormulaLibraryProviderEntity,
 } from '@actual-app/core/types/models';
 
+import { getAqlDateField } from '#components/formula/aqlSource';
 import { Cell, Field, Row } from '#components/table';
 
 import { getAqlQueryKindName, getAqlQueryOneLine } from './aqlQueryKind';
 import { FormulaLibraryUsesCell } from './FormulaLibraryUsesCell';
 import type { FormulaQueryUse } from './formulaQueryUses';
+import { QueryTimeFrameSummary } from './QueryTimeFrameSummary';
 
 type FormulaLibraryAqlQueryRowProps = {
   item: FormulaLibraryAqlQueryEntity;
@@ -33,7 +35,7 @@ export function FormulaLibraryAqlQueryRow({
   onDelete,
 }: FormulaLibraryAqlQueryRowProps) {
   const { t } = useTranslation();
-  const { description, aql } = item.data;
+  const { description, aql, dateField, timeFrame } = item.data;
 
   return (
     <Row
@@ -75,6 +77,15 @@ export function FormulaLibraryAqlQueryRow({
         >
           {getAqlQueryOneLine(aql)}
         </Text>
+      </Field>
+      <Field width={180} truncate={false} style={{ padding: '10px 0' }}>
+        {getAqlDateField({ text: aql, dateField }) === null ? (
+          <Text style={{ color: theme.pageTextSubdued }}>
+            <Trans>No date field</Trans>
+          </Text>
+        ) : (
+          <QueryTimeFrameSummary timeFrame={timeFrame ?? { mode: 'full' }} />
+        )}
       </Field>
       <FormulaLibraryUsesCell name={item.name} uses={uses} />
       <Cell width={40} plain style={{ padding: '10px 5px' }}>

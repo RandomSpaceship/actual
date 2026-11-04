@@ -171,6 +171,7 @@ export function FormulaLibraryPage() {
           <>
             <Cell value={t('Kind')} width={80} />
             <Cell value={t('Query')} width="flex" />
+            <Cell value={t('Time frame')} width={180} />
           </>
         }
         emptyText={

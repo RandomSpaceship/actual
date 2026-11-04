@@ -11,6 +11,8 @@ import type {
 } from '@actual-app/core/types/models';
 import { t } from 'i18next';
 
+import { getAqlDateField } from './aqlSource';
+
 export type FormulaAqlConfig = {
   // JSON with one key for each q() method
   text: string;
@@ -162,6 +164,25 @@ export function resolveQuery(
         name,
         message: t(
           'The card time frame for "{{name}}" is for a different library query',
+          { name: libraryItem.name },
+        ),
+      });
+    }
+    // The card time frame of an AQL query applies to its date field
+    if (
+      override &&
+      libraryItem.type === 'aql-query' &&
+      getAqlDateField({
+        text: libraryItem.data.aql,
+        dateField: libraryItem.data.dateField,
+      }) === null
+    ) {
+      issues.push({
+        severity: 'warning',
+        kind: 'stale-override',
+        name,
+        message: t(
+          'The card time frame for "{{name}}" does not apply, because the AQL query has no date field',
           { name: libraryItem.name },
         ),
       });

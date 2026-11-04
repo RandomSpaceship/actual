@@ -77,6 +77,37 @@ export async function fetchAqlQueryCount(
   return toNumber(await runAqlQuery(query.calculate({ $count: '*' })));
 }
 
+// The first rows of a table query, as the database gives them, for the
+// editor preview
+export async function fetchAqlQueryRows(
+  aql: FormulaAqlConfig,
+  dateRange: QueryDateRange | null,
+  limit: number,
+): Promise<Array<Record<string, unknown>>> {
+  const parsed = parseAqlConfig(aql);
+  if (parsed.kind !== 'table') {
+    throw new FormulaQueryError(getKindMessage(parsed));
+  }
+  let query = addDateRange(parsed.query, aql, dateRange);
+  if (query.state.limit === null || query.state.limit > limit) {
+    query = query.limit(limit);
+  }
+  const rows = await runAqlQuery(query);
+  return Array.isArray(rows) ? rows : [];
+}
+
+// The fields that the time frame can filter, for each table
+export function getAqlDateFields(table: string): string[] {
+  switch (table) {
+    case 'transactions':
+      return ['date'];
+    case 'schedules':
+      return ['next_date'];
+    default:
+      return [];
+  }
+}
+
 // For the functions that read the conditions of a filter query
 export function getAqlNotSupportedError(functionName: string) {
   return new FormulaQueryError(
