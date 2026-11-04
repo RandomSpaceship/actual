@@ -15,6 +15,7 @@ import type {
 
 import { FinancialText } from '#components/FinancialText';
 import { PrivacyFilter } from '#components/PrivacyFilter';
+import { getAmountColor } from '#components/reports/graphs/tableGraph/ReportTableRow';
 import { useDateFormat } from '#hooks/useDateFormat';
 import { useFormat } from '#hooks/useFormat';
 import { useLocale } from '#hooks/useLocale';
@@ -150,7 +151,7 @@ export function FormulaTable({
                     top: 0,
                     backgroundColor: theme.cardBackground,
                     color: theme.tableHeaderText,
-                    fontWeight: 400,
+                    fontWeight: 600,
                     padding: '5px 10px',
                     whiteSpace: 'nowrap',
                     textAlign: isNumericType(type) ? 'right' : 'left',
@@ -203,7 +204,19 @@ export function FormulaTable({
               {tableTotals.columnTotals.map((total, columnIndex) =>
                 columnIndex === tableTotals.labelColumn
                   ? renderCell(t('Total'), 'text', columnIndex)
-                  : renderCell(total, displayTypes[columnIndex], columnIndex),
+                  : renderCell(
+                      total,
+                      displayTypes[columnIndex],
+                      columnIndex,
+                      // A money total has the colours of the custom report
+                      // totals. A number column has none. The neutral colour
+                      // of 0 is too light on the light theme totals row.
+                      displayTypes[columnIndex] === 'money' &&
+                        total !== null &&
+                        total !== 0
+                        ? { color: getAmountColor(total) }
+                        : undefined,
+                    ),
               )}
             </tr>
           </tfoot>

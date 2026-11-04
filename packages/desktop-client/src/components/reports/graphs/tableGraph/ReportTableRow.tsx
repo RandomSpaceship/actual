@@ -41,10 +41,10 @@ type ReportTableRowProps = {
   scopeTagNames?: string[];
 };
 
-const getAmountColor = (amount: number) => {
+export function getAmountColor(amount: number) {
   if (amount === 0) return theme.reportsNumberNeutral;
   return amount > 0 ? theme.reportsNumberPositive : theme.reportsNumberNegative;
-};
+}
 
 export const ReportTableRow = memo(
   ({
