@@ -336,6 +336,25 @@ describe('QUERY_PIVOT', () => {
     ]);
   });
 
+  it('sorts the columns with sort 2', async () => {
+    expect(
+      (await run('=QUERY_PIVOT("firstQuarter", "category", , "month", "asc")'))
+        .table,
+    ).toEqual([
+      ['Category', '2024-02', '2024-01', '2024-03'],
+      ['Power', 0, -10, 0],
+      ['Groceries', -30, 0, 0],
+    ]);
+    expect(
+      (await run('=QUERY_PIVOT("all", "category group", , "category", "name")'))
+        .table,
+    ).toEqual([
+      ['Group', 'Groceries', 'Power', 'Rent'],
+      ['Bills', 0, -50, -20],
+      ['Food', -120, 0, 0],
+    ]);
+  });
+
   it('gives counts for QUERY_PIVOT_COUNT', async () => {
     expect(
       (await run('=QUERY_PIVOT_COUNT("firstQuarter", "category", , "month")'))

@@ -193,28 +193,46 @@ async function getDimensionKeys(
 
 // A header row with the column names, then one row for each key of dimension
 // 1. A cell without transactions is 0. asc and desc sort the rows by the row
-// total. The columns stay in budget order (or name order).
+// total, and the columns by the column total. A tie keeps budget order (or
+// name order), because the sort is stable.
 function getWideRows(
   rowDimension: QueryGroupDimension,
   [rowKeys, columnKeys]: DimensionKeys[],
   values: Map<string, number>,
-  sort: QueryGroupSort,
+  [rowSort, columnSort]: QueryGroupSort[],
 ): QueryGroupRow[] {
-  const rows = rowKeys.order.map(rowKey => {
-    const cells = columnKeys.order.map(
-      columnKey => values.get(JSON.stringify([rowKey, columnKey])) ?? 0,
+  const getValue = (rowKey: string, columnKey: string) =>
+    values.get(JSON.stringify([rowKey, columnKey])) ?? 0;
+  const columnOrder = [...columnKeys.order];
+  const columnDirection = getValueSortDirection(columnSort);
+  if (columnDirection !== 0) {
+    const columnTotals = new Map(
+      columnOrder.map(columnKey => [
+        columnKey,
+        rowKeys.order.reduce(
+          (sum, rowKey) => sum + getValue(rowKey, columnKey),
+          0,
+        ),
+      ]),
     );
+    columnOrder.sort(
+      (a, b) =>
+        columnDirection *
+        ((columnTotals.get(a) ?? 0) - (columnTotals.get(b) ?? 0)),
+    );
+  }
+  const rows = rowKeys.order.map(rowKey => {
+    const cells = columnOrder.map(columnKey => getValue(rowKey, columnKey));
     const total = cells.reduce((sum, cell) => sum + cell, 0);
     return { name: rowKeys.names.get(rowKey) ?? rowKey, cells, total };
   });
-  if (sort === 'asc' || sort === 'desc') {
-    // A tie keeps budget order, because the sort is stable
-    const direction = sort === 'asc' ? 1 : -1;
-    rows.sort((a, b) => direction * (a.total - b.total));
+  const rowDirection = getValueSortDirection(rowSort);
+  if (rowDirection !== 0) {
+    rows.sort((a, b) => rowDirection * (a.total - b.total));
   }
   const headerRow = [
     getDimensionTitle(rowDimension),
-    ...columnKeys.order.map(key => columnKeys.names.get(key) ?? key),
+    ...columnOrder.map(key => columnKeys.names.get(key) ?? key),
   ];
   return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
 }
@@ -316,7 +334,7 @@ export async function fetchQueryGroupRows({
   }
 
   if (request.shape === 'wide') {
-    return getWideRows(dimensions[0], dimensionKeys, values, sorts[0]);
+    return getWideRows(dimensions[0], dimensionKeys, values, sorts);
   }
 
   // With a period dimension, each combination gets a row. Without one, only
