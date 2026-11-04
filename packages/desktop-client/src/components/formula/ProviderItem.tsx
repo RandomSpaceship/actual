@@ -19,6 +19,7 @@ import type { FormulaQueryConfig } from '#components/formula/resolveQuery';
 import { useFormat } from '#hooks/useFormat';
 import { useFormulaExecution } from '#hooks/useFormulaExecution';
 
+import { FormulaTable } from './FormulaTable';
 import { FormulaWarnings } from './FormulaWarnings';
 
 type ProviderItemProps = {
@@ -71,7 +72,7 @@ export function ProviderItem({
     undefined,
     accounts,
     timeFrameOverrides,
-    'value',
+    'auto',
     cardProviders,
   );
 
@@ -162,6 +163,12 @@ export function ProviderItem({
               <Text style={{ color: theme.errorText, fontSize: 13 }}>
                 {value.error}
               </Text>
+            ) : value.table ? (
+              <Text style={{ fontSize: 13 }}>
+                <Trans count={value.table.length}>
+                  A table with {{ count: value.table.length }} rows
+                </Trans>
+              </Text>
             ) : typeof value.result === 'number' ? (
               <FinancialText style={{ fontSize: 13 }}>
                 {format(amountToInteger(value.result), 'financial')}
@@ -170,6 +177,13 @@ export function ProviderItem({
               <Text style={{ fontSize: 13 }}>{value.result}</Text>
             )}
           </View>
+          {value.table && !value.error && (
+            <FormulaTable
+              table={value.table}
+              compact
+              style={{ maxHeight: 160 }}
+            />
+          )}
           {/* The warning line above already says that the name is hidden */}
           <FormulaWarnings
             issues={value.issues.filter(

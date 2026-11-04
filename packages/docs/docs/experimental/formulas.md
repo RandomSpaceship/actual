@@ -422,7 +422,9 @@ There are two types of provider:
 - A library provider is in the formula library. Every card can use it.
 - A card provider is on one card only. Other cards cannot use it.
 
-A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. A provider gives one value. If the formula of a provider gives a table, use `INDEX` to get one cell. Providers are available in formula cards only, not in rule formulas.
+A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. Providers are available in formula cards only, not in rule formulas.
+
+A provider can give one value or a table. A formula uses a provider that gives a table as it uses a table from a function. For example, the provider `Spending` has the formula `=QUERY_GROUP("expenses", "category")`. Then `=INDEX(Spending, 1, 2)` gives the amount in row 1, `=SUM(Spending)` gives the total, and `=SORT(Spending, 2, 1)` gives the table sorted by amount. If the card formula is `=Spending`, the card shows the table.
 
 To add a library provider:
 
@@ -430,7 +432,7 @@ To add a library provider:
 2. Under **Providers**, select **Create new provider**.
 3. Type a name. Names are not case-sensitive, so `NetIncome` and `netincome` are the same name.
 4. Optionally, type a description.
-5. Type the formula. The formula must start with `=`. **Result** shows the value of the formula.
+5. Type the formula. The formula must start with `=`. **Result** shows the value or the table that the formula gives.
 6. Select **Save**.
 
 A provider name can have letters, digits, `_` and `.`. It must start with a letter or `_`. A name cannot look like a cell reference, for example `AB12`. Formulas use `RESULT`, `TRUE`, `FALSE` and names that start with `theme_` for other things, so a provider cannot have these names.
@@ -457,7 +459,7 @@ If a card provider has the same name as a library provider, the card uses the ca
 
 The formula autocomplete shows the card providers and the library providers in their own section.
 
-The card providers are under **Providers**. Each card provider shows its formula and its value on this card, and has these buttons:
+The card providers are under **Providers**. Each card provider shows its formula and its value or table on this card, and has these buttons:
 
 - **Insert** adds the provider name to the card formula, at the cursor.
 - **Make shared** moves the provider to the formula library. Then select **Save widget**. **Make shared** is not available when the library already has a provider with the same name. If the provider uses a card query or another card provider, Actual does not move it, and shows the names that it uses. A library provider cannot find these names, so make them shared first.

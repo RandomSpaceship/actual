@@ -28,6 +28,7 @@ import {
   ModalHeader,
 } from '#components/common/Modal';
 import { FormField, FormLabel } from '#components/forms';
+import { FormulaTable } from '#components/formula/FormulaTable';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import {
   listProviderNames,
@@ -140,19 +141,9 @@ export function EditFormulaLibraryProviderModal({
     undefined,
     simpleAccounts,
     card?.timeFrameOverrides,
-    'value',
+    'auto',
     editedCardProviders,
   );
-
-  // The table message for a card tells you to change the display, but a
-  // provider can give only one value
-  const previewError = preview.issues.some(
-    issue => issue.kind === 'table-result',
-  )
-    ? t(
-        'The formula gives a table. A provider can give only one value. Use INDEX to get one cell, for example INDEX(formula, 1, 2)',
-      )
-    : preview.error;
 
   function validateName() {
     if (trimmedName === '') {
@@ -397,7 +388,7 @@ export function EditFormulaLibraryProviderModal({
                 <Trans>Result:</Trans>
               </Text>
               {/* An error can be long, so it shows as text from its start */}
-              {previewError && !preview.isLoading ? (
+              {preview.error && !preview.isLoading ? (
                 <Text
                   style={{
                     maxHeight: 160,
@@ -410,8 +401,18 @@ export function EditFormulaLibraryProviderModal({
                     overflowWrap: 'anywhere',
                   }}
                 >
-                  {previewError}
+                  {preview.error}
                 </Text>
+              ) : preview.table ? (
+                <FormulaTable
+                  table={preview.table}
+                  compact
+                  style={{
+                    maxHeight: 200,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 6,
+                  }}
+                />
               ) : (
                 <View
                   style={{
