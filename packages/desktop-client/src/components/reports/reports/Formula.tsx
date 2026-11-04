@@ -6,6 +6,8 @@ import { useParams } from 'react-router';
 import { Button } from '@actual-app/components/button';
 import { useResponsive } from '@actual-app/components/hooks/useResponsive';
 import { Input } from '@actual-app/components/input';
+import { Menu } from '@actual-app/components/menu';
+import { Popover } from '@actual-app/components/popover';
 import { Select } from '@actual-app/components/select';
 import { styles } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
@@ -117,6 +119,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [valueFormat, setValueFormat] = useState<
     'auto' | FormulaTableColumnType
   >(widget?.meta?.valueFormat ?? 'auto');
+  const colorPresetTriggerRef = useRef<HTMLButtonElement>(null);
+  const [isColorPresetMenuOpen, setIsColorPresetMenuOpen] = useState(false);
   const [view, setView] = useState<'auto' | 'number' | 'table'>(
     widget?.meta?.view ?? 'auto',
   );
@@ -752,15 +756,48 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   marginBottom: 20,
                 }}
               >
-                <div
+                <View
                   style={{
-                    fontSize: 13,
-                    color: theme.pageTextSubdued,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                     marginBottom: 5,
                   }}
                 >
-                  <Trans>Conditional color (optional):</Trans>
-                </div>
+                  <div style={{ fontSize: 13, color: theme.pageTextSubdued }}>
+                    <Trans>Conditional color (optional):</Trans>
+                  </div>
+                  <Button
+                    ref={colorPresetTriggerRef}
+                    variant="bare"
+                    onPress={() => setIsColorPresetMenuOpen(true)}
+                  >
+                    <Trans>Presets</Trans>
+                  </Button>
+                  <Popover
+                    triggerRef={colorPresetTriggerRef}
+                    placement="bottom end"
+                    isOpen={isColorPresetMenuOpen}
+                    onOpenChange={() => setIsColorPresetMenuOpen(false)}
+                  >
+                    <Menu
+                      onMenuSelect={presetName => {
+                        setColorFormula(colorPresets[presetName] ?? '');
+                        setIsColorPresetMenuOpen(false);
+                      }}
+                      items={[
+                        {
+                          name: 'sign',
+                          text: t('Green above zero, red below zero'),
+                        },
+                        { name: 'negative', text: t('Red below zero') },
+                        { name: 'positive', text: t('Green above zero') },
+                        Menu.line,
+                        { name: 'none', text: t('No color') },
+                      ]}
+                    />
+                  </Popover>
+                </View>
                 <View
                   style={{
                     border: `1px solid ${theme.formInputBorder}`,
@@ -829,3 +866,13 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     </Page>
   );
 }
+
+// The colors of positive and negative amounts in the custom report table. An
+// empty result gives the default color, because the color of 0 is too light
+// on the light theme.
+const colorPresets: Record<string, string> = {
+  sign: '=IF(RESULT>0, theme_reportsNumberPositive, IF(RESULT<0, theme_reportsNumberNegative, ""))',
+  negative: '=IF(RESULT<0, theme_reportsNumberNegative, "")',
+  positive: '=IF(RESULT>0, theme_reportsNumberPositive, "")',
+  none: '',
+};

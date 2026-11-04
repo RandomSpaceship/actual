@@ -575,6 +575,7 @@ If the format cannot show the value, for example text with **Money**, the card s
 Formula cards support an optional **Conditional color** formula (single line) that returns a color string like `red` or `#ff0000`.
 
 - Use the **`RESULT`** variable to reference the main formula result.
+- To start from a common formula, click **Presets** and select one. The presets use the colors of positive and negative amounts in custom reports. **No color** clears the formula. You can change the formula after you select a preset.
 - Under the formula, the editor shows the color that the formula gives, with a small sample of the color. If the formula gives an error, or a value that is not a color, the editor shows a message, and the card uses the default color.
 
 ## Rule formulas
