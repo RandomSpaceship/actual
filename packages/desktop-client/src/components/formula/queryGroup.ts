@@ -1,9 +1,12 @@
 import { send } from '@actual-app/core/platform/client/connection';
+import { isPeriodDimension } from '@actual-app/core/shared/formulas/customFunctions';
 import type {
   QueryDateRange,
   QueryGroupDimension,
+  QueryGroupPeriodDimension,
   QueryGroupRequest,
   QueryGroupRow,
+  QueryGroupSort,
 } from '@actual-app/core/shared/formulas/customFunctions';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type { ObjectExpression, Query } from '@actual-app/core/shared/query';
@@ -23,20 +26,6 @@ const dimensionExpressions: Record<QueryGroupDimension, ObjectExpression> = {
   quarter: { $month: '$date' },
   year: { $year: '$date' },
 };
-
-type PeriodDimension = 'day' | 'week' | 'month' | 'quarter' | 'year';
-
-function isPeriodDimension(
-  dimension: QueryGroupDimension,
-): dimension is PeriodDimension {
-  return (
-    dimension === 'day' ||
-    dimension === 'week' ||
-    dimension === 'month' ||
-    dimension === 'quarter' ||
-    dimension === 'year'
-  );
-}
 
 type FirstDayOfWeekIdx = SyncedPrefs['firstDayOfWeekIdx'];
 
@@ -117,7 +106,7 @@ async function loadEntityKeys(
 // Each period from the start to the end of the query time frame. Without a
 // time frame, from the first to the last period with transactions.
 function getPeriodKeys(
-  dimension: PeriodDimension,
+  dimension: QueryGroupPeriodDimension,
   dateRange: QueryDateRange | null,
   seenKeys: string[],
   firstDayOfWeekIdx: FirstDayOfWeekIdx,
@@ -164,7 +153,10 @@ function getPeriodKeys(
 
 // The name of a period key. A quarter key is its first month, so it gets a
 // name of its own in the custom report format, for example "Q1 '24".
-function getPeriodName(dimension: PeriodDimension, key: string): string {
+function getPeriodName(
+  dimension: QueryGroupPeriodDimension,
+  key: string,
+): string {
   if (dimension !== 'quarter') return key;
   return monthUtils.format(key, "QQQ ''yy");
 }
@@ -206,7 +198,7 @@ function getWideRows(
   rowDimension: QueryGroupDimension,
   [rowKeys, columnKeys]: DimensionKeys[],
   values: Map<string, number>,
-  sort: QueryGroupRequest['sort'],
+  sort: QueryGroupSort,
 ): QueryGroupRow[] {
   const rows = rowKeys.order.map(rowKey => {
     const cells = columnKeys.order.map(
@@ -225,6 +217,13 @@ function getWideRows(
     ...columnKeys.order.map(key => columnKeys.names.get(key) ?? key),
   ];
   return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
+}
+
+// 1 for asc, -1 for desc, and 0 for a sort that does not use the values
+function getValueSortDirection(sort: QueryGroupSort | undefined) {
+  if (sort === 'asc') return 1;
+  if (sort === 'desc') return -1;
+  return 0;
 }
 
 // The title of the row-name column in a wide table
@@ -266,7 +265,7 @@ export async function fetchQueryGroupRows({
   request: QueryGroupRequest;
   dateRange: QueryDateRange | null;
 }): Promise<QueryGroupRow[]> {
-  const { dimensions, measure, sort } = request;
+  const { dimensions, measure, sorts } = request;
   const expressions = dimensions.map(
     dimension => dimensionExpressions[dimension],
   );
@@ -308,17 +307,16 @@ export async function fetchQueryGroupRows({
     ),
   );
 
-  if (sort === 'name') {
-    for (const [index, { order, names }] of dimensionKeys.entries()) {
-      if (isPeriodDimension(dimensions[index])) continue;
-      order.sort((a, b) =>
-        (names.get(a) ?? a).localeCompare(names.get(b) ?? b),
-      );
+  // Periods stay in date order
+  for (const [index, { order, names }] of dimensionKeys.entries()) {
+    if (sorts[index] !== 'name' || isPeriodDimension(dimensions[index])) {
+      continue;
     }
+    order.sort((a, b) => (names.get(a) ?? a).localeCompare(names.get(b) ?? b));
   }
 
   if (request.shape === 'wide') {
-    return getWideRows(dimensions[0], dimensionKeys, values, sort);
+    return getWideRows(dimensions[0], dimensionKeys, values, sorts[0]);
   }
 
   // With a period dimension, each combination gets a row. Without one, only
@@ -333,9 +331,12 @@ export async function fetchQueryGroupRows({
     .filter(row => hasPeriod || row.value !== undefined)
     .map(row => ({ keys: row.keys, value: row.value ?? 0 }));
 
-  if (sort === 'asc' || sort === 'desc') {
-    // By the dimension-1 total, so that the rows of a group stay together
-    const direction = sort === 'asc' ? 1 : -1;
+  // asc and desc for dimension 1 sort by the group total, so that the rows of
+  // a group stay together. For dimension 2, they sort inside each group. A
+  // tie keeps budget order.
+  const groupDirection = getValueSortDirection(sorts[0]);
+  const rowDirection = getValueSortDirection(sorts[1]);
+  if (groupDirection !== 0 || rowDirection !== 0) {
     const totals = new Map<string, number>();
     const positions = new Map<string, number>();
     for (const row of rows) {
@@ -344,9 +345,6 @@ export async function fetchQueryGroupRows({
         positions.set(row.keys[0], positions.size);
       }
     }
-    // A tie keeps budget order. Periods in a group stay in date order.
-    const sortsInGroup =
-      dimensions.length > 1 && !isPeriodDimension(dimensions[1]);
     const groupOf = (row: (typeof rows)[number]) => ({
       total: totals.get(row.keys[0]) ?? 0,
       position: positions.get(row.keys[0]) ?? 0,
@@ -355,9 +353,9 @@ export async function fetchQueryGroupRows({
       const groupA = groupOf(a);
       const groupB = groupOf(b);
       return (
-        direction * (groupA.total - groupB.total) ||
+        groupDirection * (groupA.total - groupB.total) ||
         groupA.position - groupB.position ||
-        (sortsInGroup ? direction * (a.value - b.value) : 0)
+        rowDirection * (a.value - b.value)
       );
     });
   }

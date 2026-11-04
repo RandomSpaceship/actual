@@ -41,6 +41,25 @@ export const queryGroupDimensions = [
 ] as const;
 export type QueryGroupDimension = (typeof queryGroupDimensions)[number];
 
+export type QueryGroupPeriodDimension =
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'quarter'
+  | 'year';
+
+export function isPeriodDimension(
+  dimension: QueryGroupDimension,
+): dimension is QueryGroupPeriodDimension {
+  return (
+    dimension === 'day' ||
+    dimension === 'week' ||
+    dimension === 'month' ||
+    dimension === 'quarter' ||
+    dimension === 'year'
+  );
+}
+
 export const queryGroupSorts = ['budget', 'name', 'asc', 'desc'] as const;
 export type QueryGroupSort = (typeof queryGroupSorts)[number];
 
@@ -50,7 +69,10 @@ export type QueryGroupSort = (typeof queryGroupSorts)[number];
 export type QueryGroupRequest = {
   queryName: string;
   dimensions: QueryGroupDimension[];
-  sort: QueryGroupSort;
+  // One sort for each dimension. Dimension 1: the order of the groups (long)
+  // or of the rows (wide). Dimension 2: the order inside each group (long) or
+  // of the columns (wide).
+  sorts: QueryGroupSort[];
   measure: 'sum' | 'count';
   shape: 'long' | 'wide';
 };
@@ -160,12 +182,15 @@ export type QueryGroupArgs = {
 // An empty dimension 2 or sort gives the default. A wide table must have
 // dimension 2. Returns an error message for a bad argument.
 export function createQueryGroupRequest(
-  { queryName, dimension1, sort1: sort, dimension2 }: QueryGroupArgs,
+  { queryName, dimension1, sort1, dimension2, sort2 }: QueryGroupArgs,
   measure: QueryGroupRequest['measure'],
   shape: QueryGroupRequest['shape'] = 'long',
 ): QueryGroupRequest | string {
   if (shape === 'wide' && dimension2 === '') {
     return 'Give a dimension for the columns, for example "month"';
+  }
+  if (dimension2 === '' && sort2 !== '') {
+    return 'Give dimension 2 before its sort';
   }
   const dimensions: QueryGroupDimension[] = [];
   for (const value of dimension2 === ''
@@ -181,13 +206,44 @@ export function createQueryGroupRequest(
     dimensions.push(dimension);
   }
 
-  const sortValue = sort === '' ? 'budget' : sort.toLowerCase();
-  const parsedSort = queryGroupSorts.find(candidate => candidate === sortValue);
-  if (!parsedSort) {
-    return `Unknown sort "${sort}". Use one of: ${queryGroupSorts.join(', ')}`;
+  const firstSort = parseQueryGroupSort(sort1);
+  if (!firstSort) return getUnknownSortMessage(sort1);
+  const sorts = [firstSort];
+  if (dimensions.length > 1) {
+    const secondSort =
+      sort2 === ''
+        ? getDefaultSecondSort(firstSort, dimensions[1], shape)
+        : parseQueryGroupSort(sort2);
+    if (!secondSort) return getUnknownSortMessage(sort2);
+    sorts.push(secondSort);
   }
 
-  return { queryName, dimensions, sort: parsedSort, measure, shape };
+  return { queryName, dimensions, sorts, measure, shape };
+}
+
+function parseQueryGroupSort(value: string) {
+  const sortValue = value === '' ? 'budget' : value.toLowerCase();
+  return queryGroupSorts.find(candidate => candidate === sortValue);
+}
+
+function getUnknownSortMessage(value: string) {
+  return `Unknown sort "${value}". Use one of: ${queryGroupSorts.join(', ')}`;
+}
+
+// Without sort 2, name sorts both dimensions. asc and desc also sort the rows
+// inside each group of a long table, but periods stay in date order, and the
+// columns of a wide table stay in budget order.
+function getDefaultSecondSort(
+  firstSort: QueryGroupSort,
+  secondDimension: QueryGroupDimension,
+  shape: QueryGroupRequest['shape'],
+): QueryGroupSort {
+  if (firstSort === 'asc' || firstSort === 'desc') {
+    return shape === 'long' && !isPeriodDimension(secondDimension)
+      ? firstSort
+      : 'budget';
+  }
+  return firstSort;
 }
 
 // HyperFormula needs the table size before it runs the function, so the

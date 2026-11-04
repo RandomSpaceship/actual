@@ -60,6 +60,16 @@ function groupedRows({ groupExpressions, selectExpressions }: GroupedQuery) {
       { key0: 'groceries', key1: '2024-02', value: isCount ? 3 : -3000 },
     ];
   }
+  if (
+    groups ===
+    JSON.stringify([{ $id: '$category.group' }, { $id: '$category' }])
+  ) {
+    return [
+      { key0: 'bills', key1: 'rent', value: -2000 },
+      { key0: 'bills', key1: 'power', value: -5000 },
+      { key0: 'food', key1: 'groceries', value: -12000 },
+    ];
+  }
   if (groups === JSON.stringify([{ $day: '$date' }])) {
     // A Monday and a Wednesday, then the Tuesday after
     return [
@@ -159,6 +169,53 @@ describe('QUERY_GROUP', () => {
       ['Power', '2024-02', 0],
       ['Power', '2024-03', 0],
     ]);
+  });
+
+  it('sorts inside each group with sort 2', async () => {
+    const groupFormula = (sort1: string, sort2: string) =>
+      `=QUERY_GROUP("all", "category group", ${sort1}, "category", ${sort2})`;
+    // Without sort 2, desc sorts both the groups and the rows in them
+    expect((await run(groupFormula('"desc"', ''))).table).toEqual([
+      ['Bills', 'Rent', -20],
+      ['Bills', 'Power', -50],
+      ['Food', 'Groceries', -120],
+    ]);
+    expect((await run(groupFormula('"asc"', '"name"'))).table).toEqual([
+      ['Food', 'Groceries', -120],
+      ['Bills', 'Power', -50],
+      ['Bills', 'Rent', -20],
+    ]);
+    expect((await run(groupFormula('', '"asc"'))).table).toEqual([
+      ['Bills', 'Power', -50],
+      ['Bills', 'Rent', -20],
+      ['Food', 'Groceries', -120],
+    ]);
+  });
+
+  it('sorts the periods in a group by value only with sort 2', async () => {
+    expect(
+      (
+        await run(
+          '=QUERY_GROUP("firstQuarter", "category", "desc", "month", "asc")',
+        )
+      ).table,
+    ).toEqual([
+      ['Power', '2024-01', -10],
+      ['Power', '2024-02', 0],
+      ['Power', '2024-03', 0],
+      ['Groceries', '2024-02', -30],
+      ['Groceries', '2024-01', 0],
+      ['Groceries', '2024-03', 0],
+    ]);
+  });
+
+  it('gives an error for a bad sort 2', async () => {
+    await expect(
+      run('=QUERY_GROUP("all", "category", , , "asc")'),
+    ).rejects.toThrow('Give dimension 2 before its sort');
+    await expect(
+      run('=QUERY_GROUP("all", "category group", , "category", "up")'),
+    ).rejects.toThrow('Unknown sort "up"');
   });
 
   it('gives a row for each day, week or quarter', async () => {
