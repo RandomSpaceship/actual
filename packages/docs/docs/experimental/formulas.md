@@ -38,7 +38,7 @@ Click the card to open the editor (where you can save the widget).
 
 - **Start with `=`** (example: `=SUM(1, 2, 3)`)
 - You can use typical Excel-style functions (autocomplete and hover help are built into the editor).
-- The result does not change while you type. To see the result, click **Run** or press **Ctrl+Enter** (**Cmd+Enter** on a Mac). A change to a query also waits for **Run**. **Save widget** runs the formula before it saves it.
+- The result changes while you type. When the result is a large table (more than 50 rows or 20 columns), the editor stops this, so that a slow query does not run again at each change. Then click **Run** or press **Ctrl+Enter** (**Cmd+Enter** on a Mac) to see the result. When the result is small again, the editor changes the result while you type again. **Save widget** always runs the formula before it saves it.
 
 ## Function reference
 

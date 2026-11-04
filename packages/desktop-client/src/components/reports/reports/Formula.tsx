@@ -122,9 +122,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     widget?.meta?.tableTotals ?? 'none',
   );
 
-  // The editor runs these inputs, not the inputs as you type them, so that
-  // a formula that is half typed does not start a slow query. Run, Ctrl+Enter
-  // and Save update them.
+  // The inputs of the last run. They follow your changes until a run gives a
+  // large table. Then only Run, Ctrl+Enter and Save update them, so that a
+  // formula that is half typed does not start another slow query.
   const [ranInputs, setRanInputs] = useState(() => ({
     formula,
     colorFormula,
@@ -167,6 +167,14 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     ranInputs.timeFrameOverrides,
     view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
   );
+  const isManualRun = issues.some(
+    issue => issue.kind === 'large-table' || issue.kind === 'table-cut',
+  );
+  if (!isManualRun && isChanged) {
+    // A state update in render, as React allows for state that follows other
+    // state. React renders again before it shows the page.
+    runFormula();
+  }
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
   const isHeaderRowShown = isFormulaTableHeaderRowShown(
     table ?? [],
@@ -487,17 +495,29 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 <Trans>Result:</Trans>
               </div>
               <View style={{ flex: 1 }} />
-              {isChanged && (
+              {isManualRun && (
                 <div style={{ fontSize: 13, color: theme.pageTextSubdued }}>
-                  <Trans>Changed. Select Run, or press Ctrl+Enter.</Trans>
+                  {isChanged ? (
+                    <Trans>
+                      Changed. The table is large, so it updates only when you
+                      select Run or press Ctrl+Enter.
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      The table is large, so it updates only when you select Run
+                      or press Ctrl+Enter.
+                    </Trans>
+                  )}
                 </div>
               )}
-              <Button
-                variant={isChanged ? 'primary' : 'normal'}
-                onPress={runFormula}
-              >
-                <Trans>Run</Trans>
-              </Button>
+              {isManualRun && (
+                <Button
+                  variant={isChanged ? 'primary' : 'normal'}
+                  onPress={runFormula}
+                >
+                  <Trans>Run</Trans>
+                </Button>
+              )}
             </View>
             <View
               style={{
