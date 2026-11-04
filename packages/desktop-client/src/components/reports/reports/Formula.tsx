@@ -15,6 +15,7 @@ import type {
   FormulaLibraryItemEntity,
   FormulaTableColumn,
   FormulaTableHeader,
+  FormulaTableTotals,
   FormulaWidget,
 } from '@actual-app/core/types/models';
 import type { EditorView } from '@codemirror/view';
@@ -115,6 +116,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   );
   const [tableHeader, setTableHeader] = useState<FormulaTableHeader>(
     widget?.meta?.tableHeader ?? 'auto',
+  );
+  const [tableTotals, setTableTotals] = useState<FormulaTableTotals>(
+    widget?.meta?.tableTotals ?? 'none',
   );
 
   const title = widget?.meta?.name || t('Formula');
@@ -252,6 +256,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           view,
           tableColumns,
           tableHeader,
+          tableTotals,
         },
       },
     });
@@ -286,6 +291,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             view,
             tableColumns,
             tableHeader,
+            tableTotals,
           },
         },
       },
@@ -460,6 +466,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   table={table}
                   columns={tableColumns}
                   headerRow={isHeaderRowShown}
+                  totals={tableTotals}
                   style={{ flex: 1, padding: 10 }}
                 />
               ) : (
@@ -520,6 +527,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 header={tableHeader}
                 onHeaderChange={setTableHeader}
                 isHeaderRowShown={isHeaderRowShown}
+                totals={tableTotals}
+                onTotalsChange={setTableTotals}
                 headerRowNames={getFormulaTableColumnNames(
                   table ?? [],
                   [],

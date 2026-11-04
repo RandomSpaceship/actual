@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getFormulaTableColumnNames,
   getFormulaTableColumnTypes,
+  getFormulaTableTotals,
   isFormulaTableHeaderRowShown,
 } from './FormulaTable';
 
@@ -108,5 +109,40 @@ describe('isFormulaTableHeaderRowShown', () => {
         'none',
       ),
     ).toBe(false);
+  });
+});
+
+describe('getFormulaTableTotals', () => {
+  const bodyRows = [
+    ['Rent', -50, 0.5, -20],
+    ['Power', { error: '#DIV/0!' }, 0.25, -10],
+  ];
+  const columnTypes = ['text', 'money', 'percent', 'number'] as const;
+
+  it('sums the money and number columns for the totals row', () => {
+    expect(getFormulaTableTotals(bodyRows, [...columnTypes], 'row')).toEqual({
+      rowTotals: null,
+      columnTotals: [null, -50, null, -30],
+      totalColumnType: 'money',
+      labelColumn: 0,
+    });
+  });
+
+  it('sums each row and all rows with both totals', () => {
+    expect(getFormulaTableTotals(bodyRows, [...columnTypes], 'both')).toEqual({
+      rowTotals: [-70, -10],
+      columnTotals: [null, -50, null, -30, -80],
+      totalColumnType: 'money',
+      labelColumn: 0,
+    });
+  });
+
+  it('gives no totals for none', () => {
+    expect(getFormulaTableTotals(bodyRows, [...columnTypes], 'none')).toEqual({
+      rowTotals: null,
+      columnTotals: null,
+      totalColumnType: 'money',
+      labelColumn: -1,
+    });
   });
 });

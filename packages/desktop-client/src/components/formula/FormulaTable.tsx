@@ -10,6 +10,7 @@ import type {
   FormulaTableColumn,
   FormulaTableColumnType,
   FormulaTableHeader,
+  FormulaTableTotals,
 } from '@actual-app/core/types/models';
 
 import { FinancialText } from '#components/FinancialText';
@@ -25,6 +26,7 @@ type FormulaTableProps = {
   columns?: FormulaTableColumn[];
   // Show the first row as the header row
   headerRow?: boolean;
+  totals?: FormulaTableTotals;
   style?: CSSProperties;
 };
 
@@ -32,6 +34,7 @@ export function FormulaTable({
   table,
   columns = [],
   headerRow = false,
+  totals = 'none',
   style,
 }: FormulaTableProps) {
   const { t } = useTranslation();
@@ -43,6 +46,10 @@ export function FormulaTable({
   const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
   const headerNames = getFormulaTableColumnNames(table, columns, headerRow);
   const hasHeader = headerNames.some(name => name !== '');
+  const tableTotals = getFormulaTableTotals(bodyRows, columnTypes, totals);
+  const displayTypes = tableTotals.rowTotals
+    ? [...columnTypes, tableTotals.totalColumnType]
+    : columnTypes;
 
   function formatCell(
     value: string | number | boolean | null,
@@ -72,6 +79,45 @@ export function FormulaTable({
     return value;
   }
 
+  function renderCell(
+    cell: FormulaTableData[number][number],
+    type: FormulaTableColumnType,
+    columnIndex: number,
+    extraStyle?: CSSProperties,
+  ) {
+    const cellStyle: CSSProperties = {
+      padding: '5px 10px',
+      whiteSpace: 'nowrap',
+      textAlign: isNumericType(type) ? 'right' : 'left',
+      ...extraStyle,
+    };
+    if (isErrorCell(cell)) {
+      return (
+        <td
+          key={columnIndex}
+          title={cell.error}
+          style={{ ...cellStyle, color: theme.errorText }}
+        >
+          {cell.error}
+        </td>
+      );
+    }
+    const text = formatCell(cell, type);
+    return (
+      <td key={columnIndex} style={cellStyle}>
+        {type === 'money' ? (
+          <FinancialText>
+            <PrivacyFilter>{text}</PrivacyFilter>
+          </FinancialText>
+        ) : isNumericType(type) ? (
+          <FinancialText>{text}</FinancialText>
+        ) : (
+          text
+        )}
+      </td>
+    );
+  }
+
   return (
     <View
       style={{
@@ -92,7 +138,7 @@ export function FormulaTable({
         {hasHeader && (
           <thead>
             <tr>
-              {columnTypes.map((type, columnIndex) => (
+              {displayTypes.map((type, columnIndex) => (
                 <th
                   key={columnIndex}
                   scope="col"
@@ -109,9 +155,11 @@ export function FormulaTable({
                   }}
                 >
                   {/* A month in the header row shows as a date */}
-                  {headerRow && !columns[columnIndex]?.name
-                    ? formatDate(headerNames[columnIndex], dateFormat, locale)
-                    : headerNames[columnIndex]}
+                  {columnIndex >= columnTypes.length
+                    ? t('Total')
+                    : headerRow && !columns[columnIndex]?.name
+                      ? formatDate(headerNames[columnIndex], dateFormat, locale)
+                      : headerNames[columnIndex]}
                 </th>
               ))}
             </tr>
@@ -126,42 +174,37 @@ export function FormulaTable({
                   rowIndex > 0 ? `1px solid ${theme.tableBorder}` : undefined,
               }}
             >
-              {columnTypes.map((type, columnIndex) => {
-                const cell = row[columnIndex] ?? null;
-                const cellStyle: CSSProperties = {
-                  padding: '5px 10px',
-                  whiteSpace: 'nowrap',
-                  textAlign: isNumericType(type) ? 'right' : 'left',
-                };
-                if (isErrorCell(cell)) {
-                  return (
-                    <td
-                      key={columnIndex}
-                      title={cell.error}
-                      style={{ ...cellStyle, color: theme.errorText }}
-                    >
-                      {cell.error}
-                    </td>
-                  );
-                }
-                const text = formatCell(cell, type);
-                return (
-                  <td key={columnIndex} style={cellStyle}>
-                    {type === 'money' ? (
-                      <FinancialText>
-                        <PrivacyFilter>{text}</PrivacyFilter>
-                      </FinancialText>
-                    ) : isNumericType(type) ? (
-                      <FinancialText>{text}</FinancialText>
-                    ) : (
-                      text
-                    )}
-                  </td>
-                );
-              })}
+              {columnTypes.map((type, columnIndex) =>
+                renderCell(row[columnIndex] ?? null, type, columnIndex),
+              )}
+              {tableTotals.rowTotals &&
+                renderCell(
+                  tableTotals.rowTotals[rowIndex],
+                  tableTotals.totalColumnType,
+                  columnTypes.length,
+                  { fontWeight: 600 },
+                )}
             </tr>
           ))}
         </tbody>
+        {tableTotals.columnTotals && (
+          <tfoot>
+            <tr
+              style={{
+                borderTop: `1px solid ${theme.tableBorder}`,
+                color: theme.tableRowHeaderText,
+                backgroundColor: theme.tableRowHeaderBackground,
+                fontWeight: 600,
+              }}
+            >
+              {tableTotals.columnTotals.map((total, columnIndex) =>
+                columnIndex === tableTotals.labelColumn
+                  ? renderCell(t('Total'), 'text', columnIndex)
+                  : renderCell(total, displayTypes[columnIndex], columnIndex),
+              )}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </View>
   );
@@ -187,6 +230,65 @@ export function getFormulaTableColumnTypes(
       ? 'money'
       : 'text';
   });
+}
+
+type FormulaTableTotalsResult = {
+  // The total of each body row, or null without a totals column
+  rowTotals: Array<number | null> | null;
+  // The total of each column, then the total of the totals column if there
+  // is one. null without a totals row.
+  columnTotals: Array<number | null> | null;
+  totalColumnType: FormulaTableColumnType;
+  // The column that shows "Total" in the totals row, or -1
+  labelColumn: number;
+};
+
+// Only money and number columns have a total. A percent, date or text
+// column has none, and an error cell does not count.
+export function getFormulaTableTotals(
+  bodyRows: FormulaTableData,
+  columnTypes: FormulaTableColumnType[],
+  totals: FormulaTableTotals,
+): FormulaTableTotalsResult {
+  const isSummed = columnTypes.map(
+    type => type === 'money' || type === 'number',
+  );
+  const totalColumnType = columnTypes.some(type => type === 'money')
+    ? 'money'
+    : 'number';
+  const rowTotals =
+    totals === 'column' || totals === 'both'
+      ? bodyRows.map(row =>
+          sumNumbers(row.filter((_, columnIndex) => isSummed[columnIndex])),
+        )
+      : null;
+  if (totals !== 'row' && totals !== 'both') {
+    return { rowTotals, columnTotals: null, totalColumnType, labelColumn: -1 };
+  }
+
+  const columnTotals: Array<number | null> = columnTypes.map(
+    (_, columnIndex) => {
+      if (!isSummed[columnIndex]) return null;
+      return sumNumbers(bodyRows.map(row => row[columnIndex] ?? null));
+    },
+  );
+  if (rowTotals) {
+    columnTotals.push(sumNumbers(rowTotals));
+  }
+  return {
+    rowTotals,
+    columnTotals,
+    totalColumnType,
+    labelColumn: columnTypes.findIndex(type => type === 'text'),
+  };
+}
+
+// The sum of the number cells, or null when there are none
+function sumNumbers(cells: FormulaTableData[number]): number | null {
+  const numbers = cells.filter(cell => typeof cell === 'number');
+  return numbers.length > 0
+    ? numbers.reduce((sum, value) => sum + value, 0)
+    : null;
 }
 
 // For 'auto', the first row is the header row when it has no numbers, and a

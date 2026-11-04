@@ -8,6 +8,7 @@ import type {
   FormulaTableColumn,
   FormulaTableColumnType,
   FormulaTableHeader,
+  FormulaTableTotals,
 } from '@actual-app/core/types/models';
 
 type FormulaTableColumnSettingsProps = {
@@ -18,6 +19,8 @@ type FormulaTableColumnSettingsProps = {
   onHeaderChange: (header: FormulaTableHeader) => void;
   // The table shows its first row as the header row
   isHeaderRowShown: boolean;
+  totals: FormulaTableTotals;
+  onTotalsChange: (totals: FormulaTableTotals) => void;
   // The names in the first row, for the placeholders
   headerRowNames: string[];
 };
@@ -29,6 +32,8 @@ export function FormulaTableColumnSettings({
   header,
   onHeaderChange,
   isHeaderRowShown,
+  totals,
+  onTotalsChange,
   headerRowNames,
 }: FormulaTableColumnSettingsProps) {
   const { t } = useTranslation();
@@ -62,6 +67,7 @@ export function FormulaTableColumnSettings({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
+          flexWrap: 'wrap',
           gap: 10,
           marginBottom: 5,
         }}
@@ -81,6 +87,19 @@ export function FormulaTableColumnSettings({
             ],
             ['first-row', t('First row')],
             ['none', t('Column names only')],
+          ]}
+        />
+        <View style={{ ...labelStyle, marginLeft: 10 }}>
+          <Trans>Totals:</Trans>
+        </View>
+        <Select
+          value={totals}
+          onChange={(value: FormulaTableTotals) => onTotalsChange(value)}
+          options={[
+            ['none', t('None')],
+            ['row', t('Totals row')],
+            ['column', t('Totals column')],
+            ['both', t('Row and column')],
           ]}
         />
       </View>

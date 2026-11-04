@@ -478,6 +478,8 @@ export type FormulaWidget = AbstractWidget<
     // 'first-row' uses the first row of the table as the header row. 'auto'
     // (the default) does so when the first row looks like column names.
     tableHeader?: FormulaTableHeader;
+    // A totals row, a totals column or both. 'none' is the default.
+    tableTotals?: FormulaTableTotals;
     queriesVersion?: number;
     queries?: Record<
       string,
@@ -509,6 +511,7 @@ export type FormulaTableColumnType =
 
 // Without a type, a column of numbers shows as money, and other columns as text
 export type FormulaTableHeader = 'auto' | 'first-row' | 'none';
+export type FormulaTableTotals = 'none' | 'row' | 'column' | 'both';
 export type FormulaTableColumn = {
   name?: string;
   type?: FormulaTableColumnType;
