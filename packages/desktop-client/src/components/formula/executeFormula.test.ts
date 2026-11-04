@@ -72,6 +72,27 @@ describe('executeFormula', () => {
     });
   });
 
+  it('evaluates card providers, also in library providers', async () => {
+    const library = [
+      provider('Total', '=Doubled + 1'),
+      provider('Doubled', '=1000'),
+    ];
+
+    const result = await executeFormula({
+      formula: '=Total',
+      resolveQuery: name => resolveQuery(name, { localQueries, library }),
+      accounts: [],
+      library,
+      cardProviders: { Doubled: { formula: '=QUERY("a") * 2' } },
+      language: 'en-US',
+    });
+
+    expect(result.value).toBe(123.45 * 2 + 1);
+    expect(result.issues).toEqual([
+      expect.objectContaining({ kind: 'shadowed', name: 'Doubled' }),
+    ]);
+  });
+
   it('fetches a query whose name depends on the data of another query', async () => {
     const result = await run('=QUERY(IF(QUERY_COUNT("a") > 0, "b", "c"))');
 

@@ -68,6 +68,7 @@ export function FormulaCard({
     simpleAccounts,
     meta?.timeFrameOverrides,
     view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
+    meta?.providers,
   );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
   // The table view has no colour
@@ -97,6 +98,8 @@ export function FormulaCard({
     colorVariables,
     simpleAccounts,
     meta?.timeFrameOverrides,
+    'value',
+    meta?.providers,
   );
 
   // Determine the custom color from color formula result

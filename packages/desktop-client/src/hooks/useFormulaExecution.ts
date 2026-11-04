@@ -11,6 +11,7 @@ import type {
   FormulaTable,
   SimpleAccount,
 } from '#components/formula/executeFormula';
+import type { CardProviders } from '#components/formula/resolveProviders';
 import { resolveQuery } from '#components/formula/resolveQuery';
 import type {
   FormulaIssue,
@@ -46,6 +47,8 @@ export function useFormulaExecution(
   // Keyed by library item id
   timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>,
   output: FormulaOutput = 'value',
+  // The card's own providers
+  cardProviders?: CardProviders,
 ) {
   const [language] = useGlobalPref('language');
   const [result, setResult] = useState<number | string | null>(null);
@@ -81,6 +84,7 @@ export function useFormulaExecution(
   const accountsKey = JSON.stringify(accounts ?? null);
   const libraryKey = JSON.stringify(library ?? null);
   const timeFrameOverridesKey = JSON.stringify(timeFrameOverrides ?? null);
+  const cardProvidersKey = JSON.stringify(cardProviders ?? null);
 
   const queriesRef = useRef(queries);
   queriesRef.current = queries;
@@ -92,6 +96,8 @@ export function useFormulaExecution(
   libraryRef.current = library;
   const timeFrameOverridesRef = useRef(timeFrameOverrides);
   timeFrameOverridesRef.current = timeFrameOverrides;
+  const cardProvidersRef = useRef(cardProviders);
+  cardProvidersRef.current = cardProviders;
 
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +134,7 @@ export function useFormulaExecution(
           accounts: accountsRef.current ?? [],
           namedExpressions: namedExpressionsRef.current,
           library,
+          cardProviders: cardProvidersRef.current,
           language,
           output,
         });
@@ -176,6 +183,7 @@ export function useFormulaExecution(
     accountsKey,
     libraryKey,
     timeFrameOverridesKey,
+    cardProvidersKey,
     dataVersion,
     output,
   ]);

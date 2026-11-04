@@ -99,9 +99,69 @@ describe('resolveProviders', () => {
       expect.objectContaining({ severity: 'warning', kind: 'duplicate-name' }),
     ]);
   });
+
+  it('uses a card provider, also in library providers, with a warning for a hidden name', () => {
+    const library = [
+      provider('1', 'Net', '=Income - 10'),
+      provider('2', 'Income', '=1000'),
+    ];
+
+    const result = resolveProviders(['=Net'], library, [], {
+      INCOME: { formula: '=Bonus + 1' },
+      Bonus: { formula: '=5' },
+    });
+
+    expect(result.providers).toEqual([
+      { name: 'Net', formula: '=Income - 10', uses: ['Income'] },
+      { name: 'INCOME', formula: '=Bonus + 1', uses: ['Bonus'] },
+      { name: 'Bonus', formula: '=5', uses: [] },
+    ]);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        kind: 'shadowed',
+        name: 'Income',
+        message: 'The card provider "INCOME" hides the library provider',
+      }),
+    ]);
+  });
+
+  it('uses the exact card provider name first', () => {
+    expect(
+      resolveProviders(['=total'], [], [], {
+        Total: { formula: '=1' },
+        total: { formula: '=2' },
+      }).providers,
+    ).toEqual([{ name: 'total', formula: '=2', uses: [] }]);
+  });
+
+  it('finds a cycle through card and library providers', () => {
+    const result = resolveProviders(
+      ['=Card'],
+      [provider('1', 'Shared', '=Card + 1')],
+      [],
+      { Card: { formula: '=Shared' } },
+    );
+
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        kind: 'provider-cycle',
+        message: 'Providers "Card", "Shared" use each other',
+      }),
+    ]);
+  });
 });
 
 describe('listProviderNames', () => {
+  it('lists card providers first, and not the library names that they hide', () => {
+    expect(
+      listProviderNames(
+        [provider('1', 'Total', '=1'), provider('2', 'Net', '=2')],
+        { TOTAL: { formula: '=3' } },
+      ),
+    ).toEqual({ TOTAL: '=3', Net: '=2' });
+  });
+
   it('lists each provider name once, with the oldest formula', () => {
     expect(
       listProviderNames([

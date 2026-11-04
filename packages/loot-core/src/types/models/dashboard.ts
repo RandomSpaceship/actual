@@ -1,5 +1,6 @@
 import type { ForecastSeries, ForecastSource } from './forecast';
 import type {
+  FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
 } from './formula-library';
@@ -494,6 +495,9 @@ export type FormulaWidget = AbstractWidget<
     >;
     // Keyed by library item id
     timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>;
+    // The card's own providers, keyed by name. A card provider wins over a
+    // library provider with the same name, also in library providers.
+    providers?: Record<string, FormulaLibraryProviderData>;
   } | null
 >;
 

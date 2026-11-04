@@ -26,7 +26,10 @@ import {
   normalizeQueryTimeFrameStart,
 } from '#components/formula/queryTimeFrame';
 import { resolveProviders } from '#components/formula/resolveProviders';
-import type { ResolvedProvider } from '#components/formula/resolveProviders';
+import type {
+  CardProviders,
+  ResolvedProvider,
+} from '#components/formula/resolveProviders';
 import type {
   FormulaIssue,
   FormulaQueryConfig,
@@ -259,6 +262,7 @@ export async function executeFormula({
   accounts,
   namedExpressions,
   library = [],
+  cardProviders = {},
   language,
   output = 'value',
 }: {
@@ -268,6 +272,8 @@ export async function executeFormula({
   namedExpressions?: Record<string, number | string>;
   // Oldest first. The formula can use its providers
   library?: FormulaLibraryItemEntity[];
+  // They win over library providers with the same name
+  cardProviders?: CardProviders;
   // The language global preference
   language?: string;
   output?: FormulaOutput;
@@ -316,6 +322,7 @@ export async function executeFormula({
     [formula],
     library,
     Object.keys(namedExpressions ?? {}),
+    cardProviders,
   );
   resolvedProviders.issues.forEach(addIssue);
   if (issues.some(issue => issue.severity === 'error')) {
