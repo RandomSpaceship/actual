@@ -134,6 +134,7 @@ export function FormulaCard({
             columns={meta?.tableColumns}
             headerRow={isFormulaTableHeaderRowShown(table, meta?.tableHeader)}
             totals={meta?.tableTotals}
+            compact
             style={{
               flex: 1,
               padding: showTitle ? '0 10px 10px' : 10,

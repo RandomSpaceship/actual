@@ -28,6 +28,8 @@ type FormulaTableProps = {
   // Show the first row as the header row
   headerRow?: boolean;
   totals?: FormulaTableTotals;
+  // Small text and rows, as the custom report table on a dashboard card
+  compact?: boolean;
   style?: CSSProperties;
 };
 
@@ -36,6 +38,7 @@ export function FormulaTable({
   columns = [],
   headerRow = false,
   totals = 'none',
+  compact = false,
   style,
 }: FormulaTableProps) {
   const { t } = useTranslation();
@@ -51,6 +54,11 @@ export function FormulaTable({
   const displayTypes = tableTotals.rowTotals
     ? [...columnTypes, tableTotals.totalColumnType]
     : columnTypes;
+
+  // The same cell size as the custom report table
+  const cellSize: CSSProperties = compact
+    ? { padding: '0 5px', height: 20 }
+    : { padding: '5px 10px' };
 
   function formatCell(
     value: string | number | boolean | null,
@@ -87,7 +95,7 @@ export function FormulaTable({
     extraStyle?: CSSProperties,
   ) {
     const cellStyle: CSSProperties = {
-      padding: '5px 10px',
+      ...cellSize,
       whiteSpace: 'nowrap',
       textAlign: isNumericType(type) ? 'right' : 'left',
       ...extraStyle,
@@ -135,7 +143,7 @@ export function FormulaTable({
         style={{
           borderCollapse: 'collapse',
           minWidth: '100%',
-          fontSize: 13,
+          fontSize: compact ? styles.tinyText.fontSize : 13,
           color: theme.tableText,
         }}
       >
@@ -149,10 +157,10 @@ export function FormulaTable({
                   style={{
                     position: 'sticky',
                     top: 0,
-                    backgroundColor: theme.cardBackground,
+                    backgroundColor: theme.tableHeaderBackground,
                     color: theme.tableHeaderText,
                     fontWeight: 600,
-                    padding: '5px 10px',
+                    ...cellSize,
                     whiteSpace: 'nowrap',
                     textAlign: isNumericType(type) ? 'right' : 'left',
                     borderBottom: `1px solid ${theme.tableBorder}`,
