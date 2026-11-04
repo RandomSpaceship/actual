@@ -45,6 +45,10 @@ export function FormulaChartTooltip({
     >
       <div style={{ marginBottom: 10 }}>
         <strong>{row.label}</strong>
+        {/* An outer slice of a two-ring donut */}
+        {typeof row.group === 'string' && (
+          <div style={{ color: theme.pageTextSubdued }}>{row.group}</div>
+        )}
       </div>
       <div style={{ lineHeight: 1.5 }}>
         {shownSeries.map(({ key, name, type }) => {

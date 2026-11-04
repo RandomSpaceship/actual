@@ -12,8 +12,6 @@ import {
   Legend,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ReferenceLine,
   Tooltip,
   XAxis,
@@ -33,6 +31,7 @@ import { useFormulaValueFormatter } from './formatFormulaValue';
 import { noSeriesColumn } from './formulaChartData';
 import type { FormulaChartData, FormulaChartRow } from './formulaChartData';
 import { FormulaChartTooltip } from './FormulaChartTooltip';
+import { FormulaDonutChart } from './FormulaDonutChart';
 
 type FormulaChartProps = {
   chart: FormulaChartData;
@@ -135,32 +134,14 @@ export function FormulaChart({
     <Container style={{ height: 'auto', flex: 1, ...style }}>
       {(width, height) => {
         if (type === 'donut') {
-          const [valueSeries] = series;
-          if (!valueSeries) return null;
-          // The legend under the donut names the slices
-          const legendHeight = compact ? 0 : 40;
-          const radius = Math.min(width, height - legendHeight) / 2 - 10;
           return (
-            <PieChart width={width} height={height}>
-              {tooltip}
-              {/* In row order, not A to Z */}
-              {!compact && <Legend itemSorter={null} />}
-              <Pie
-                // Recharts takes the colour of a slice and its legend item
-                // from the fill of the row
-                data={rows.map((row, rowIndex) => ({
-                  ...row,
-                  fill: colors[rowIndex % colors.length],
-                }))}
-                dataKey={valueSeries.key}
-                nameKey="label"
-                {...animationProps}
-                innerRadius={radius * 0.5}
-                outerRadius={radius}
-                startAngle={90}
-                endAngle={-270}
-              />
-            </PieChart>
+            <FormulaDonutChart
+              chart={chart}
+              compact={compact}
+              width={width}
+              height={height}
+              tooltip={tooltip}
+            />
           );
         }
 
