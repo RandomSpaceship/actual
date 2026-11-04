@@ -2,6 +2,7 @@ import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
 import { Select } from '@actual-app/components/select';
+import type { CSSProperties } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
@@ -12,7 +13,7 @@ import type {
 
 import { Checkbox } from '#components/forms';
 
-import { rowNumberLabelColumn } from './formulaChartData';
+import { noSeriesColumn, rowNumberLabelColumn } from './formulaChartData';
 import type { FormulaChartData } from './formulaChartData';
 
 type FormulaChartSettingsFormProps = {
@@ -25,6 +26,7 @@ type FormulaChartSettingsFormProps = {
 };
 
 const automaticLabelColumn = 'auto';
+const automaticSeriesColumn = 'auto';
 
 export function FormulaChartSettingsForm({
   settings,
@@ -49,7 +51,18 @@ export function FormulaChartSettingsForm({
       : getColumnName(labelColumn);
   }
 
-  const shownValueColumns = chart.series.map(series => series.columnIndex);
+  function getSeriesColumnName(seriesColumn: number) {
+    return seriesColumn === noSeriesColumn
+      ? t('None')
+      : getColumnName(seriesColumn);
+  }
+
+  const type = settings.type ?? 'bar';
+  const canStack = type === 'bar' || type === 'area';
+  // A long table has one series for each series value, but one value column
+  const shownValueColumns = [
+    ...new Set(chart.series.map(series => series.columnIndex)),
+  ];
   function setValueColumn(columnIndex: number, isShown: boolean) {
     const valueColumns = isShown
       ? [...shownValueColumns, columnIndex].sort((a, b) => a - b)
@@ -60,6 +73,13 @@ export function FormulaChartSettingsForm({
   const labelStyle = {
     fontSize: 13,
     color: theme.pageTextSubdued,
+  };
+  const toggleStyle: CSSProperties = {
+    ...labelStyle,
+    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   };
 
   return (
@@ -76,7 +96,7 @@ export function FormulaChartSettingsForm({
           <Trans>Chart:</Trans>
         </View>
         <Select
-          value={settings.type ?? 'bar'}
+          value={type}
           onChange={(type: FormulaChartType) => onChange({ ...settings, type })}
           options={[
             ['bar', t('Bar')],
@@ -115,15 +135,54 @@ export function FormulaChartSettingsForm({
             ),
           ]}
         />
-        <View
-          style={{
-            ...labelStyle,
-            marginLeft: 10,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-          }}
-        >
+        <View style={{ ...labelStyle, marginLeft: 10 }}>
+          {type === 'donut' ? (
+            <Trans>Outer ring:</Trans>
+          ) : (
+            <Trans>Series:</Trans>
+          )}
+        </View>
+        <Select
+          value={
+            settings.seriesColumn === undefined
+              ? automaticSeriesColumn
+              : String(settings.seriesColumn)
+          }
+          onChange={(value: string) =>
+            onChange({
+              ...settings,
+              seriesColumn:
+                value === automaticSeriesColumn ? undefined : Number(value),
+            })
+          }
+          options={[
+            [
+              automaticSeriesColumn,
+              t('Automatic ({{column}})', {
+                column: getSeriesColumnName(chart.seriesColumn),
+              }),
+            ],
+            [String(noSeriesColumn), t('None')],
+            ...columnNames.flatMap((_, columnIndex) =>
+              columnIndex === chart.labelColumn
+                ? []
+                : [[String(columnIndex), getColumnName(columnIndex)] as const],
+            ),
+          ]}
+        />
+        {canStack && (
+          <View style={toggleStyle}>
+            <label htmlFor="formula-chart-stacked">
+              <Trans>Stack:</Trans>
+            </label>
+            <Toggle
+              id="formula-chart-stacked"
+              isOn={settings.stacked ?? false}
+              onToggle={stacked => onChange({ ...settings, stacked })}
+            />
+          </View>
+        )}
+        <View style={toggleStyle}>
           <label htmlFor="formula-chart-flip-sign">
             <Trans>Flip signs:</Trans>
           </label>
@@ -146,7 +205,12 @@ export function FormulaChartSettingsForm({
           <Trans>Values:</Trans>
         </View>
         {columnNames.map((_, columnIndex) => {
-          if (columnIndex === chart.labelColumn) return null;
+          if (
+            columnIndex === chart.labelColumn ||
+            columnIndex === chart.seriesColumn
+          ) {
+            return null;
+          }
           const checkboxId = `formula-chart-value-${columnIndex}`;
           return (
             <View
@@ -178,8 +242,9 @@ export function FormulaChartSettingsForm({
       <View style={{ ...labelStyle, fontSize: 11 }}>
         <Trans>
           Automatic uses the first text or date column for the labels, and each
-          money, percent or number column for the values. Flip signs shows
-          spending as positive values.
+          money, percent or number column for the values. When a label shows
+          more than one time, Automatic uses the next text or date column for
+          the series. Flip signs shows spending as positive values.
         </Trans>
       </View>
     </View>
