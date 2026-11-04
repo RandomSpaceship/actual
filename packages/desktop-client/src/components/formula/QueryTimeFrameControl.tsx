@@ -204,8 +204,11 @@ export function QueryTimeFrameControl({
     return monthUtils.format(date, dateFormat);
   }
 
+  // All time has no dates of its own, so the picker shows the transactions
   const [pickerStartDate, pickerEndDate] = clampMonthRangeToBounds(
-    ...normalizeMonthRangeForPicker(startDate, endDate),
+    ...(timeRangeMode === 'full'
+      ? normalizeMonthRangeForPicker(earliestTransaction, latestTransaction)
+      : normalizeMonthRangeForPicker(startDate, endDate)),
     earliestMonth,
     latestMonth,
   );

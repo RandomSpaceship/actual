@@ -390,7 +390,9 @@ export function QueryManager({
   }
 
   return (
-    <View style={{ padding: 20, flex: 1, minWidth: 400 }}>
+    // As tall as the content, so that the items do not shrink and cover each
+    // other in the pane, which scrolls
+    <View style={{ padding: 20, flexGrow: 1, flexShrink: 0, minWidth: 400 }}>
       <View
         style={{
           display: 'flex',
