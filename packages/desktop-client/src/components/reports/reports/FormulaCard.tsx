@@ -166,6 +166,7 @@ export function FormulaCard({
               fontSizeMode={fontSizeMode}
               staticFontSize={staticFontSize}
               customColor={customColor}
+              valueFormat={meta?.valueFormat}
             />
           </View>
         )}

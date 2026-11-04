@@ -27,6 +27,8 @@ export type FormulaIssue = {
     | 'table-result'
     // Only the editor shows it
     | 'large-table'
+    // Only the editor shows it. A value does not fit its format.
+    | 'unformattable'
     // The table shows only part of the result
     | 'table-cut'
     | 'shadowed'

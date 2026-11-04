@@ -1,11 +1,9 @@
-import React, { useMemo } from 'react';
-
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import { amountToInteger } from '@actual-app/core/shared/util';
+import type { FormulaTableColumnType } from '@actual-app/core/types/models';
 
+import { useFormulaValueFormatter } from '#components/formula/formatFormulaValue';
 import { PrivacyFilter } from '#components/PrivacyFilter';
-import { useFormat } from '#hooks/useFormat';
 
 import { ReportCardValueSkeleton } from './ReportCardValueSkeleton';
 
@@ -19,6 +17,7 @@ type FormulaResultProps = {
   fontSizeMode?: 'dynamic' | 'static';
   staticFontSize?: number;
   customColor?: string | null;
+  valueFormat?: 'auto' | FormulaTableColumnType;
 };
 
 export function FormulaResult({
@@ -28,21 +27,21 @@ export function FormulaResult({
   fontSizeMode = 'dynamic',
   staticFontSize = 32,
   customColor = null,
+  valueFormat = 'auto',
 }: FormulaResultProps) {
-  const format = useFormat();
+  const formatFormulaValue = useFormulaValueFormatter();
 
-  // Format the display value - just show what we got
-  const displayValue = useMemo(() => {
-    if (error) {
-      return error;
-    } else if (value === null || value === undefined) {
-      return '';
-    } else if (typeof value === 'number') {
-      return format(amountToInteger(value), 'financial');
-    } else {
-      return String(value);
-    }
-  }, [error, value, format]);
+  // 'auto' shows a number as money, and text as the formula gives it
+  const displayValue = error
+    ? error
+    : formatFormulaValue(
+        value ?? null,
+        valueFormat === 'auto'
+          ? typeof value === 'number'
+            ? 'money'
+            : 'text'
+          : valueFormat,
+      );
 
   const lines = displayValue.split(/\r?\n/);
   const lineCount = lines.length;

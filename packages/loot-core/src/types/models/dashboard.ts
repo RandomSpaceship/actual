@@ -470,6 +470,9 @@ export type FormulaWidget = AbstractWidget<
     staticFontSize?: number;
     showTitle?: boolean;
     colorFormula?: string;
+    // The format of one value. 'auto' (the default) shows a number as money,
+    // and text as the formula gives it.
+    valueFormat?: 'auto' | FormulaTableColumnType;
     // 'auto' (the default) shows a table for a formula that gives a table,
     // and one value for other formulas
     view?: 'auto' | 'number' | 'table';

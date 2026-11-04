@@ -14,6 +14,7 @@ import { View } from '@actual-app/components/view';
 import type {
   FormulaLibraryItemEntity,
   FormulaTableColumn,
+  FormulaTableColumnType,
   FormulaTableHeader,
   FormulaTableTotals,
   FormulaWidget,
@@ -24,9 +25,11 @@ import { useQuery } from '@tanstack/react-query';
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import { ColorFormulaResult } from '#components/formula/ColorFormulaResult';
 import { maxShownTableColumns } from '#components/formula/executeFormula';
+import { isFormulaValueFormattable } from '#components/formula/formatFormulaValue';
 import {
   FormulaTable,
   getFormulaTableColumnNames,
+  getFormulaTableUnformattableColumns,
   isFormulaTableHeaderRowShown,
 } from '#components/formula/FormulaTable';
 import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColumnSettings';
@@ -34,6 +37,7 @@ import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
 import { listProviderNames } from '#components/formula/resolveProviders';
 import { listQueryNames } from '#components/formula/resolveQuery';
+import type { FormulaIssue } from '#components/formula/resolveQuery';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
 import { MobilePageHeader, Page, PageHeader } from '#components/Page';
 import { FormulaResult } from '#components/reports/FormulaResult';
@@ -110,6 +114,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [colorFormula, setColorFormula] = useState(
     widget?.meta?.colorFormula || '',
   );
+  const [valueFormat, setValueFormat] = useState<
+    'auto' | FormulaTableColumnType
+  >(widget?.meta?.valueFormat ?? 'auto');
   const [view, setView] = useState<'auto' | 'number' | 'table'>(
     widget?.meta?.view ?? 'auto',
   );
@@ -182,6 +189,47 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     tableHeader,
   );
   const isHeaderRowFound = isFormulaTableHeaderRowShown(table ?? [], 'auto');
+
+  // A value that does not fit its format shows as the formula gives it
+  const formatNames: Record<FormulaTableColumnType, string> = {
+    money: t('Money'),
+    percent: t('Percent'),
+    number: t('Number'),
+    date: t('Date'),
+    text: t('Text'),
+  };
+  const formatIssues: FormulaIssue[] = isTableView
+    ? getFormulaTableUnformattableColumns(
+        table ?? [],
+        tableColumns,
+        isHeaderRowShown,
+      ).map(columnIndex => {
+        const format = formatNames[tableColumns[columnIndex]?.type ?? 'text'];
+        return {
+          severity: 'warning',
+          kind: 'unformattable',
+          name: String(columnIndex + 1),
+          message: t(
+            'The {{format}} format cannot show some values in column {{columnNumber}}. They show as the formula gives them.',
+            { columnNumber: columnIndex + 1, format },
+          ),
+        };
+      })
+    : valueFormat !== 'auto' &&
+        !error &&
+        !isFormulaValueFormattable(result, valueFormat)
+      ? [
+          {
+            severity: 'warning',
+            kind: 'unformattable',
+            name: '',
+            message: t(
+              'The {{format}} format cannot show this result, so it shows as the formula gives it.',
+              { format: formatNames[valueFormat] },
+            ),
+          },
+        ]
+      : [];
 
   const colorVariables = useMemo(
     () => ({
@@ -284,6 +332,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           staticFontSize,
           showTitle,
           colorFormula,
+          valueFormat,
           view,
           tableColumns,
           tableHeader,
@@ -321,6 +370,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             staticFontSize,
             showTitle,
             colorFormula,
+            valueFormat,
             view,
             tableColumns,
             tableHeader,
@@ -549,10 +599,13 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   fontSizeMode={fontSizeMode}
                   staticFontSize={staticFontSize}
                   customColor={customColor}
+                  valueFormat={valueFormat}
                 />
               )}
             </View>
-            <FormulaWarnings issues={[...issues, ...colorIssues]} />
+            <FormulaWarnings
+              issues={[...issues, ...colorIssues, ...formatIssues]}
+            />
           </View>
           <View
             style={{
@@ -625,6 +678,31 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   alignItems: 'flex-end',
                 }}
               >
+                <View>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: theme.pageTextSubdued,
+                      marginBottom: 5,
+                    }}
+                  >
+                    <Trans>Format:</Trans>
+                  </div>
+                  <Select
+                    value={valueFormat}
+                    onChange={(value: 'auto' | FormulaTableColumnType) =>
+                      setValueFormat(value)
+                    }
+                    options={[
+                      ['auto', t('Automatic')],
+                      ['money', formatNames.money],
+                      ['percent', formatNames.percent],
+                      ['number', formatNames.number],
+                      ['date', formatNames.date],
+                      ['text', formatNames.text],
+                    ]}
+                  />
+                </View>
                 <View>
                   <div
                     style={{

@@ -538,6 +538,8 @@ The column types are:
 - **Text**: the value as it is.
 - **Automatic** (the default): **Money** for a column of numbers, and **Text** for other columns.
 
+If a cell does not fit the type of its column, the cell shows the value as the formula gives it. For example, text in a **Money** column shows as text. The editor then shows a warning for that column.
+
 The **Header row** setting has three options:
 
 - **Automatic** (the default): the first row of the table is the header row when the first row has no numbers, and a column has text in the first row and only numbers below it. A table from `QUERY_PIVOT` gets a header row this way. A table from `QUERY_GROUP` does not.
@@ -558,6 +560,15 @@ The **Totals** setting adds totals to the table:
 The table view has no font size and no conditional color.
 
 If a formula gives a table but **Display** is **One value**, the card shows an error. Set **Display** to **Automatic** or **Table**, or use `INDEX` to get one cell from the table.
+
+### Format One Value
+
+When the card shows one value, the **Format** setting sets how the value shows. The formats are the same as the column types of a table:
+
+- **Automatic** (the default): a number shows as **Money**, and text shows as it is.
+- **Money**, **Percent**, **Number**, **Date** or **Text**: the value shows in that format.
+
+If the format cannot show the value, for example text with **Money**, the card shows the value as the formula gives it. The editor then shows a warning. To make your own format, use **Text** and a function such as `FORMATNUMBER` or `TEXT`.
 
 ### Optional: conditional color
 

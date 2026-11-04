@@ -4,8 +4,6 @@ import { styles } from '@actual-app/components/styles';
 import type { CSSProperties } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import * as monthUtils from '@actual-app/core/shared/months';
-import { amountToInteger } from '@actual-app/core/shared/util';
 import type {
   FormulaTableColumn,
   FormulaTableColumnType,
@@ -16,12 +14,13 @@ import type {
 import { FinancialText } from '#components/FinancialText';
 import { PrivacyFilter } from '#components/PrivacyFilter';
 import { getAmountColor } from '#components/reports/graphs/tableGraph/ReportTableRow';
-import { useDateFormat } from '#hooks/useDateFormat';
-import { useFormat } from '#hooks/useFormat';
-import { useLocale } from '#hooks/useLocale';
 
 import { maxShownTableColumns, maxShownTableRows } from './executeFormula';
 import type { FormulaTable as FormulaTableData } from './executeFormula';
+import {
+  isFormulaValueFormattable,
+  useFormulaValueFormatter,
+} from './formatFormulaValue';
 
 type FormulaTableProps = {
   table: FormulaTableData;
@@ -43,9 +42,7 @@ export function FormulaTable({
   style,
 }: FormulaTableProps) {
   const { t } = useTranslation();
-  const format = useFormat();
-  const dateFormat = useDateFormat() || 'MM/dd/yyyy';
-  const locale = useLocale();
+  const formatFormulaValue = useFormulaValueFormatter();
 
   const bodyRows = headerRow ? table.slice(1) : table;
   const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
@@ -81,34 +78,6 @@ export function FormulaTable({
     borderTop: `1px solid ${theme.tableBorder}`,
   };
 
-  function formatCell(
-    value: string | number | boolean | null,
-    type: FormulaTableColumnType,
-  ): string {
-    if (value === null) return '';
-    if (typeof value === 'number') {
-      switch (type) {
-        case 'money':
-          return format(amountToInteger(value), 'financial');
-        case 'percent':
-          return format(value * 100, 'number') + '%';
-        case 'number':
-          return format(value, 'number');
-        case 'date':
-          return formatDate(serialToDate(value), dateFormat, locale);
-        default:
-          return String(value);
-      }
-    }
-    if (type === 'date' && typeof value === 'string') {
-      return formatDate(value, dateFormat, locale);
-    }
-    if (typeof value === 'boolean') {
-      return value ? t('TRUE') : t('FALSE');
-    }
-    return value;
-  }
-
   function renderCell(
     cell: FormulaTableData[number][number],
     type: FormulaTableColumnType,
@@ -133,7 +102,7 @@ export function FormulaTable({
         </td>
       );
     }
-    const text = formatCell(cell, type);
+    const text = formatFormulaValue(cell, type);
     return (
       <td key={columnIndex} style={cellStyle}>
         {type === 'money' ? (
@@ -197,7 +166,7 @@ export function FormulaTable({
                   {columnIndex >= shownTypes.length
                     ? t('Totals')
                     : headerRow && !columns[columnIndex]?.name
-                      ? formatDate(headerNames[columnIndex], dateFormat, locale)
+                      ? formatFormulaValue(headerNames[columnIndex], 'date')
                       : headerNames[columnIndex]}
                 </th>
               ))}
@@ -273,6 +242,25 @@ export function getFormulaTableColumnTypes(
     return values.length > 0 && values.every(value => typeof value === 'number')
       ? 'money'
       : 'text';
+  });
+}
+
+// The columns with a set type that cannot show all of their cells. These
+// cells show as the formula gives them. A header row does not count.
+export function getFormulaTableUnformattableColumns(
+  table: FormulaTableData,
+  columns: FormulaTableColumn[],
+  headerRow = false,
+): number[] {
+  const bodyRows = headerRow ? table.slice(1) : table;
+  return columns.flatMap((column, columnIndex) => {
+    const setType = column?.type;
+    if (!setType) return [];
+    const hasUnformattableCell = bodyRows.some(row => {
+      const cell = row[columnIndex] ?? null;
+      return !isErrorCell(cell) && !isFormulaValueFormattable(cell, setType);
+    });
+    return hasUnformattableCell ? [columnIndex] : [];
   });
 }
 
@@ -381,26 +369,4 @@ function isErrorCell(
 
 function isNumericType(type: FormulaTableColumnType) {
   return type === 'money' || type === 'percent' || type === 'number';
-}
-
-// A spreadsheet date number counts days from 1899-12-30
-function serialToDate(serial: number): string {
-  const millisecondsPerDay = 24 * 60 * 60 * 1000;
-  const date = new Date(Date.UTC(1899, 11, 30) + serial * millisecondsPerDay);
-  return date.toISOString().slice(0, 10);
-}
-
-function formatDate(
-  value: string,
-  dateFormat: string,
-  locale: ReturnType<typeof useLocale>,
-): string {
-  if (monthUtils.isValidYearMonthDay(value)) {
-    return monthUtils.format(value, dateFormat, locale);
-  }
-  if (monthUtils.isValidYearMonth(value)) {
-    // As the custom report table
-    return monthUtils.format(value, "MMM ''yy", locale);
-  }
-  return value;
 }

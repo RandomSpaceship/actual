@@ -56,6 +56,7 @@
     "#components/codemirror/autocompleteTabAccept": "./src/components/codemirror/autocompleteTabAccept.ts",
     "#components/formula/queryTimeFrame": "./src/components/formula/queryTimeFrame.ts",
     "#components/formula/executeFormula": "./src/components/formula/executeFormula.ts",
+    "#components/formula/formatFormulaValue": "./src/components/formula/formatFormulaValue.ts",
     "#components/formula/resolveQuery": "./src/components/formula/resolveQuery.ts",
     "#components/formula/resolveProviders": "./src/components/formula/resolveProviders.ts",
     "#components/mobile/utils": "./src/components/mobile/utils.ts",

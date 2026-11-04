@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { isFormulaValueFormattable } from './formatFormulaValue';
 import {
   getFormulaTableColumnNames,
   getFormulaTableColumnTypes,
   getFormulaTableTotals,
+  getFormulaTableUnformattableColumns,
   isFormulaTableHeaderRowShown,
 } from './FormulaTable';
 
@@ -144,5 +146,53 @@ describe('getFormulaTableTotals', () => {
       totalColumnType: 'money',
       labelColumn: -1,
     });
+  });
+});
+
+describe('isFormulaValueFormattable', () => {
+  it('needs a number for money, percent and number', () => {
+    expect(isFormulaValueFormattable(12, 'money')).toBe(true);
+    expect(isFormulaValueFormattable('Abc', 'money')).toBe(false);
+    expect(isFormulaValueFormattable('12', 'percent')).toBe(false);
+    expect(isFormulaValueFormattable(true, 'number')).toBe(false);
+  });
+
+  it('needs a date number, a date or a month for date', () => {
+    expect(isFormulaValueFormattable(45000, 'date')).toBe(true);
+    expect(isFormulaValueFormattable('2024-01-31', 'date')).toBe(true);
+    expect(isFormulaValueFormattable('2024-01', 'date')).toBe(true);
+    expect(isFormulaValueFormattable('January', 'date')).toBe(false);
+  });
+
+  it('can show any value as text, and an empty value in each format', () => {
+    expect(isFormulaValueFormattable(12, 'text')).toBe(true);
+    expect(isFormulaValueFormattable(null, 'money')).toBe(true);
+  });
+});
+
+describe('getFormulaTableUnformattableColumns', () => {
+  it('gives the columns with a set type that cannot show a cell', () => {
+    expect(
+      getFormulaTableUnformattableColumns(
+        [
+          ['Rent', 'Abc', 5, '2024-01'],
+          ['Power', 3, { error: '#DIV/0!' }, 'soon'],
+        ],
+        [{}, { type: 'money' }, { type: 'number' }, { type: 'date' }],
+      ),
+    ).toEqual([1, 3]);
+  });
+
+  it('does not count the header row', () => {
+    expect(
+      getFormulaTableUnformattableColumns(
+        [
+          ['Name', 'Amount'],
+          ['Rent', 5],
+        ],
+        [{}, { type: 'money' }],
+        true,
+      ),
+    ).toEqual([]);
   });
 });
