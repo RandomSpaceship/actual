@@ -442,6 +442,8 @@ When you export a dashboard, the file also holds the library queries and the lib
 - If your formula library has a different query with the same name, each card that uses the name gets a copy of the query from the file. The card query has priority over the library query, so the card shows the same result as before the export.
 - If your formula library has no query with the name, Actual adds the query to your formula library.
 
+An [AQL query](#write-queries-in-actualql) in the file works the same, with one difference. If your formula library has a different query with the same name, Actual adds the AQL query from the file with a new name, for example `coffee_2`. Actual changes the name in the imported cards and providers, so the cards show the same result as before the export.
+
 For each provider in the file, Actual does one of these:
 
 - If your formula library has a provider with the same name and formula, the cards use your provider.
@@ -449,6 +451,71 @@ For each provider in the file, Actual does one of these:
 - If your formula library has no provider with the name, Actual adds the provider to your formula library.
 
 The import does not change or delete the queries and providers that are already in your formula library. A card time frame for a library query stays with its query.
+
+### Write Queries in ActualQL
+
+An AQL query is a library query that you write in ActualQL, the query language of the [Actual API](../api/actual-ql/index.md). It can do things that the filters of a query cannot do, for example:
+
+- Join "and" and "or" in one query, for example "Kroger transactions under $50, or any bill".
+- Match text with a regular expression (`$regexp`) or with a pattern (`$like`).
+- Read the fields of a linked record, for example `payee.name` or `category.group.name`.
+- Read other tables: accounts, payees, categories, category groups, schedules and the budget tables.
+
+To add an AQL query:
+
+1. Go to **Settings** > **Formula library**.
+2. Under **AQL queries**, select **Create new AQL query**.
+3. Type a name. AQL queries and the other library queries share one set of names, so an AQL query cannot have the name of a library query.
+4. Type the query in the **Query** box. The line under the box shows the kind of the query, or the error in the text.
+5. Optionally, set the date field and the time frame.
+6. Look at **Result**. It updates when you stop typing.
+7. Select **Save**.
+
+A card uses an AQL query by its name, as for the other library queries, for example `QUERY("groceries")`. In the card editor, AQL queries show with the library queries.
+
+#### Write the Query
+
+Write the query as JSON, with one key for each method of an ActualQL query: `table`, `filter`, `options`, `groupBy`, `select`, `orderBy`, `calculate`, `limit` and `offset`. For example, this query is the same as `q('transactions').filter({ 'payee.name': { $oneof: ['Kroger', 'Publix'] } })`:
+
+```json
+{
+  "table": "transactions",
+  "filter": { "payee.name": { "$oneof": ["Kroger", "Publix"] } }
+}
+```
+
+A `filter` can also be a list of objects. A transaction must then match all of them.
+
+The query can read only these tables: `transactions`, `accounts`, `payees`, `categories`, `category_groups`, `schedules`, `zero_budgets` and `reflect_budgets`. A query never reads deleted records.
+
+#### Kinds of AQL Query
+
+The JSON gives one of three kinds of query:
+
+| Kind   | The query has                                                                            | Use it in                                                                                       |
+| ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Filter | `"table": "transactions"`, with only `filter` and `options`                              | `QUERY`, `QUERY_COUNT`, `QUERY_GROUP`, `QUERY_PIVOT`, `QUERY_DAYS` and the other date functions |
+| Value  | `calculate`                                                                              | `QUERY`                                                                                         |
+| Table  | `select`, `groupBy`, `orderBy`, `limit` or `offset`, or a table that is not transactions | No formula function reads a table query yet                                                     |
+
+A filter AQL query works the same as a library query with filters. For example, `QUERY("groceries")` gives the sum of the amounts, and `QUERY_GROUP("groceries", "payee")` gives a row for each payee.
+
+A value query gives the value of its `calculate`. Actual reads the value as an amount, the same as the amounts of transactions, unless the calculation is `$count`. If the value is a count of a different kind, select **The value is a count, not an amount**.
+
+`QUERY_EXTRACT_CATEGORIES`, `QUERY_EXTRACT_TIMEFRAME_START` and `QUERY_EXTRACT_TIMEFRAME_END` do not work with an AQL query.
+
+#### Set the Time Frame of an AQL Query
+
+The time frame filters a date field. A transactions query uses `date`, and a schedules query can use `next_date`. Queries of the other tables have no time frame. To turn off the time frame, set **Date field for the time frame** to **None**.
+
+The time frame starts at **All time**. A card can give the query its own time frame, as for the other library queries. If the query has no date field, the card time frame does not apply, and the card shows a warning line.
+
+#### Tips for AQL Queries
+
+- A linked field such as `category` or `payee` gives an id. To get the name, use `category.name` or `payee.name`.
+- ActualQL cannot order rows by a name from `select`. To order by a sum, repeat the sum in `orderBy`, with the direction in `$dir`: `"orderBy": [{"$sum": "$amount", "$dir": "desc"}]`.
+- The result of a table query in the editor shows the values as the database stores them, so amounts are in cents.
+- If the query has an error, for example a field name that does not exist, the card shows the error. The other parts of Actual do not show it.
 
 ### Reuse a Formula With Providers
 
