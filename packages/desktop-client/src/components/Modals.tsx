@@ -13,6 +13,7 @@ import { useDispatch } from '#redux';
 
 import { EditSyncAccount } from './banksync/EditSyncAccount';
 import { ConfirmFormulaLibraryItemDeleteModal } from './formula-library/ConfirmFormulaLibraryItemDeleteModal';
+import { EditFormulaLibraryAqlQueryModal } from './formula-library/EditFormulaLibraryAqlQueryModal';
 import { EditFormulaLibraryProviderModal } from './formula-library/EditFormulaLibraryProviderModal';
 import { EditFormulaLibraryQueryModal } from './formula-library/EditFormulaLibraryQueryModal';
 import { AccountAutocompleteModal } from './modals/AccountAutocompleteModal';
@@ -192,6 +193,11 @@ export function Modals() {
 
         case 'edit-formula-library-query':
           return <EditFormulaLibraryQueryModal key={key} {...modal.options} />;
+
+        case 'edit-formula-library-aql-query':
+          return (
+            <EditFormulaLibraryAqlQueryModal key={key} {...modal.options} />
+          );
 
         case 'edit-formula-library-provider':
           return (

@@ -10,6 +10,7 @@ import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import { getNormalisedString } from '@actual-app/core/shared/normalisation';
 import type {
+  FormulaLibraryAqlQueryEntity,
   FormulaLibraryItemEntity,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
@@ -23,6 +24,7 @@ import { useFeatureFlag } from '#hooks/useFeatureFlag';
 import { pushModal } from '#modals/modalsSlice';
 import { useDispatch } from '#redux';
 
+import { FormulaLibraryAqlQueryRow } from './FormulaLibraryAqlQueryRow';
 import { FormulaLibraryProviderRow } from './FormulaLibraryProviderRow';
 import { FormulaLibraryRow } from './FormulaLibraryRow';
 import { isOverriddenLibraryItem } from './formulaQueryUses';
@@ -55,10 +57,14 @@ export function FormulaLibraryPage() {
   const queries = library.filter(
     (item): item is FormulaLibraryQueryEntity => item.type === 'query',
   );
+  const aqlQueries = library.filter(
+    (item): item is FormulaLibraryAqlQueryEntity => item.type === 'aql-query',
+  );
   const providers = library.filter(
     (item): item is FormulaLibraryProviderEntity => item.type === 'provider',
   );
   const filteredQueries = filterAndSort(queries, () => []);
+  const filteredAqlQueries = filterAndSort(aqlQueries, item => [item.data.aql]);
   const filteredProviders = filterAndSort(providers, item => [
     item.data.formula,
   ]);
@@ -67,6 +73,14 @@ export function FormulaLibraryPage() {
     dispatch(
       pushModal({
         modal: { name: 'edit-formula-library-query', options: { item } },
+      }),
+    );
+  }
+
+  function onEditAqlQuery(item?: FormulaLibraryAqlQueryEntity) {
+    dispatch(
+      pushModal({
+        modal: { name: 'edit-formula-library-aql-query', options: { item } },
       }),
     );
   }
@@ -146,6 +160,36 @@ export function FormulaLibraryPage() {
             uses={findUses(item)}
             isOverridden={isOverriddenLibraryItem(item, library)}
             onEdit={onEditQuery}
+            onDelete={onDelete}
+          />
+        ))}
+      </LibrarySection>
+
+      <LibrarySection
+        title={t('AQL queries')}
+        header={
+          <>
+            <Cell value={t('Kind')} width={80} />
+            <Cell value={t('Query')} width="flex" />
+          </>
+        }
+        emptyText={
+          aqlQueries.length === 0 ? (
+            <Trans>No AQL queries</Trans>
+          ) : (
+            <Trans>No AQL queries match the filter</Trans>
+          )
+        }
+        createText={<Trans>Create new AQL query</Trans>}
+        onCreate={() => onEditAqlQuery()}
+      >
+        {filteredAqlQueries.map(item => (
+          <FormulaLibraryAqlQueryRow
+            key={item.id}
+            item={item}
+            uses={findUses(item)}
+            isOverridden={isOverriddenLibraryItem(item, library)}
+            onEdit={onEditAqlQuery}
             onDelete={onDelete}
           />
         ))}

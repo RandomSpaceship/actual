@@ -6,6 +6,7 @@ import type {
   BankSyncCredentialSource,
   CategoryEntity,
   CategoryGroupEntity,
+  FormulaLibraryAqlQueryEntity,
   FormulaLibraryItemEntity,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
@@ -614,6 +615,12 @@ export type Modal =
       name: 'edit-formula-library-query';
       options: {
         item?: FormulaLibraryQueryEntity;
+      };
+    }
+  | {
+      name: 'edit-formula-library-aql-query';
+      options: {
+        item?: FormulaLibraryAqlQueryEntity;
       };
     }
   | {

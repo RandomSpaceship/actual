@@ -19,10 +19,12 @@ import {
 } from '@actual-app/core/shared/formulas/providerNameUses';
 import {
   findQueryNameReferences,
+  isNamedQueryItem,
   isSameQueryName,
 } from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
+  FormulaLibraryAqlQueryEntity,
   FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
@@ -45,6 +47,7 @@ import { addNotification } from '#notifications/notificationsSlice';
 import { useDispatch } from '#redux';
 import type { AppDispatch } from '#redux/store';
 
+import { LibraryAqlQueryItem } from './LibraryAqlQueryItem';
 import { LibraryQueryItem } from './LibraryQueryItem';
 import { ProviderItem } from './ProviderItem';
 import {
@@ -107,8 +110,9 @@ export function QueryManager({
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
   const createLibraryItem = useCreateFormulaLibraryItemMutation();
 
+  // Filter queries and AQL queries
   const libraryQueries = library
-    .filter(item => item.type === 'query')
+    .filter(isNamedQueryItem)
     .sort((a, b) => a.name.localeCompare(b.name));
   const libraryProviders = library
     .filter(item => item.type === 'provider')
@@ -246,6 +250,14 @@ export function QueryManager({
     dispatch(
       pushModal({
         modal: { name: 'edit-formula-library-query', options: { item } },
+      }),
+    );
+  }
+
+  function handleEditLibraryAqlQuery(item: FormulaLibraryAqlQueryEntity) {
+    dispatch(
+      pushModal({
+        modal: { name: 'edit-formula-library-aql-query', options: { item } },
       }),
     );
   }
@@ -496,26 +508,35 @@ export function QueryManager({
             </label>
           </View>
           {isLibraryShown &&
-            libraryQueries.map(item => (
-              <LibraryQueryItem
-                key={item.id}
-                item={item}
-                isHidden={findCardQueryName(item.name) !== undefined}
-                onEdit={() => handleEditLibraryQuery(item)}
-                onCopyIntoCard={
-                  findCardQueryName(item.name) === undefined
-                    ? () => handleCopyIntoCard(item)
-                    : undefined
-                }
-                timeFrameOverride={findTimeFrameOverride(item)}
-                onTimeFrameOverrideChange={
-                  findCardQueryName(item.name) === undefined
-                    ? timeFrame =>
-                        handleTimeFrameOverrideChange(item, timeFrame)
-                    : undefined
-                }
-              />
-            ))}
+            libraryQueries.map(item =>
+              item.type === 'aql-query' ? (
+                <LibraryAqlQueryItem
+                  key={item.id}
+                  item={item}
+                  isHidden={findCardQueryName(item.name) !== undefined}
+                  onEdit={() => handleEditLibraryAqlQuery(item)}
+                />
+              ) : (
+                <LibraryQueryItem
+                  key={item.id}
+                  item={item}
+                  isHidden={findCardQueryName(item.name) !== undefined}
+                  onEdit={() => handleEditLibraryQuery(item)}
+                  onCopyIntoCard={
+                    findCardQueryName(item.name) === undefined
+                      ? () => handleCopyIntoCard(item)
+                      : undefined
+                  }
+                  timeFrameOverride={findTimeFrameOverride(item)}
+                  onTimeFrameOverrideChange={
+                    findCardQueryName(item.name) === undefined
+                      ? timeFrame =>
+                          handleTimeFrameOverrideChange(item, timeFrame)
+                      : undefined
+                  }
+                />
+              ),
+            )}
         </View>
       )}
 
