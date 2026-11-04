@@ -176,7 +176,7 @@ describe('QUERY_GROUP', () => {
     ]);
     expect(
       (await run('=QUERY_GROUP("firstQuarter", "quarter")')).table,
-    ).toEqual([['Q1 2024', -30]]);
+    ).toEqual([["Q1 '24", -30]]);
   });
 
   it('starts the week on the day that the preference gives', async () => {

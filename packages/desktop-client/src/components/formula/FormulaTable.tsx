@@ -55,10 +55,16 @@ export function FormulaTable({
     ? [...columnTypes, tableTotals.totalColumnType]
     : columnTypes;
 
-  // The same cell size as the custom report table
+  // The same cell size as the custom report table. Its 20px rows overlap by
+  // 1px, so each row starts 19px below the last.
   const cellSize: CSSProperties = compact
-    ? { padding: '0 5px', height: 20 }
+    ? { padding: '0 5px', height: 19 }
     : { padding: '5px 10px' };
+
+  // With the line of the last row, a 2px line, as in the custom report table
+  const totalsBorder: CSSProperties = {
+    borderTop: `1px solid ${theme.tableBorder}`,
+  };
 
   function formatCell(
     value: string | number | boolean | null,
@@ -98,6 +104,7 @@ export function FormulaTable({
       ...cellSize,
       whiteSpace: 'nowrap',
       textAlign: isNumericType(type) ? 'right' : 'left',
+      borderBottom: `1px solid ${theme.tableBorder}`,
       ...extraStyle,
     };
     if (isErrorCell(cell)) {
@@ -141,7 +148,10 @@ export function FormulaTable({
     >
       <table
         style={{
-          borderCollapse: 'collapse',
+          // Separate borders stay on the sticky header cells. Collapsed
+          // borders stay on the table, so they scroll away.
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           minWidth: '100%',
           fontSize: compact ? styles.tinyText.fontSize : 13,
           color: theme.tableText,
@@ -163,12 +173,14 @@ export function FormulaTable({
                     ...cellSize,
                     whiteSpace: 'nowrap',
                     textAlign: isNumericType(type) ? 'right' : 'left',
-                    borderBottom: `1px solid ${theme.tableBorder}`,
+                    // The custom report table has a 2px line under the header
+                    borderTop: `1px solid ${theme.tableBorder}`,
+                    borderBottom: `2px solid ${theme.tableBorder}`,
                   }}
                 >
                   {/* A month in the header row shows as a date */}
                   {columnIndex >= columnTypes.length
-                    ? t('Total')
+                    ? t('Totals')
                     : headerRow && !columns[columnIndex]?.name
                       ? formatDate(headerNames[columnIndex], dateFormat, locale)
                       : headerNames[columnIndex]}
@@ -179,13 +191,7 @@ export function FormulaTable({
         )}
         <tbody>
           {bodyRows.map((row, rowIndex) => (
-            <tr
-              key={rowIndex}
-              style={{
-                borderTop:
-                  rowIndex > 0 ? `1px solid ${theme.tableBorder}` : undefined,
-              }}
-            >
+            <tr key={rowIndex}>
               {columnTypes.map((type, columnIndex) =>
                 renderCell(row[columnIndex] ?? null, type, columnIndex),
               )}
@@ -203,7 +209,6 @@ export function FormulaTable({
           <tfoot>
             <tr
               style={{
-                borderTop: `1px solid ${theme.tableBorder}`,
                 color: theme.tableRowHeaderText,
                 backgroundColor: theme.tableRowHeaderBackground,
                 fontWeight: 600,
@@ -211,7 +216,7 @@ export function FormulaTable({
             >
               {tableTotals.columnTotals.map((total, columnIndex) =>
                 columnIndex === tableTotals.labelColumn
-                  ? renderCell(t('Total'), 'text', columnIndex)
+                  ? renderCell(t('Totals'), 'text', columnIndex, totalsBorder)
                   : renderCell(
                       total,
                       displayTypes[columnIndex],
@@ -222,8 +227,8 @@ export function FormulaTable({
                       displayTypes[columnIndex] === 'money' &&
                         total !== null &&
                         total !== 0
-                        ? { color: getAmountColor(total) }
-                        : undefined,
+                        ? { ...totalsBorder, color: getAmountColor(total) }
+                        : totalsBorder,
                     ),
               )}
             </tr>
@@ -379,7 +384,8 @@ function formatDate(
     return monthUtils.format(value, dateFormat, locale);
   }
   if (monthUtils.isValidYearMonth(value)) {
-    return monthUtils.format(value, 'MMM yyyy', locale);
+    // As the custom report table
+    return monthUtils.format(value, "MMM ''yy", locale);
   }
   return value;
 }

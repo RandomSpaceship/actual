@@ -273,7 +273,7 @@ Some things to know:
 - Transactions without a category go in an **Uncategorized** row. This row also has transfers and the transactions of off-budget accounts, if the query does not filter them out. Transactions without a payee go in a **No payee** row.
 - A transfer payee gets the name of its account.
 - A period dimension (`day`, `week`, `month`, `quarter` or `year`) gives a row for each period of the query date range, also for a period without transactions. If the query has no date range, the rows go from the first to the last period with transactions.
-- A week has the date of its first day, for example `2024-01-07`. The **First day of the week** setting on the **Settings** page gives the first day of a week. A quarter has a name such as `Q1 2024`.
+- A week has the date of its first day, for example `2024-01-07`. The **First day of the week** setting on the **Settings** page gives the first day of a week. A quarter has a name such as `Q1 '24`.
 - The editor shows a warning for a table with more than 50 rows, or with more than 20 columns. A table that large is hard to read on a card. The card does not show this warning.
 - A query without transactions gives one row with empty names and 0.
 - The arguments must be text in the formula, for example `"category"`. A cell reference or a function does not work here.
@@ -301,7 +301,7 @@ This example gives the spending of each category, with one column for each month
 
 The first row has the names of the columns, for example the months. The first cell of this row has the name of the first dimension, for example `Category`. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
-The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. A day or a week shows in your date format. To give a column a different name, type it under **Columns**.
+The card shows the first row as the header row of the table. A month in the header row shows as the short month name and year, for example `Jan '24`. A day or a week shows in your date format. To give a column a different name, type it under **Columns**.
 
 With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", "month"), 2, 2)` gives the amount of the first category in the first month.
 
@@ -530,7 +530,7 @@ The column types are:
 - **Money**: an amount, with your currency settings. Privacy mode hides these values.
 - **Percent**: a number as a percentage. For example, `0.25` shows as `25%`.
 - **Number**: a number, with your number format.
-- **Date**: a date, with your date format. A month such as `2024-01` shows as `Jan 2024`.
+- **Date**: a date, with your date format. A month such as `2024-01` shows as `Jan '24`.
 - **Text**: the value as it is.
 - **Automatic** (the default): **Money** for a column of numbers, and **Text** for other columns.
 
@@ -545,7 +545,7 @@ A name under **Columns** replaces the name from the first row. If the table has 
 The **Totals** setting adds totals to the table:
 
 - **None** (the default): no totals.
-- **Totals row**: a row at the end with the total of each **Money** and **Number** column. The first **Text** column shows **Total**.
+- **Totals row**: a row at the end with the total of each **Money** and **Number** column. The first **Text** column shows **Totals**.
 - **Totals column**: a column at the end with the total of the **Money** and **Number** cells of each row.
 - **Row and column**: both. The last cell of the totals row has the total of all rows.
 

@@ -113,7 +113,14 @@ export function FormulaCard({
     >
       <View style={{ flex: 1, overflow: 'hidden' }}>
         {showTitle && (
-          <View style={{ flexGrow: 0, flexShrink: 0, padding: 20 }}>
+          <View
+            style={{
+              flexGrow: 0,
+              flexShrink: 0,
+              // A table has the title padding of the custom report card
+              padding: isTableView ? '10px 10px 5px' : 20,
+            }}
+          >
             <ReportCardName
               name={meta?.name || t('Formula')}
               isEditing={nameMenuOpen}

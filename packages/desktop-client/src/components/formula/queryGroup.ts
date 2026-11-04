@@ -163,14 +163,10 @@ function getPeriodKeys(
 }
 
 // The name of a period key. A quarter key is its first month, so it gets a
-// name of its own, for example "Q1 2024".
+// name of its own in the custom report format, for example "Q1 '24".
 function getPeriodName(dimension: PeriodDimension, key: string): string {
   if (dimension !== 'quarter') return key;
-  const quarter = Math.floor(monthUtils.getMonthIndex(key) / 3) + 1;
-  return t('Q{{quarter}} {{year}}', {
-    quarter,
-    year: monthUtils.getYear(key),
-  });
+  return monthUtils.format(key, "QQQ ''yy");
 }
 
 // The keys that the table shows for one dimension, in budget order
@@ -237,7 +233,7 @@ function getDimensionTitle(dimension: QueryGroupDimension): string {
     case 'category':
       return t('Category');
     case 'category_group':
-      return t('Category group');
+      return t('Group');
     case 'payee':
       return t('Payee');
     case 'account':
