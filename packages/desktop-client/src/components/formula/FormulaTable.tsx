@@ -125,6 +125,9 @@ export function FormulaTable({
         overflow: 'auto',
         ...styles.horizontalScrollbar,
         ...style,
+        // A sticky header stays below the top padding, and rows that scroll
+        // past show in that gap
+        paddingTop: 0,
       }}
     >
       <table
@@ -145,7 +148,7 @@ export function FormulaTable({
                   style={{
                     position: 'sticky',
                     top: 0,
-                    backgroundColor: theme.tableBackground,
+                    backgroundColor: theme.cardBackground,
                     color: theme.tableHeaderText,
                     fontWeight: 400,
                     padding: '5px 10px',
