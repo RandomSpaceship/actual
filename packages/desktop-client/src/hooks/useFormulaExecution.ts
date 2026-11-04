@@ -11,6 +11,7 @@ import type {
   FormulaTable,
   SimpleAccount,
 } from '#components/formula/executeFormula';
+import type { FormulaSourceMap } from '#components/formula/formulaSourceMap';
 import type { CardProviders } from '#components/formula/resolveProviders';
 import { resolveQuery } from '#components/formula/resolveQuery';
 import type {
@@ -54,6 +55,7 @@ export function useFormulaExecution(
   const [result, setResult] = useState<number | string | null>(null);
   const [table, setTable] = useState<FormulaTable | null>(null);
   const [spills, setSpills] = useState(false);
+  const [sourceMap, setSourceMap] = useState<FormulaSourceMap | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<FormulaIssue[]>(NO_ISSUES);
@@ -107,6 +109,7 @@ export function useFormulaExecution(
       if (!formula || !formula.startsWith('=')) {
         setResult(null);
         setTable(null);
+        setSourceMap(null);
         setError('Formula must start with =');
         setIssues(NO_ISSUES);
         setIsLoading(false);
@@ -152,6 +155,9 @@ export function useFormulaExecution(
         );
         setTable(errorMessages.length > 0 ? null : (execution.table ?? null));
         setSpills(execution.spills ?? false);
+        setSourceMap(
+          errorMessages.length > 0 ? null : (execution.sourceMap ?? null),
+        );
         setError(errorMessages.length > 0 ? errorMessages.join('; ') : null);
         setIssues(execution.issues);
       } catch (err) {
@@ -161,6 +167,7 @@ export function useFormulaExecution(
         setResult(null);
         setTable(null);
         setSpills(false);
+        setSourceMap(null);
         setIssues(NO_ISSUES);
       } finally {
         if (!cancelled) {
@@ -188,5 +195,5 @@ export function useFormulaExecution(
     output,
   ]);
 
-  return { result, table, spills, isLoading, error, issues };
+  return { result, table, spills, sourceMap, isLoading, error, issues };
 }

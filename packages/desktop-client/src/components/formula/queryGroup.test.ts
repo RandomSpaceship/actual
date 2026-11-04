@@ -2,6 +2,11 @@ import { send } from '@actual-app/core/platform/client/connection';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeFormula } from './executeFormula';
+import {
+  getCellTransactionsFilter,
+  getColumnTransactionsFilter,
+  getRowTransactionsFilter,
+} from './formulaSourceMap';
 import { resolveQuery } from './resolveQuery';
 
 vi.mock('@actual-app/core/platform/client/connection', () => ({
@@ -392,5 +397,109 @@ describe('QUERY_PIVOT', () => {
     await expect(run('=QUERY_PIVOT("all", "category")')).rejects.toThrow(
       'Give a dimension for the columns',
     );
+  });
+});
+
+describe('source map', () => {
+  const firstQuarterDates = { start: '2024-01-01', end: '2024-03-31' };
+
+  it('gives the transactions of each group', async () => {
+    const { sourceMap } = await run('=QUERY_GROUP("all", "category")');
+    if (!sourceMap) throw new Error('No source map');
+    expect(getCellTransactionsFilter(sourceMap, 0, 1)).toEqual({
+      dateRange: null,
+      conditions: [{ field: 'category', op: 'is', value: 'power', type: 'id' }],
+    });
+    // The label cell gives the same transactions as its value
+    expect(getCellTransactionsFilter(sourceMap, 0, 0)).toEqual(
+      getCellTransactionsFilter(sourceMap, 0, 1),
+    );
+    expect(getCellTransactionsFilter(sourceMap, 2, 1)).toEqual({
+      dateRange: null,
+      conditions: [
+        {
+          customName: 'Category: Uncategorized',
+          queryFilter: { category: null },
+        },
+      ],
+    });
+    expect(getColumnTransactionsFilter(sourceMap, 1)).toEqual({
+      dateRange: null,
+      conditions: [],
+    });
+  });
+
+  it('gives the days of a period inside the query time frame', async () => {
+    const { sourceMap } = await run(
+      '=QUERY_GROUP("firstQuarter", "category", , "month")',
+    );
+    if (!sourceMap) throw new Error('No source map');
+    // The row of Power in February
+    expect(getCellTransactionsFilter(sourceMap, 1, 2)).toEqual({
+      dateRange: { start: '2024-02-01', end: '2024-02-29' },
+      conditions: [{ field: 'category', op: 'is', value: 'power', type: 'id' }],
+    });
+    expect(sourceMap.query.dateRange).toEqual(firstQuarterDates);
+  });
+
+  it('gives a week from its first day', async () => {
+    const { sourceMap } = await run('=QUERY_GROUP("all", "week")');
+    expect(sourceMap?.rows[0]?.dateRange).toEqual({
+      start: '2023-12-31',
+      end: '2024-01-06',
+    });
+  });
+
+  it('gives the row and the column of a wide table', async () => {
+    const { sourceMap } = await run(
+      '=QUERY_PIVOT("firstQuarter", "category", , "month")',
+    );
+    if (!sourceMap) throw new Error('No source map');
+    const power = { field: 'category', op: 'is', value: 'power', type: 'id' };
+    const january = { start: '2024-01-01', end: '2024-01-31' };
+    // The header row and the name column
+    expect(getCellTransactionsFilter(sourceMap, 0, 0)).toBeNull();
+    expect(getCellTransactionsFilter(sourceMap, 0, 1)).toEqual({
+      dateRange: january,
+      conditions: [],
+    });
+    expect(getCellTransactionsFilter(sourceMap, 1, 0)).toEqual({
+      dateRange: firstQuarterDates,
+      conditions: [power],
+    });
+    expect(getCellTransactionsFilter(sourceMap, 1, 1)).toEqual({
+      dateRange: january,
+      conditions: [power],
+    });
+    expect(getRowTransactionsFilter(sourceMap, 1)).toEqual({
+      dateRange: firstQuarterDates,
+      conditions: [power],
+    });
+    expect(getColumnTransactionsFilter(sourceMap, 1)).toEqual({
+      dateRange: january,
+      conditions: [],
+    });
+  });
+
+  it('works through a provider that is one call', async () => {
+    const result = await executeFormula({
+      formula: '=Spending',
+      resolveQuery: name => resolveQuery(name, { localQueries, library: [] }),
+      accounts: [],
+      cardProviders: { Spending: { formula: '=QUERY_GROUP("all", "payee")' } },
+      language: 'en-US',
+      output: 'table',
+    });
+    expect(result.sourceMap?.rows).toHaveLength(2);
+  });
+
+  it('gives no source map when other functions change the rows', async () => {
+    for (const formula of [
+      '=SORT(QUERY_GROUP("all", "category"), 2, 1)',
+      '=QUERY_GROUP("all", "category") & "!"',
+      '=VSTACK(QUERY_GROUP("all", "category"), QUERY_GROUP("all", "payee"))',
+    ]) {
+      expect((await run(formula)).sourceMap).toBeUndefined();
+    }
   });
 });

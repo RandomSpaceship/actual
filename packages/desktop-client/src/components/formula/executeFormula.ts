@@ -51,7 +51,15 @@ import {
   getAqlDateField,
   getAqlNotSupportedError,
 } from './aqlSource';
+import {
+  combineTransactionsFilters,
+  getDimensionTransactionsFilter,
+  getQueryTransactionsFilter,
+  getSourceFunctionName,
+} from './formulaSourceMap';
+import type { FormulaSourceMap, FormulaSourceRows } from './formulaSourceMap';
 import { fetchQueryGroupRows } from './queryGroup';
+import type { QueryGroupResult } from './queryGroup';
 
 bootstrapHyperFormula();
 
@@ -73,6 +81,13 @@ export type FormulaOutput = 'value' | 'table' | 'auto';
 export type SimpleAccount = { id: string; name: string };
 
 type AddIssue = (issue: FormulaIssue) => void;
+
+// The rows and columns of each QUERY_GROUP request (by prefetch key) and each
+// QUERY_TABLE name, for the source map
+type SourceRowsByCall = {
+  queryGroups: Map<string, FormulaSourceRows>;
+  queryTables: Map<string, FormulaSourceRows>;
+};
 
 // Formulas use amounts, the database stores integers. Do all conversions here,
 // so that support for other currency decimal places (#9340) changes one place.
@@ -405,6 +420,9 @@ export async function executeFormula({
   // The formula gives a table, in each output. The 'auto' output shows a
   // table only then.
   spills?: boolean;
+  // The transactions of the table cells. Only for a table from one source
+  // function call, such as =QUERY_GROUP("spending", "category").
+  sourceMap?: FormulaSourceMap;
   issues: FormulaIssue[];
 }> {
   if (!formula || !formula.startsWith('=')) {
@@ -451,6 +469,10 @@ export async function executeFormula({
   }
 
   const formulaQueryContext = createFormulaQueryContext();
+  const sourceRows: SourceRowsByCall = {
+    queryGroups: new Map(),
+    queryTables: new Map(),
+  };
   const evaluate = () =>
     evaluateFormulaWithContext({
       formula,
@@ -469,8 +491,18 @@ export async function executeFormula({
         addIssue,
       )) +
       (await prefetchAccountBalances(formulaQueryContext, accounts, addIssue)) +
-      (await prefetchQueryGroups(formulaQueryContext, resolveQuery, addIssue)) +
-      (await prefetchQueryTables(formulaQueryContext, resolveQuery, addIssue));
+      (await prefetchQueryGroups(
+        formulaQueryContext,
+        resolveQuery,
+        addIssue,
+        sourceRows.queryGroups,
+      )) +
+      (await prefetchQueryTables(
+        formulaQueryContext,
+        resolveQuery,
+        addIssue,
+        sourceRows.queryTables,
+      ));
     if (
       fetchCount === 0 &&
       (await prefetchBudgetQueries(formulaQueryContext)) === 0
@@ -516,19 +548,36 @@ export async function executeFormula({
   if (evaluation.table && output !== 'value') {
     addTableCutIssue(evaluation.table, addIssue);
   }
+  let sourceMap: FormulaSourceMap | undefined;
+  if (evaluation.table && output !== 'value') {
+    try {
+      sourceMap = await getFormulaSourceMap({
+        formula,
+        table: evaluation.table,
+        providers: resolvedProviders.providers,
+        formulaQueryContext,
+        sourceRows,
+        resolveQuery,
+      });
+    } catch (err) {
+      // The table is still right, only the clicks do not work
+      console.error('Error making the formula source map:', err);
+    }
+  }
 
   if (output === 'table') {
     return {
       value: evaluation.value,
       table: evaluation.table ?? [[evaluation.value]],
       spills,
+      sourceMap,
       issues,
     };
   }
 
   if (output === 'auto') {
     return evaluation.table
-      ? { value: null, table: evaluation.table, spills, issues }
+      ? { value: null, table: evaluation.table, spills, sourceMap, issues }
       : { value: evaluation.value, spills, issues };
   }
 
@@ -693,6 +742,7 @@ async function prefetchQueryGroups(
   formulaQueryContext: Required<FormulaQueryContext>,
   resolveQuery: QueryResolver,
   addIssue: AddIssue,
+  sourceRows: SourceRowsByCall['queryGroups'],
 ) {
   let fetchCount = 0;
   for (const [key, request] of formulaQueryContext.queryGroupRequests) {
@@ -705,11 +755,13 @@ async function prefetchQueryGroups(
     if (!query) continue;
 
     try {
-      const rows = await fetchQueryGroupRows({
+      const result = await fetchQueryGroupRows({
         transactionsQuery: await buildFilteredTransactionsQuery(query.config),
         request,
         dateRange: getQueryDateRange(query.config),
       });
+      const { rows } = result;
+      sourceRows.set(key, getQueryGroupSourceRows(request, result));
       addQueryGroupLargeTableIssue(request, rows, addIssue);
       formulaQueryContext.queryGroupPrefetch.set(
         key,
@@ -730,11 +782,46 @@ async function prefetchQueryGroups(
   return fetchCount;
 }
 
+// The transactions of each row and column of a QUERY_GROUP table
+function getQueryGroupSourceRows(
+  request: QueryGroupRequest,
+  { rowKeys, columnKeys }: QueryGroupResult,
+): FormulaSourceRows {
+  const { dimensions } = request;
+  if (request.shape === 'wide') {
+    return {
+      rows: rowKeys.map(
+        keys => keys && getDimensionTransactionsFilter(dimensions[0], keys[0]),
+      ),
+      columns: (columnKeys ?? []).map(key =>
+        key === null
+          ? null
+          : getDimensionTransactionsFilter(dimensions[1], key),
+      ),
+      isComplete: true,
+    };
+  }
+  return {
+    rows: rowKeys.map(
+      keys =>
+        keys &&
+        combineTransactionsFilters(
+          ...keys.map((key, index) =>
+            getDimensionTransactionsFilter(dimensions[index], key),
+          ),
+        ),
+    ),
+    columns: null,
+    isComplete: true,
+  };
+}
+
 // Returns the number of names that were not fetched before
 async function prefetchQueryTables(
   formulaQueryContext: Required<FormulaQueryContext>,
   resolveQuery: QueryResolver,
   addIssue: AddIssue,
+  sourceRows: SourceRowsByCall['queryTables'],
 ) {
   return prefetchQueryValues({
     names: formulaQueryContext.queryTableNames,
@@ -744,6 +831,16 @@ async function prefetchQueryTables(
     addIssue,
     fetchValue: async (config, queryName) => {
       const queryTable = await fetchQueryTable(config);
+      if (queryTable.rowFilters) {
+        sourceRows.set(queryName, {
+          rows: queryTable.rowFilters.map(({ name, filter }) => ({
+            dateRange: null,
+            conditions: [{ customName: name, queryFilter: filter }],
+          })),
+          columns: null,
+          isComplete: queryTable.hasAllRows,
+        });
+      }
       addLargeTableIssue({
         queryName,
         rowCount: queryTable.rows.length,
@@ -793,6 +890,75 @@ export async function fetchQueryTable(
           : cell,
       ),
     ),
+  };
+}
+
+// The source map of a formula that is one call of QUERY_GROUP, QUERY_PIVOT,
+// QUERY_TABLE or a _COUNT form, or a provider that is one call. Other
+// functions, such as FILTER and SORT, can change the rows, so other formulas
+// get no source map.
+async function getFormulaSourceMap({
+  formula,
+  table,
+  providers,
+  formulaQueryContext,
+  sourceRows,
+  resolveQuery,
+}: {
+  formula: string;
+  table: FormulaTable;
+  providers: ResolvedProvider[];
+  formulaQueryContext: Required<FormulaQueryContext>;
+  sourceRows: SourceRowsByCall;
+  resolveQuery: QueryResolver;
+}): Promise<FormulaSourceMap | undefined> {
+  const functionName = getSourceFunctionName(formula, providers);
+  if (!functionName) return undefined;
+
+  // The call is all of the formula, so it is the only request
+  const { queryGroupRequests, queryTableNames } = formulaQueryContext;
+  let queryName: string;
+  let rows: FormulaSourceRows | undefined;
+  const isQueryTable = functionName === 'QUERY_TABLE';
+  if (
+    queryTableNames.size !== (isQueryTable ? 1 : 0) ||
+    queryGroupRequests.size !== (isQueryTable ? 0 : 1)
+  ) {
+    return undefined;
+  }
+  if (isQueryTable) {
+    const [tableName] = queryTableNames;
+    queryName = tableName;
+    rows = sourceRows.queryTables.get(tableName);
+  } else {
+    const [[key, request]] = queryGroupRequests;
+    queryName = request.queryName;
+    rows = sourceRows.queryGroups.get(key);
+  }
+  if (!rows) return undefined;
+
+  // A query without rows gives one empty row. The header row of QUERY_TABLE
+  // comes before the rows.
+  const headerRowCount =
+    rows.rows.length === 0 ? 0 : table.length - rows.rows.length;
+  if (headerRowCount !== 0 && headerRowCount !== 1) return undefined;
+
+  const { query } = resolveQuery(queryName);
+  if (!query) return undefined;
+  const queryFilter = await getQueryTransactionsFilter(
+    queryName,
+    query.config,
+    getQueryDateRange(query.config),
+  );
+  if (!queryFilter) return undefined;
+
+  return {
+    ...rows,
+    query: queryFilter,
+    rows:
+      rows.rows.length === 0
+        ? table.map(() => null)
+        : [...Array.from({ length: headerRowCount }, () => null), ...rows.rows],
   };
 }
 

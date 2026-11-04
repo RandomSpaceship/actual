@@ -200,7 +200,7 @@ function getWideRows(
   [rowKeys, columnKeys]: DimensionKeys[],
   values: Map<string, number>,
   [rowSort, columnSort]: QueryGroupSort[],
-): QueryGroupRow[] {
+): QueryGroupResult {
   const getValue = (rowKey: string, columnKey: string) =>
     values.get(JSON.stringify([rowKey, columnKey])) ?? 0;
   const columnOrder = [...columnKeys.order];
@@ -224,7 +224,12 @@ function getWideRows(
   const rows = rowKeys.order.map(rowKey => {
     const cells = columnOrder.map(columnKey => getValue(rowKey, columnKey));
     const total = cells.reduce((sum, cell) => sum + cell, 0);
-    return { name: rowKeys.names.get(rowKey) ?? rowKey, cells, total };
+    return {
+      key: rowKey,
+      name: rowKeys.names.get(rowKey) ?? rowKey,
+      cells,
+      total,
+    };
   });
   const rowDirection = getValueSortDirection(rowSort);
   if (rowDirection !== 0) {
@@ -234,7 +239,11 @@ function getWideRows(
     getDimensionTitle(rowDimension),
     ...columnOrder.map(key => columnKeys.names.get(key) ?? key),
   ];
-  return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
+  return {
+    rows: [headerRow, ...rows.map(row => [row.name, ...row.cells])],
+    rowKeys: [null, ...rows.map(row => [row.key])],
+    columnKeys: [null, ...columnOrder],
+  };
 }
 
 // 1 for asc, -1 for desc, and 0 for a sort that does not use the values
@@ -270,6 +279,18 @@ function getDimensionTitle(dimension: QueryGroupDimension): string {
   }
 }
 
+// The rows of a QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or
+// QUERY_PIVOT_COUNT call, and the keys of the groups in each row and column
+export type QueryGroupResult = {
+  rows: QueryGroupRow[];
+  // One for each row: the key of each dimension of a long table, or the key
+  // of dimension 1 of a wide table. null: the header row.
+  rowKeys: Array<string[] | null>;
+  // Only for a wide table. One for each column: the key of dimension 2. null:
+  // the name column.
+  columnKeys: Array<string | null> | null;
+};
+
 // The rows for a QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or
 // QUERY_PIVOT_COUNT call, with the sums as
 // integers. A month or year dimension gives a row with 0 for each period
@@ -282,7 +303,7 @@ export async function fetchQueryGroupRows({
   transactionsQuery: Query;
   request: QueryGroupRequest;
   dateRange: QueryDateRange | null;
-}): Promise<QueryGroupRow[]> {
+}): Promise<QueryGroupResult> {
   const { dimensions, measure, sorts } = request;
   const expressions = dimensions.map(
     dimension => dimensionExpressions[dimension],
@@ -378,8 +399,14 @@ export async function fetchQueryGroupRows({
     });
   }
 
-  return rows.map(row => [
-    ...row.keys.map((key, index) => dimensionKeys[index].names.get(key) ?? key),
-    row.value,
-  ]);
+  return {
+    rows: rows.map(row => [
+      ...row.keys.map(
+        (key, index) => dimensionKeys[index].names.get(key) ?? key,
+      ),
+      row.value,
+    ]),
+    rowKeys: rows.map(row => row.keys),
+    columnKeys: null,
+  };
 }

@@ -7,7 +7,7 @@ import {
 } from '@actual-app/core/shared/formulas/aqlQuery';
 import type { ParsedAqlQuery } from '@actual-app/core/shared/formulas/aqlQuery';
 import type { QueryDateRange } from '@actual-app/core/shared/formulas/customFunctions';
-import type { Query } from '@actual-app/core/shared/query';
+import type { ObjectExpression, Query } from '@actual-app/core/shared/query';
 import { t } from 'i18next';
 
 import type { FormulaAqlConfig } from './resolveQuery';
@@ -90,7 +90,17 @@ export type AqlQueryTable = {
   // The query gives more rows than rowLimit, so the rows stop there
   isCut: boolean;
   rowLimit: number;
+  // The transactions of each row, for the transactions page. null: the rows
+  // do not come from transactions, or a row has no field values that find
+  // them.
+  rowFilters: AqlRowFilter[] | null;
+  // The rows have all of the transactions of the query: the rows are not cut,
+  // and the query has no limit or offset
+  hasAllRows: boolean;
 };
+
+// The filter of one row, and its name on the transactions page
+export type AqlRowFilter = { name: string; filter: ObjectExpression };
 
 // For QUERY_TABLE and the editor preview. The rows stop at the row limit of
 // the query, or at a smaller limit that the query has.
@@ -127,15 +137,52 @@ export async function fetchAqlQueryTable(
           .filter(column => column.usesAmount)
           .map(column => column.name)
       : columns.filter(isAmountField));
+  const rows = shownRecords.map(record =>
+    columns.map(column => toTableValue(record[column])),
+  );
   return {
     columns,
-    rows: shownRecords.map(record =>
-      columns.map(column => toTableValue(record[column])),
-    ),
+    rows,
     isMoneyColumn: columns.map(column => moneyColumns.includes(column)),
     isCut,
     rowLimit,
+    rowFilters: getAqlRowFilters(parsed, columns, rows),
+    hasAllRows:
+      !isCut && ownLimit === null && parsed.query.state.offset === null,
   };
+}
+
+// A group of a transactions query has the values of its groupBy fields. A
+// query without groupBy that selects the id gives one transaction in each
+// row. Other rows have no filter: a groupBy expression such as
+// {"$month": "$date"} needs the same expression in the filter.
+function getAqlRowFilters(
+  parsed: ParsedAqlQuery,
+  columns: string[],
+  rows: AqlQueryTable['rows'],
+): AqlRowFilter[] | null {
+  if (parsed.table !== 'transactions' || !parsed.columns) return null;
+  const { groupExpressions } = parsed.query.state;
+  const fields = groupExpressions.length > 0 ? [...groupExpressions] : ['id'];
+  const fieldColumns = fields.map(field =>
+    typeof field === 'string' && /^[A-Za-z_][\w.]*$/.test(field)
+      ? columns.indexOf(field)
+      : -1,
+  );
+  if (fieldColumns.some(columnIndex => columnIndex === -1)) return null;
+  return rows.map(row => {
+    const values = fieldColumns.map(columnIndex => row[columnIndex]);
+    return {
+      name: fields
+        .map((field, index) => `${String(field)}: ${values[index] ?? ''}`)
+        .join(', '),
+      filter: {
+        $and: fields.map((field, index) => ({
+          [String(field)]: values[index],
+        })),
+      },
+    };
+  });
 }
 
 export function getAqlRowLimit(aql: FormulaAqlConfig) {

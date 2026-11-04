@@ -26,9 +26,9 @@ type SentQuery = {
 
 // The rows that a table query gets, before its limit
 const tableRows = [
-  { 'payee.name': 'Cafe', total: -1250, count: 3 },
-  { 'payee.name': 'Shop', total: -500, count: 1 },
-  { 'payee.name': null, total: 200, count: 1 },
+  { 'payee.name': 'Cafe', total: -1250, count: 3, id: 'cafe-1' },
+  { 'payee.name': 'Shop', total: -500, count: 1, id: 'shop-1' },
+  { 'payee.name': null, total: 200, count: 1, id: 'none-1' },
 ];
 
 const spendByPayee = {
@@ -92,6 +92,20 @@ const library = [
   aqlItem('countIsMoney', spendByPayee, { moneyColumns: ['count'] }),
   aqlItem('twoRows', spendByPayee, { rowLimit: 2 }),
   aqlItem('ownLimit', { ...spendByPayee, limit: 2 }, { rowLimit: 2 }),
+  aqlItem('cafeByPayee', {
+    ...spendByPayee,
+    filter: { 'payee.name': 'Cafe' },
+  }),
+  aqlItem('byMonth', {
+    table: 'transactions',
+    groupBy: [{ $month: '$date' }],
+    select: [{ month: { $month: '$date' } }],
+  }),
+  aqlItem('transactionIds', {
+    table: 'transactions',
+    select: ['id', 'amount'],
+  }),
+  aqlItem('payeeNames', { table: 'payees', select: ['name'] }),
   aqlItem('badField', {
     table: 'transactions',
     filter: { nope: 1 },
@@ -323,5 +337,92 @@ describe('QUERY_TABLE', () => {
     await expect(run('=QUERY_TABLE("spendByPayee", 1 = 1)')).rejects.toThrow(
       /must be in the formula/,
     );
+  });
+});
+
+describe('QUERY_TABLE source map', () => {
+  it('gives the groupBy values of each row', async () => {
+    const { sourceMap } = await run('=QUERY_TABLE("spendByPayee")', 'table');
+    expect(sourceMap).toEqual({
+      query: { dateRange: null, conditions: [] },
+      rows: [
+        {
+          dateRange: null,
+          conditions: [
+            {
+              customName: 'payee.name: Cafe',
+              queryFilter: { $and: [{ 'payee.name': 'Cafe' }] },
+            },
+          ],
+        },
+        {
+          dateRange: null,
+          conditions: [
+            {
+              customName: 'payee.name: Shop',
+              queryFilter: { $and: [{ 'payee.name': 'Shop' }] },
+            },
+          ],
+        },
+        {
+          dateRange: null,
+          conditions: [
+            {
+              customName: 'payee.name: ',
+              queryFilter: { $and: [{ 'payee.name': null }] },
+            },
+          ],
+        },
+      ],
+      columns: null,
+      isComplete: true,
+    });
+  });
+
+  it('gives the filter of the query as one condition', async () => {
+    const { sourceMap } = await run('=QUERY_TABLE("cafeByPayee")', 'table');
+    expect(sourceMap?.query.conditions).toEqual([
+      {
+        customName: 'Query: cafeByPayee',
+        queryFilter: { $and: [{ 'payee.name': 'Cafe' }] },
+      },
+    ]);
+  });
+
+  it('gives no transactions for the header row', async () => {
+    const { sourceMap } = await run(
+      '=QUERY_TABLE("spendByPayee", TRUE())',
+      'table',
+    );
+    expect(sourceMap?.rows).toHaveLength(4);
+    expect(sourceMap?.rows[0]).toBeNull();
+    expect(sourceMap?.rows[1]?.conditions[0]).toMatchObject({
+      customName: 'payee.name: Cafe',
+    });
+  });
+
+  it('gives one transaction for each row with an id column', async () => {
+    const { sourceMap } = await run('=QUERY_TABLE("transactionIds")', 'table');
+    expect(sourceMap?.rows[1]?.conditions).toEqual([
+      { customName: 'id: shop-1', queryFilter: { $and: [{ id: 'shop-1' }] } },
+    ]);
+  });
+
+  it('has not all rows of the query after a limit', async () => {
+    expect(
+      (await run('=QUERY_TABLE("twoRows")', 'table')).sourceMap?.isComplete,
+    ).toBe(false);
+    expect(
+      (await run('=QUERY_TABLE("ownLimit")', 'table')).sourceMap?.isComplete,
+    ).toBe(false);
+  });
+
+  it('gives no source map without plain groupBy fields or transactions', async () => {
+    expect(
+      (await run('=QUERY_TABLE("byMonth")', 'table')).sourceMap,
+    ).toBeUndefined();
+    expect(
+      (await run('=QUERY_TABLE("payeeNames")', 'table')).sourceMap,
+    ).toBeUndefined();
   });
 });
