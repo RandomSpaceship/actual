@@ -537,6 +537,11 @@ export type FormulaChartSettings = {
   // The columns of the values, by position. Without it, each money, percent
   // or number column that is not the label column.
   valueColumns?: number[];
+  // A long table: the column that splits the values into series (the stacks,
+  // or the outer ring of a donut), by position. -1 uses no series column.
+  // Without it, the first text or date column that is not the label column,
+  // but only when a label shows more than one time.
+  seriesColumn?: number;
   // Shows each value with the opposite sign, for example spending
   flipSign?: boolean;
 };

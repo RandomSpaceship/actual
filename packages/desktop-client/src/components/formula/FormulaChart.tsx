@@ -30,6 +30,7 @@ import { useFormat } from '#hooks/useFormat';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
 import { useFormulaValueFormatter } from './formatFormulaValue';
+import { noSeriesColumn } from './formulaChartData';
 import type { FormulaChartData, FormulaChartRow } from './formulaChartData';
 import { FormulaChartTooltip } from './FormulaChartTooltip';
 
@@ -95,6 +96,7 @@ export function FormulaChart({
               type: oneSeries.type,
             }))}
             formatValue={formatFormulaValue}
+            hideEmptyValues={chart.seriesColumn !== noSeriesColumn}
           />
         );
       }}

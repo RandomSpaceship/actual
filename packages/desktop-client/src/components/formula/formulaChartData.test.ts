@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { FormulaTable } from './executeFormula';
-import { getFormulaChartData, rowNumberLabelColumn } from './formulaChartData';
+import {
+  getFormulaChartData,
+  manySeriesLimit,
+  noSeriesColumn,
+  rowNumberLabelColumn,
+} from './formulaChartData';
 
 const formatLabel = (value: unknown, type: string) =>
   type === 'date' ? `date:${String(value)}` : String(value);
@@ -145,6 +150,129 @@ describe('getFormulaChartData', () => {
       expect(chart.rows.map(row => row.value0)).toEqual([3000, 900]);
       expect(chart.warnings).toEqual([
         { kind: 'donut-mixed-signs', columnIndex: 1 },
+      ]);
+    });
+  });
+
+  describe('long table', () => {
+    // As QUERY_GROUP("q", "month", "category") gives
+    const monthsByCategory: FormulaTable = [
+      ['2024-01', 'Food', -100],
+      ['2024-01', 'Rent', -900],
+      ['2024-02', 'Food', -50],
+      ['2024-02', 'Food', -5],
+    ];
+
+    it('uses the second text column as the series column', () => {
+      const chart = getFormulaChartData(
+        monthsByCategory,
+        [{ type: 'date' }],
+        false,
+        {},
+        formatLabel,
+      );
+      expect(chart.labelColumn).toBe(0);
+      expect(chart.seriesColumn).toBe(1);
+      expect(chart.series).toEqual([
+        { key: 'value0', columnIndex: 2, name: 'Food', type: 'money' },
+        { key: 'value1', columnIndex: 2, name: 'Rent', type: 'money' },
+      ]);
+      // A missing pair gives 0, and a duplicate pair adds up
+      expect(chart.rows).toEqual([
+        { label: 'date:2024-01', value0: -100, value1: -900 },
+        { label: 'date:2024-02', value0: -55, value1: 0 },
+      ]);
+      expect(chart.warnings).toEqual([]);
+    });
+
+    it('does not use a series column when each label shows one time', () => {
+      const chart = getFormulaChartData(
+        [
+          ['Food', 'weekly shop', -100],
+          ['Rent', 'monthly', -900],
+        ],
+        [],
+        false,
+        {},
+        formatLabel,
+      );
+      expect(chart.seriesColumn).toBe(noSeriesColumn);
+      expect(chart.rows).toEqual([
+        { label: 'Food', value0: -100 },
+        { label: 'Rent', value0: -900 },
+      ]);
+    });
+
+    it('uses no series column when the settings say so', () => {
+      const chart = getFormulaChartData(
+        monthsByCategory,
+        [],
+        false,
+        { seriesColumn: noSeriesColumn },
+        formatLabel,
+      );
+      expect(chart.seriesColumn).toBe(noSeriesColumn);
+      expect(chart.rows).toHaveLength(4);
+    });
+
+    it('shows only the first value column, and flips the signs', () => {
+      const chart = getFormulaChartData(
+        [
+          ['Jan', 'Food', -1, -2],
+          ['Jan', 'Rent', -3, -4],
+        ],
+        [],
+        false,
+        { flipSign: true },
+        formatLabel,
+      );
+      expect(chart.rows).toEqual([{ label: 'Jan', value0: 1, value1: 3 }]);
+      expect(chart.warnings).toEqual([
+        { kind: 'series-first-column', columnIndex: 2 },
+      ]);
+    });
+
+    it('warns about many series', () => {
+      const count = manySeriesLimit + 1;
+      const chart = getFormulaChartData(
+        Array.from({ length: count }, (_, index) => ['Jan', `c${index}`, 1]),
+        [],
+        false,
+        {},
+        formatLabel,
+      );
+      expect(chart.series).toHaveLength(count);
+      expect(chart.warnings).toEqual([{ kind: 'many-series', count }]);
+    });
+
+    it('gives a donut two rings that agree', () => {
+      // As QUERY_GROUP("q", "category group", "category") gives
+      const chart = getFormulaChartData(
+        [
+          ['Bills', 'Rent', -900],
+          ['Food', 'Groceries', -100],
+          ['Bills', 'Power', -50],
+          ['Food', 'Eating out', 0],
+          ['Bills', 'Refund', 20],
+        ],
+        [],
+        false,
+        { type: 'donut' },
+        formatLabel,
+      );
+      // In group order, without empty slices, as sizes
+      expect(chart.rows).toEqual([
+        { label: 'Rent', group: 'Bills', value0: 900 },
+        { label: 'Power', group: 'Bills', value0: 50 },
+        { label: 'Refund', group: 'Bills', value0: 20 },
+        { label: 'Groceries', group: 'Food', value0: 100 },
+      ]);
+      expect(chart.groups).toEqual([
+        { label: 'Bills', value0: 970 },
+        { label: 'Food', value0: 100 },
+      ]);
+      expect(chart.warnings).toEqual([
+        { kind: 'donut-mixed-signs', columnIndex: 2 },
       ]);
     });
   });

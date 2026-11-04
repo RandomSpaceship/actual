@@ -19,19 +19,25 @@ import type { FormulaIssue } from './resolveQuery';
 
 // A row number label instead of a label column
 export const rowNumberLabelColumn = -1;
+// No series column: each value column is a series
+export const noSeriesColumn = -1;
+// More series than this gives a warning, because the colours repeat
+export const manySeriesLimit = 20;
 
 export type FormulaChartSeries = {
   // The key of the value in each chart row
   key: string;
+  // The value column of the series
   columnIndex: number;
-  // From the column settings or the header row. Empty when the column has
-  // no name.
+  // From the column settings or the header row, or the series value of a
+  // long table. Empty when the column has no name.
   name: string;
   type: FormulaTableColumnType;
 };
 
 // The label, then one value for each series. A cell that is not a number
-// gives null, so the chart shows a gap.
+// gives null, so the chart shows a gap. An outer slice of a two-ring donut
+// also has the label of its group.
 export type FormulaChartRow = { label: string } & Record<
   string,
   string | number | null
@@ -44,6 +50,10 @@ export type FormulaChartWarning =
   | { kind: 'missing-column'; columnIndex: number }
   // A donut shows only its first value column
   | { kind: 'donut-first-column'; columnIndex: number }
+  // With a series column, the chart shows only the first value column
+  | { kind: 'series-first-column'; columnIndex: number }
+  // The series column gives more series than manySeriesLimit
+  | { kind: 'many-series'; count: number }
   // A donut shows the size of each value, so a negative value and a positive
   // value look the same
   | { kind: 'donut-mixed-signs'; columnIndex: number };
@@ -51,8 +61,13 @@ export type FormulaChartWarning =
 export type FormulaChartData = {
   type: FormulaChartType;
   labelColumn: number;
+  seriesColumn: number;
   series: FormulaChartSeries[];
   rows: FormulaChartRow[];
+  // The inner ring of a two-ring donut: one row for each group, with the sum
+  // of its outer slices. The rows are then the outer slices, in group order,
+  // and each one has a 'group' label.
+  groups?: FormulaChartRow[];
   warnings: FormulaChartWarning[];
 };
 
@@ -84,10 +99,11 @@ export function getFormulaChartData(
     }
     return isFound;
   }
+  function isLabelType(columnType: FormulaTableColumnType) {
+    return columnType === 'text' || columnType === 'date';
+  }
 
-  const defaultLabelColumn = columnTypes.findIndex(
-    columnType => columnType === 'text' || columnType === 'date',
-  );
+  const defaultLabelColumn = columnTypes.findIndex(isLabelType);
   const labelColumn =
     settings.labelColumn === undefined
       ? defaultLabelColumn
@@ -96,24 +112,91 @@ export function getFormulaChartData(
         ? settings.labelColumn
         : defaultLabelColumn;
 
+  // A long table has a label more than one time, once for each series. A
+  // wide table with a second text column, for example notes, does not.
+  const labels = bodyRows.map((row, rowIndex) => getRowLabel(row, rowIndex));
+  const hasRepeatedLabels = new Set(labels).size < labels.length;
+  const defaultSeriesColumn = hasRepeatedLabels
+    ? columnTypes.findIndex(
+        (columnType, columnIndex) =>
+          isLabelType(columnType) && columnIndex !== labelColumn,
+      )
+    : noSeriesColumn;
+  const seriesColumn =
+    settings.seriesColumn === undefined
+      ? defaultSeriesColumn
+      : settings.seriesColumn === noSeriesColumn ||
+          settings.seriesColumn === labelColumn ||
+          !isInTable(settings.seriesColumn)
+        ? noSeriesColumn
+        : settings.seriesColumn;
+  const hasSeriesColumn = seriesColumn !== noSeriesColumn;
+
   let valueColumns = settings.valueColumns
     ? settings.valueColumns.filter(
-        columnIndex => isInTable(columnIndex) && columnIndex !== labelColumn,
+        columnIndex =>
+          isInTable(columnIndex) &&
+          columnIndex !== labelColumn &&
+          columnIndex !== seriesColumn,
       )
     : columnTypes.flatMap((columnType, columnIndex) =>
-        isNumericType(columnType) && columnIndex !== labelColumn
+        isNumericType(columnType) &&
+        columnIndex !== labelColumn &&
+        columnIndex !== seriesColumn
           ? [columnIndex]
           : [],
       );
-  if (type === 'donut' && valueColumns.length > 1) {
+  if ((hasSeriesColumn || type === 'donut') && valueColumns.length > 1) {
     warnings.push({
-      kind: 'donut-first-column',
+      kind: hasSeriesColumn ? 'series-first-column' : 'donut-first-column',
       columnIndex: valueColumns[0],
     });
     valueColumns = valueColumns.slice(0, 1);
   }
   if (valueColumns.length === 0) {
     warnings.push({ kind: 'no-values' });
+  }
+
+  function getRowLabel(row: FormulaTableCell[], rowIndex: number) {
+    return labelColumn === rowNumberLabelColumn
+      ? String(rowIndex + 1)
+      : getLabel(row[labelColumn] ?? null, columnTypes[labelColumn]);
+  }
+  function getValue(cell: FormulaTableCell | undefined) {
+    return typeof cell === 'number' ? (settings.flipSign ? -cell : cell) : null;
+  }
+
+  if (hasSeriesColumn && valueColumns.length > 0) {
+    const [valueColumn] = valueColumns;
+    const longRows = bodyRows.map((row, rowIndex) => ({
+      label: labels[rowIndex],
+      seriesName: getLabel(
+        row[seriesColumn] ?? null,
+        columnTypes[seriesColumn],
+      ),
+      value: getValue(row[valueColumn]),
+    }));
+    if (type === 'donut') {
+      return {
+        type,
+        labelColumn,
+        seriesColumn,
+        ...getTwoRingRows(longRows, valueColumn),
+        warnings,
+      };
+    }
+    const series = getLongSeries(longRows, valueColumn);
+    if (series.length > manySeriesLimit) {
+      warnings.push({ kind: 'many-series', count: series.length });
+    }
+    return {
+      type,
+      labelColumn,
+      seriesColumn,
+      series,
+      rows: getLongRows(longRows, series),
+      warnings,
+    };
   }
 
   const series = valueColumns.map(
@@ -126,29 +209,19 @@ export function getFormulaChartData(
   );
 
   let rows = bodyRows.map((row, rowIndex): FormulaChartRow => {
-    const chartRow: FormulaChartRow = {
-      label:
-        labelColumn === rowNumberLabelColumn
-          ? String(rowIndex + 1)
-          : getLabel(row[labelColumn] ?? null, columnTypes[labelColumn]),
-    };
+    const chartRow: FormulaChartRow = { label: labels[rowIndex] };
     for (const { key, columnIndex } of series) {
-      const cell = row[columnIndex] ?? null;
-      chartRow[key] =
-        typeof cell === 'number' ? (settings.flipSign ? -cell : cell) : null;
+      chartRow[key] = getValue(row[columnIndex]);
     }
     return chartRow;
   });
 
   if (type === 'donut' && series.length > 0) {
     const [{ key, columnIndex }] = series;
-    const values = rows.map(row => row[key]);
-    if (
-      values.some(value => typeof value === 'number' && value > 0) &&
-      values.some(value => typeof value === 'number' && value < 0)
-    ) {
-      warnings.push({ kind: 'donut-mixed-signs', columnIndex });
-    }
+    warnAboutMixedSigns(
+      rows.map(row => row[key]),
+      columnIndex,
+    );
     // A slice has a size, so it cannot be negative. Rows without a value
     // have no slice.
     rows = rows.flatMap(row => {
@@ -159,7 +232,90 @@ export function getFormulaChartData(
     });
   }
 
-  return { type, labelColumn, series, rows, warnings };
+  return { type, labelColumn, seriesColumn, series, rows, warnings };
+
+  // One series for each series value, in the order of the table
+  function getLongSeries(
+    longRows: LongRow[],
+    valueColumn: number,
+  ): FormulaChartSeries[] {
+    const seriesNames = [...new Set(longRows.map(row => row.seriesName))];
+    return seriesNames.map((name, seriesIndex) => ({
+      key: `value${seriesIndex}`,
+      columnIndex: valueColumn,
+      name,
+      type: columnTypes[valueColumn],
+    }));
+  }
+
+  // One row for each label. A label and series pair without a row gives 0,
+  // because the table holds sums. Two rows with the same pair add up.
+  function getLongRows(longRows: LongRow[], series: FormulaChartSeries[]) {
+    const keyOfSeries = new Map(
+      series.map(oneSeries => [oneSeries.name, oneSeries.key]),
+    );
+    const rowOfLabel = new Map<string, FormulaChartRow>();
+    for (const { label, seriesName, value } of longRows) {
+      let chartRow = rowOfLabel.get(label);
+      if (!chartRow) {
+        chartRow = { label };
+        for (const { key } of series) {
+          chartRow[key] = 0;
+        }
+        rowOfLabel.set(label, chartRow);
+      }
+      const key = keyOfSeries.get(seriesName);
+      if (key !== undefined && value !== null) {
+        chartRow[key] = Number(chartRow[key] ?? 0) + value;
+      }
+    }
+    return [...rowOfLabel.values()];
+  }
+
+  // The label column gives the inner ring and the series column gives the
+  // outer ring. The inner ring is the sum of its outer slices, so the rings
+  // always agree.
+  function getTwoRingRows(longRows: LongRow[], valueColumn: number) {
+    const key = 'value0';
+    const series: FormulaChartSeries[] = [
+      {
+        key,
+        columnIndex: valueColumn,
+        name: columnNames[valueColumn] ?? '',
+        type: columnTypes[valueColumn],
+      },
+    ];
+    warnAboutMixedSigns(
+      longRows.map(row => row.value),
+      valueColumn,
+    );
+    const slicesOfGroup = new Map<string, FormulaChartRow[]>();
+    for (const { label, seriesName, value } of longRows) {
+      if (value === null || value === 0) continue;
+      const slices = slicesOfGroup.get(label) ?? [];
+      slices.push({ label: seriesName, group: label, [key]: Math.abs(value) });
+      slicesOfGroup.set(label, slices);
+    }
+    const groups = [...slicesOfGroup].map(
+      ([label, slices]): FormulaChartRow => ({
+        label,
+        [key]: slices.reduce((sum, slice) => sum + Number(slice[key]), 0),
+      }),
+    );
+    return { series, rows: [...slicesOfGroup.values()].flat(), groups };
+  }
+
+  function warnAboutMixedSigns(
+    values: Array<string | number | null>,
+    columnIndex: number,
+  ) {
+    if (
+      values.some(value => typeof value === 'number' && value > 0) &&
+      values.some(value => typeof value === 'number' && value < 0)
+    ) {
+      warnings.push({ kind: 'donut-mixed-signs', columnIndex });
+    }
+  }
 
   function getLabel(
     cell: FormulaTableCell,
@@ -168,6 +324,12 @@ export function getFormulaChartData(
     return isErrorCell(cell) ? cell.error : formatLabel(cell, columnType);
   }
 }
+
+type LongRow = {
+  label: string;
+  seriesName: string;
+  value: number | null;
+};
 
 function isErrorCell(cell: FormulaTableCell): cell is { error: string } {
   return typeof cell === 'object' && cell !== null;
@@ -212,6 +374,26 @@ export function getFormulaChartIssues(
           message: t(
             'A donut shows one value column. It shows column {{columnNumber}}.',
             { columnNumber: warning.columnIndex + 1 },
+          ),
+        };
+      case 'series-first-column':
+        return {
+          severity: 'warning',
+          kind: 'chart',
+          name: String(warning.columnIndex + 1),
+          message: t(
+            'With a series column, the chart shows one value column. It shows column {{columnNumber}}.',
+            { columnNumber: warning.columnIndex + 1 },
+          ),
+        };
+      case 'many-series':
+        return {
+          severity: 'warning',
+          kind: 'chart',
+          name: '',
+          message: t(
+            'The chart has {{count}} series, so some colors repeat. Group the rows into fewer series, or select a different series column.',
+            { count: warning.count },
           ),
         };
       case 'donut-mixed-signs':

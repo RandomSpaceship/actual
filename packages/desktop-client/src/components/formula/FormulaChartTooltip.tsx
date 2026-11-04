@@ -13,6 +13,9 @@ type FormulaChartTooltipProps = {
   row: FormulaChartRow;
   series: Array<{ key: string; name: string; type: FormulaTableColumnType }>;
   formatValue: ReturnType<typeof useFormulaValueFormatter>;
+  // A long table can give many series, and most of them can be 0 for one
+  // label. Then the tooltip shows only the series with a value.
+  hideEmptyValues?: boolean;
 };
 
 // The label, then the value of each series in the format of its column
@@ -20,7 +23,14 @@ export function FormulaChartTooltip({
   row,
   series,
   formatValue,
+  hideEmptyValues = false,
 }: FormulaChartTooltipProps) {
+  const shownSeries = hideEmptyValues
+    ? series.filter(({ key }) => {
+        const value = row[key];
+        return value !== null && value !== undefined && value !== 0;
+      })
+    : series;
   return (
     <div
       className={css({
@@ -37,7 +47,7 @@ export function FormulaChartTooltip({
         <strong>{row.label}</strong>
       </div>
       <div style={{ lineHeight: 1.5 }}>
-        {series.map(({ key, name, type }) => {
+        {shownSeries.map(({ key, name, type }) => {
           const value = row[key] ?? null;
           const text = formatValue(value, type);
           return (
