@@ -4,6 +4,7 @@ import {
 } from '@actual-app/core/shared/formulas/providerNameUses';
 import {
   formulaUsesQueryName,
+  getLibraryNameKind,
   isSameQueryName,
 } from '@actual-app/core/shared/formulas/queryNameUses';
 import type {
@@ -62,7 +63,7 @@ export function findFormulaQueryUses(
       providers: cardProviders = {},
     } = widget.meta;
     if (
-      type === 'query'
+      type !== 'provider'
         ? Object.keys(queries).some(localName =>
             isSameQueryName(localName, name),
           )
@@ -115,7 +116,8 @@ export function findProviderUses(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// True when an older library item of the same type has the same name.
+// True when an older library item of the same kind has the same name (filter
+// queries and AQL queries are one kind).
 // Formulas then use the older one, so this item has no uses. The library list
 // is oldest first.
 export function isOverriddenLibraryItem(
@@ -125,7 +127,7 @@ export function isOverriddenLibraryItem(
   for (const libraryItem of library) {
     if (libraryItem.id === item.id) return false;
     if (
-      libraryItem.type === item.type &&
+      getLibraryNameKind(libraryItem.type) === getLibraryNameKind(item.type) &&
       isSameQueryName(libraryItem.name, item.name)
     ) {
       return true;

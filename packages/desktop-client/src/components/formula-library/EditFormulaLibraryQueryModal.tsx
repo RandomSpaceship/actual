@@ -7,7 +7,10 @@ import { Paragraph } from '@actual-app/components/paragraph';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
+import {
+  isNamedQueryItem,
+  isSameQueryName,
+} from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryQueryData,
@@ -85,7 +88,7 @@ export function EditFormulaLibraryQueryModal({
       library.some(
         libraryItem =>
           libraryItem.id !== item?.id &&
-          libraryItem.type === 'query' &&
+          isNamedQueryItem(libraryItem) &&
           isSameQueryName(libraryItem.name, trimmedName),
       )
     ) {

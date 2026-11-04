@@ -6,7 +6,11 @@ import type {
 } from '@actual-app/core/types/models';
 import { describe, expect, it } from 'vitest';
 
-import { findFormulaQueryUses, findProviderUses } from './formulaQueryUses';
+import {
+  findFormulaQueryUses,
+  findProviderUses,
+  isOverriddenLibraryItem,
+} from './formulaQueryUses';
 
 const food = { type: 'query' as const, name: 'food' };
 
@@ -81,6 +85,48 @@ describe('findFormulaQueryUses', () => {
     ];
 
     expect(findFormulaQueryUses(food, widgets, pages)).toEqual([]);
+  });
+
+  it('finds an AQL query as a query, and skips a card query of its name', () => {
+    const aqlFood = { type: 'aql-query' as const, name: 'food' };
+    const widgets = [
+      formulaWidget('library', 'main', { formula: '=QUERY("food")' }),
+      formulaWidget('local', 'main', {
+        formula: '=QUERY("food")',
+        queries: { food: {} },
+      }),
+      formulaWidget('provider', 'main', { formula: '=food' }),
+    ];
+
+    expect(
+      findFormulaQueryUses(aqlFood, widgets, pages).map(use => use.widgetId),
+    ).toEqual(['library']);
+  });
+});
+
+describe('isOverriddenLibraryItem', () => {
+  it('treats filter queries and AQL queries as one set of names', () => {
+    const library: FormulaLibraryItemEntity[] = [
+      { id: 'old', type: 'query', name: 'Food', data: {}, created_at: 1 },
+      {
+        id: 'new',
+        type: 'aql-query',
+        name: 'food',
+        data: { aql: '{"table": "transactions"}' },
+        created_at: 2,
+      },
+      {
+        id: 'provider',
+        type: 'provider',
+        name: 'food',
+        data: { formula: '=1' },
+        created_at: 3,
+      },
+    ];
+
+    expect(isOverriddenLibraryItem(library[1], library)).toBe(true);
+    expect(isOverriddenLibraryItem(library[0], library)).toBe(false);
+    expect(isOverriddenLibraryItem(library[2], library)).toBe(false);
   });
 });
 
