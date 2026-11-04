@@ -203,6 +203,22 @@ describe('getFormulaChartData', () => {
       ]);
     });
 
+    it('stacks a bar or area chart only', () => {
+      const getStacked = (type: 'bar' | 'area' | 'line') =>
+        getFormulaChartData(
+          monthsByCategory,
+          [],
+          false,
+          { type, stacked: true },
+          formatLabel,
+        ).stacked;
+      expect([
+        getStacked('bar'),
+        getStacked('area'),
+        getStacked('line'),
+      ]).toEqual([true, true, false]);
+    });
+
     it('uses no series column when the settings say so', () => {
       const chart = getFormulaChartData(
         monthsByCategory,

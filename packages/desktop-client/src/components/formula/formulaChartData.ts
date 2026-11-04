@@ -62,6 +62,8 @@ export type FormulaChartData = {
   type: FormulaChartType;
   labelColumn: number;
   seriesColumn: number;
+  // Bar and area only
+  stacked: boolean;
   series: FormulaChartSeries[];
   rows: FormulaChartRow[];
   // The inner ring of a two-ring donut: one row for each group, with the sum
@@ -86,6 +88,8 @@ export function getFormulaChartData(
   formatLabel: LabelFormatter,
 ): FormulaChartData {
   const type = settings.type ?? 'bar';
+  const stacked =
+    (settings.stacked ?? false) && (type === 'bar' || type === 'area');
   const width = Math.max(0, ...table.map(row => row.length));
   const bodyRows = headerRow ? table.slice(1) : table;
   const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
@@ -181,6 +185,7 @@ export function getFormulaChartData(
         type,
         labelColumn,
         seriesColumn,
+        stacked,
         ...getTwoRingRows(longRows, valueColumn),
         warnings,
       };
@@ -193,6 +198,7 @@ export function getFormulaChartData(
       type,
       labelColumn,
       seriesColumn,
+      stacked,
       series,
       rows: getLongRows(longRows, series),
       warnings,
@@ -232,7 +238,15 @@ export function getFormulaChartData(
     });
   }
 
-  return { type, labelColumn, seriesColumn, series, rows, warnings };
+  return {
+    type,
+    labelColumn,
+    seriesColumn,
+    stacked,
+    series,
+    rows,
+    warnings,
+  };
 
   // One series for each series value, in the order of the table
   function getLongSeries(

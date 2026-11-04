@@ -57,6 +57,7 @@ export function FormulaChart({
   const animationProps = useRechartsAnimation();
   const colors = getColorScale('qualitative');
   const { type, series, rows } = chart;
+  const stackId = chart.stacked ? 'stack' : undefined;
 
   const seriesNames = series.map(
     oneSeries =>
@@ -204,6 +205,7 @@ export function FormulaChart({
                 <Area
                   key={oneSeries.key}
                   dataKey={oneSeries.key}
+                  stackId={stackId}
                   type="linear"
                   stroke={colors[seriesIndex % colors.length]}
                   fill={colors[seriesIndex % colors.length]}
@@ -216,7 +218,15 @@ export function FormulaChart({
         }
 
         return (
-          <BarChart width={width} height={height} data={rows} margin={margin}>
+          <BarChart
+            width={width}
+            height={height}
+            data={rows}
+            margin={margin}
+            // A negative value stacks down from 0, so it does not cancel a
+            // positive value
+            stackOffset="sign"
+          >
             {tooltip}
             {axes}
             {legend}
@@ -224,6 +234,7 @@ export function FormulaChart({
               <Bar
                 key={oneSeries.key}
                 dataKey={oneSeries.key}
+                stackId={stackId}
                 fill={colors[seriesIndex % colors.length]}
                 {...animationProps}
               />

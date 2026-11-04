@@ -542,6 +542,8 @@ export type FormulaChartSettings = {
   // Without it, the first text or date column that is not the label column,
   // but only when a label shows more than one time.
   seriesColumn?: number;
+  // Stacks the series of a bar or area chart
+  stacked?: boolean;
   // Shows each value with the opposite sign, for example spending
   flipSign?: boolean;
 };
