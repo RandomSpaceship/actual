@@ -5,6 +5,7 @@ import { Button } from '@actual-app/components/button';
 import { DateRangePicker } from '@actual-app/components/date-range-picker';
 import type { DateRangePreset } from '@actual-app/components/date-range-picker';
 import { Input } from '@actual-app/components/input';
+import { Select } from '@actual-app/components/select';
 import { View } from '@actual-app/components/view';
 import { send } from '@actual-app/core/platform/client/connection';
 import * as monthUtils from '@actual-app/core/shared/months';
@@ -111,17 +112,19 @@ function isPresetTimeRangeMode(
   return !['sliding-window', 'static'].includes(mode);
 }
 
+type TimeFrameModeOption = TimeFrame['mode'] | 'library';
+
 type QueryTimeFrameControlProps = {
   timeFrame: TimeFrame;
   onChange: (timeFrame: TimeFrame) => void;
-  // For a library query in a card. With it, the mode button cycles
-  // Library -> Live -> Static -> Library. In the Library state, timeFrame is
-  // the library time frame, and a change gives the card its own time frame.
+  // For a library query in a card. With it, the mode menu has Library. In
+  // the Library state, timeFrame is the library time frame, and a change
+  // gives the card its own time frame.
   onUseLibraryTimeFrame?: () => void;
   isLibraryTimeFrame?: boolean;
 };
 
-// The time frame of a query: the mode button, the date range picker, and the
+// The time frame of a query: the mode menu, the date range picker, and the
 // name of a preset range
 export function QueryTimeFrameControl({
   timeFrame,
@@ -243,40 +246,35 @@ export function QueryTimeFrameControl({
           alignItems: 'center',
         }}
       >
-        <Button
-          style={{ minWidth: 50 }}
-          variant={
-            isLibraryTimeFrame || timeRangeMode !== 'static'
-              ? 'primary'
-              : 'normal'
-          }
-          onPress={() => {
-            if (
-              onUseLibraryTimeFrame &&
-              !isLibraryTimeFrame &&
-              timeRangeMode === 'static'
-            ) {
-              onUseLibraryTimeFrame();
+        <Select
+          value={isLibraryTimeFrame ? 'library' : timeRangeMode}
+          onChange={(value: TimeFrameModeOption) => {
+            if (value === 'library') {
+              onUseLibraryTimeFrame?.();
               return;
             }
-
-            const newMode =
-              isLibraryTimeFrame || timeRangeMode === 'static'
-                ? 'sliding-window'
-                : 'static';
+            if (value !== 'sliding-window' && value !== 'static') return;
             const [newStart, newEnd] = calculateTimeRange(
               asMonthSlidingTimeFrame({
                 start: startDate,
                 end: endDate,
-                mode: newMode,
+                mode: value,
               }),
             );
-
-            onChange({ start: newStart, end: newEnd, mode: newMode });
+            onChange({ start: newStart, end: newEnd, mode: value });
           }}
-        >
-          {isLibraryTimeFrame ? t('Library') : timeRangeLabel}
-        </Button>
+          options={[
+            ...(onUseLibraryTimeFrame
+              ? [['library', t('Library')] as const]
+              : []),
+            ['sliding-window', timeRangeLabels['sliding-window']],
+            ['static', timeRangeLabels.static],
+            // A preset comes from the date range picker
+            ...(isPresetTimeRange && !isLibraryTimeFrame
+              ? [[timeRangeMode, timeRangeLabel] as const]
+              : []),
+          ]}
+        />
         {isDateRangePickerReady ? (
           <DateRangePicker
             start={pickerStartDate}
