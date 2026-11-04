@@ -144,6 +144,16 @@ export function EditFormulaLibraryProviderModal({
     editedCardProviders,
   );
 
+  // The table message for a card tells you to change the display, but a
+  // provider can give only one value
+  const previewError = preview.issues.some(
+    issue => issue.kind === 'table-result',
+  )
+    ? t(
+        'The formula gives a table. A provider can give only one value. Use INDEX to get one cell, for example INDEX(formula, 1, 2)',
+      )
+    : preview.error;
+
   function validateName() {
     if (trimmedName === '') {
       return t('Enter a name');
@@ -386,22 +396,39 @@ export function EditFormulaLibraryProviderModal({
               <Text style={{ color: theme.pageTextSubdued, marginBottom: 5 }}>
                 <Trans>Result:</Trans>
               </Text>
-              <View
-                style={{
-                  height: 60,
-                  backgroundColor: theme.cardBackground,
-                  borderRadius: 6,
-                  overflow: 'auto',
-                }}
-              >
-                <FormulaResult
-                  value={preview.result}
-                  error={preview.error}
-                  loading={preview.isLoading}
-                  fontSizeMode="static"
-                  staticFontSize={20}
-                />
-              </View>
+              {/* An error can be long, so it shows as text from its start */}
+              {previewError && !preview.isLoading ? (
+                <Text
+                  style={{
+                    maxHeight: 160,
+                    overflowY: 'auto',
+                    padding: 10,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 6,
+                    color: theme.errorText,
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {previewError}
+                </Text>
+              ) : (
+                <View
+                  style={{
+                    height: 60,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 6,
+                    overflow: 'auto',
+                  }}
+                >
+                  <FormulaResult
+                    value={preview.result}
+                    loading={preview.isLoading}
+                    fontSizeMode="static"
+                    staticFontSize={20}
+                  />
+                </View>
+              )}
               <FormulaWarnings issues={preview.issues} />
               <Text
                 style={{
