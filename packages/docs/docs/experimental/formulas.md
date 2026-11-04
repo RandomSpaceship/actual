@@ -609,7 +609,25 @@ The tooltip shows each value in the format of its column. Privacy mode hides **M
 
 Spending from `QUERY_GROUP` gives negative amounts. Turn on **Flip signs** to show each value with the opposite sign. This setting changes all of the value columns.
 
+Turn on **Stack** to put the series of a **Bar** or **Area** chart on top of each other. Negative values stack down from zero, so they do not cancel positive values.
+
 A **Donut** chart shows only the first value column. It shows the size of each value, so a negative value and a positive value of the same size look the same. If a column has both negative and positive values, the editor shows a warning. A row with no value or a value of zero has no slice.
+
+#### Chart a Long Table
+
+`QUERY_GROUP` with two dimensions gives a long table: one row for each pair of values, for example a month and a category. The chart can split such a table into series, so you do not have to change it into a wide table first.
+
+The **Series** setting selects the column that splits the values:
+
+- **Automatic** (the default): if a label shows in more than one row, the next **Text** or **Date** column after the label column. Otherwise, no column.
+- **None**: each value column is a series.
+- A column: each different value of that column is a series.
+
+For example, `=QUERY_GROUP("expenses", "month", "category")` gives one bar for each category in each month. Turn on **Stack** to show one stacked bar for each month.
+
+With a series column, the chart shows only the first value column. If a label and series pair has no row, its value is zero. If two rows have the same pair, the chart adds their values. If the chart has more than 20 series, the editor shows a warning, because some colors repeat. The tooltip shows only the series with a value that is not zero.
+
+For a **Donut** chart, the setting is **Outer ring**. The chart then has two rings. For example, `=QUERY_GROUP("expenses", "category group", "category")` shows the category groups in the inner ring and their categories in the outer ring. Each slice of the inner ring is the sum of its outer slices, so the two rings always agree. The outer slices have lighter colors of their group color. The legend shows the groups.
 
 On a dashboard card, the chart has no axes and no legend, as the other report cards. Point to a bar, a point or a slice to see its values. A click on the chart does not open the transactions.
 
