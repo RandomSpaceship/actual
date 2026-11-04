@@ -91,6 +91,14 @@ describe('formula library app', () => {
         data: {},
       }),
     ).rejects.toThrow(/already in use/);
+    // Filter queries and AQL queries share one set of names
+    await expect(
+      app.handlers['formula-library-create']({
+        type: 'aql-query',
+        name: 'Food',
+        data: { aql: '{"table": "transactions"}' },
+      }),
+    ).rejects.toThrow(/already in use/);
   });
 
   it('allows the name of a deleted item', async () => {

@@ -1,3 +1,8 @@
+import type {
+  FormulaLibraryItemEntity,
+  FormulaLibraryNamedQueryEntity,
+} from '#types/models';
+
 // Functions whose first argument is a query name
 const QUERY_NAME_FUNCTIONS = new Set([
   'QUERY',
@@ -108,6 +113,18 @@ export function findQueryNameReferences(formula: string): QueryNameReference[] {
 
 export function isSameQueryName(a: string, b: string) {
   return a.toLowerCase() === b.toLowerCase();
+}
+
+// Filter queries and AQL queries share one set of names
+export function isNamedQueryItem(
+  item: FormulaLibraryItemEntity,
+): item is FormulaLibraryNamedQueryEntity {
+  return item.type === 'query' || item.type === 'aql-query';
+}
+
+// Items of the same kind cannot have the same name
+export function getLibraryNameKind(type: FormulaLibraryItemEntity['type']) {
+  return type === 'provider' ? 'provider' : 'query';
 }
 
 export function formulaUsesQueryName(formula: string, name: string) {

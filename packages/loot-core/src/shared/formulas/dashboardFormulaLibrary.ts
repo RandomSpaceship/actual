@@ -114,8 +114,16 @@ function findLibraryItem<
   );
 }
 
+type ExportableLibraryItem = Exclude<
+  FormulaLibraryItemEntity,
+  { type: 'aql-query' }
+>;
+
+// AQL queries are not in a dashboard export yet
 function sortOldestFirst(library: FormulaLibraryItemEntity[]) {
-  return [...library].sort((a, b) => a.created_at - b.created_at);
+  return library
+    .filter((item): item is ExportableLibraryItem => item.type !== 'aql-query')
+    .sort((a, b) => a.created_at - b.created_at);
 }
 
 // The winning provider of each name, as formulas use them
@@ -133,7 +141,7 @@ function getProviderFormulas(
 }
 
 function toExportItem(
-  item: FormulaLibraryItemEntity,
+  item: ExportableLibraryItem,
 ): ExportImportFormulaLibraryItem {
   return item.type === 'provider'
     ? { id: item.id, type: item.type, name: item.name, data: item.data }
@@ -150,7 +158,7 @@ export function collectFormulaLibraryForExport(
   const providers = getProviderFormulas(oldestFirst);
   const items = new Map<string, ExportImportFormulaLibraryItem>();
 
-  function add(item: FormulaLibraryItemEntity | undefined) {
+  function add(item: ExportableLibraryItem | undefined) {
     if (item && !items.has(item.id)) {
       items.set(item.id, toExportItem(item));
     }
@@ -226,7 +234,7 @@ type ProviderImportPlan = {
 // - The library has no provider with the name: it gets a new item.
 function planProviderImport(
   exportedProviders: ExportImportFormulaLibraryProvider[],
-  library: FormulaLibraryItemEntity[],
+  library: ExportableLibraryItem[],
   createId: () => string,
 ): ProviderImportPlan {
   const localProviders = getProviderFormulas(library.map(toExportItem));

@@ -35,6 +35,33 @@ export type FormulaLibraryProviderEntity = Omit<
   data: FormulaLibraryProviderData;
 };
 
+export type FormulaLibraryAqlQueryData = {
+  description?: string;
+  // JSON with one key for each q() method, as typed
+  aql: string;
+  // The date field that the time frame filters. Without it, the query has no
+  // time frame. null: the user chose no date field.
+  dateField?: string | null;
+  timeFrame?: Partial<TimeFrame>;
+  // A value query gives a count, not an amount
+  isCount?: boolean;
+};
+
+// A query in AQL. Formulas use its name as the name of a filter query
+export type FormulaLibraryAqlQueryEntity = Omit<
+  FormulaLibraryQueryEntity,
+  'type' | 'data'
+> & {
+  type: 'aql-query';
+  data: FormulaLibraryAqlQueryData;
+};
+
+// The items that QUERY and the other query functions refer to
+export type FormulaLibraryNamedQueryEntity =
+  | FormulaLibraryQueryEntity
+  | FormulaLibraryAqlQueryEntity;
+
 export type FormulaLibraryItemEntity =
   | FormulaLibraryQueryEntity
+  | FormulaLibraryAqlQueryEntity
   | FormulaLibraryProviderEntity;

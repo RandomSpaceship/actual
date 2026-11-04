@@ -12,6 +12,7 @@ import {
   renameProviderInFormula,
 } from '#shared/formulas/providerNameUses';
 import {
+  getLibraryNameKind,
   isSameQueryName,
   renameQueryInFormula,
 } from '#shared/formulas/queryNameUses';
@@ -52,7 +53,7 @@ async function validateName(
     items.some(
       item =>
         item.id !== id &&
-        item.type === type &&
+        getLibraryNameKind(item.type) === getLibraryNameKind(type) &&
         isSameQueryName(item.name, name),
     )
   ) {
@@ -110,7 +111,7 @@ async function updateItem({
   const isUsedItem =
     items.find(
       candidate =>
-        candidate.type === item.type &&
+        getLibraryNameKind(candidate.type) === getLibraryNameKind(item.type) &&
         isSameQueryName(candidate.name, item.name),
     )?.id === id;
   const rename = (formula: string) =>
@@ -144,7 +145,7 @@ async function updateItem({
     for (const widget of widgets) {
       const meta = widget.meta;
       const localNames = Object.keys(
-        (item.type === 'query' ? meta?.queries : meta?.providers) ?? {},
+        (item.type === 'provider' ? meta?.providers : meta?.queries) ?? {},
       );
       if (
         !meta ||
