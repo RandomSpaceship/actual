@@ -42,6 +42,14 @@ import {
 } from '#components/reports/reportRanges';
 import { bootstrapHyperFormula } from '#util/bootstrapHyperFormula';
 
+import {
+  buildAqlFilterQuery,
+  fetchAqlQueryCount,
+  fetchAqlQueryValue,
+  FormulaQueryError,
+  getAqlDateField,
+  getAqlNotSupportedError,
+} from './aqlSource';
 import { fetchQueryGroupRows } from './queryGroup';
 
 bootstrapHyperFormula();
@@ -569,16 +577,26 @@ async function prefetchQueryValues<T>({
       prefetch.set(queryName, await fetchValue(query.config));
     } catch (err) {
       console.error(`Error running query "${queryName}":`, err);
-      addIssue({
-        severity: 'error',
-        kind: 'query-failed',
-        name: queryName,
-        message: t('Query "{{name}}" could not run', { name: queryName }),
-      });
+      addIssue(getQueryFailedIssue(queryName, err));
       prefetch.set(queryName, fallback);
     }
   }
   return fetchCount;
+}
+
+function getQueryFailedIssue(queryName: string, err: unknown): FormulaIssue {
+  return {
+    severity: 'error',
+    kind: 'query-failed',
+    name: queryName,
+    message:
+      err instanceof FormulaQueryError
+        ? t('Query "{{name}}": {{message}}', {
+            name: queryName,
+            message: err.message,
+          })
+        : t('Query "{{name}}" could not run', { name: queryName }),
+  };
 }
 
 // Returns the number of names that were not fetched before
@@ -595,8 +613,16 @@ async function prefetchFormulaQueries(
     names: formulaQueryContext.queryNames,
     prefetch: formulaQueryContext.querySumPrefetch,
     fallback: 0,
-    fetchValue: async config =>
-      integerToFormulaAmount(await fetchQuerySum(config)),
+    fetchValue: async config => {
+      if (!config.aql) {
+        return integerToFormulaAmount(await fetchQuerySum(config));
+      }
+      const { value, isAmount } = await fetchAqlQueryValue(
+        config.aql,
+        getQueryDateRange(config),
+      );
+      return isAmount ? integerToFormulaAmount(value) : value;
+    },
   });
 
   fetchCount += await prefetchQueryValues({
@@ -604,7 +630,10 @@ async function prefetchFormulaQueries(
     names: formulaQueryContext.queryCountNames,
     prefetch: formulaQueryContext.queryCountPrefetch,
     fallback: 0,
-    fetchValue: fetchQueryCount,
+    fetchValue: config =>
+      config.aql
+        ? fetchAqlQueryCount(config.aql, getQueryDateRange(config))
+        : fetchQueryCount(config),
   });
 
   fetchCount += await prefetchQueryValues({
@@ -612,7 +641,10 @@ async function prefetchFormulaQueries(
     names: formulaQueryContext.queryExtractCategoryNames,
     prefetch: formulaQueryContext.queryExtractCategoriesPrefetch,
     fallback: [],
-    fetchValue: extractQueryCategories,
+    fetchValue: async config => {
+      if (config.aql) throw getAqlNotSupportedError('QUERY_EXTRACT_CATEGORIES');
+      return extractQueryCategories(config);
+    },
   });
 
   fetchCount += await prefetchQueryValues({
@@ -620,7 +652,12 @@ async function prefetchFormulaQueries(
     names: formulaQueryContext.queryExtractTimeframeStartNames,
     prefetch: formulaQueryContext.queryExtractTimeframeStartPrefetch,
     fallback: monthUtils.currentMonth(),
-    fetchValue: async config => extractQueryTimeframeStart(config),
+    fetchValue: async config => {
+      if (config.aql) {
+        throw getAqlNotSupportedError('QUERY_EXTRACT_TIMEFRAME_START');
+      }
+      return extractQueryTimeframeStart(config);
+    },
   });
 
   fetchCount += await prefetchQueryValues({
@@ -628,7 +665,12 @@ async function prefetchFormulaQueries(
     names: formulaQueryContext.queryExtractTimeframeEndNames,
     prefetch: formulaQueryContext.queryExtractTimeframeEndPrefetch,
     fallback: monthUtils.currentMonth(),
-    fetchValue: async config => extractQueryTimeframeEnd(config),
+    fetchValue: async config => {
+      if (config.aql) {
+        throw getAqlNotSupportedError('QUERY_EXTRACT_TIMEFRAME_END');
+      }
+      return extractQueryTimeframeEnd(config);
+    },
   });
 
   fetchCount += await prefetchQueryValues({
@@ -678,14 +720,7 @@ async function prefetchQueryGroups(
       );
     } catch (err) {
       console.error(`Error running query "${request.queryName}":`, err);
-      addIssue({
-        severity: 'error',
-        kind: 'query-failed',
-        name: request.queryName,
-        message: t('Query "{{name}}" could not run', {
-          name: request.queryName,
-        }),
-      });
+      addIssue(getQueryFailedIssue(request.queryName, err));
     }
   }
   return fetchCount;
@@ -861,10 +896,13 @@ async function prefetchBudgetQueries(
 }
 
 // The days that the query filter includes, or null if the query has no time
-// frame
+// frame. The time frame of an AQL query applies only with a date field.
 function getQueryDateRange(config: FormulaQueryConfig): QueryDateRange | null {
   const timeFrame = config.timeFrame;
   if (!timeFrame || !timeFrame.mode) {
+    return null;
+  }
+  if (config.aql && getAqlDateField(config.aql) === null) {
     return null;
   }
 
@@ -883,6 +921,9 @@ function getQueryDateRange(config: FormulaQueryConfig): QueryDateRange | null {
 export async function buildFilteredTransactionsQuery(
   config: FormulaQueryConfig,
 ): Promise<Query> {
+  if (config.aql) {
+    return buildAqlFilterQuery(config.aql, getQueryDateRange(config));
+  }
   const conditions = config.conditions || [];
   const conditionsOp = config.conditionsOp || 'and';
   const dateRange = getQueryDateRange(config);

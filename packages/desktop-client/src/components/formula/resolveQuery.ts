@@ -1,17 +1,31 @@
-import { isSameQueryName } from '@actual-app/core/shared/formulas/queryNameUses';
+import {
+  isNamedQueryItem,
+  isSameQueryName,
+} from '@actual-app/core/shared/formulas/queryNameUses';
 import type {
   FormulaLibraryItemEntity,
-  FormulaLibraryQueryEntity,
+  FormulaLibraryNamedQueryEntity,
   FormulaTimeFrameOverride,
   RuleConditionEntity,
   TimeFrame,
 } from '@actual-app/core/types/models';
 import { t } from 'i18next';
 
+export type FormulaAqlConfig = {
+  // JSON with one key for each q() method
+  text: string;
+  // Without it, the time frame does not apply. undefined: "date" for
+  // transactions. null: no date field.
+  dateField?: string | null;
+  isCount?: boolean;
+};
+
 export type FormulaQueryConfig = {
   conditions?: RuleConditionEntity[];
   conditionsOp?: 'and' | 'or';
   timeFrame?: Partial<TimeFrame>;
+  // Set for an AQL query, in place of the conditions
+  aql?: FormulaAqlConfig;
 };
 
 export type FormulaIssue = {
@@ -86,8 +100,8 @@ export function resolveQuery(
         isSameQueryName(queryName, name),
       );
   const libraryMatches = library.filter(
-    (item): item is FormulaLibraryQueryEntity =>
-      item.type === 'query' && isSameQueryName(item.name, name),
+    (item): item is FormulaLibraryNamedQueryEntity =>
+      isNamedQueryItem(item) && isSameQueryName(item.name, name),
   );
 
   if (localName !== undefined) {
@@ -116,7 +130,7 @@ export function resolveQuery(
 
   const [libraryItem] = libraryMatches;
   if (libraryItem) {
-    const { conditions, conditionsOp, timeFrame } = libraryItem.data;
+    const { timeFrame } = libraryItem.data;
     const override = Object.hasOwn(timeFrameOverrides, libraryItem.id)
       ? timeFrameOverrides[libraryItem.id]
       : undefined;
@@ -158,8 +172,18 @@ export function resolveQuery(
         source: 'library',
         libraryId: libraryItem.id,
         config: {
-          conditions,
-          conditionsOp,
+          ...(libraryItem.type === 'aql-query'
+            ? {
+                aql: {
+                  text: libraryItem.data.aql,
+                  dateField: libraryItem.data.dateField,
+                  isCount: libraryItem.data.isCount,
+                },
+              }
+            : {
+                conditions: libraryItem.data.conditions,
+                conditionsOp: libraryItem.data.conditionsOp,
+              }),
           timeFrame: override ? override.timeFrame : timeFrame,
         },
       },
@@ -193,7 +217,7 @@ export function listQueryNames({
   }
   for (const item of library) {
     if (
-      item.type === 'query' &&
+      isNamedQueryItem(item) &&
       !Object.keys(names).some(name => isSameQueryName(name, item.name))
     ) {
       names[item.name] = 'library';
