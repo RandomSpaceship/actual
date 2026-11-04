@@ -1104,6 +1104,80 @@ export function getFormulaFunctionCatalog(): Record<
       description: t('Returns TRUE if value is logical (TRUE/FALSE).'),
       parameters: [{ name: 'value', description: t('Value') }],
     },
+    CHOOSECOLS: {
+      name: 'CHOOSECOLS',
+      category: 'other',
+      modes: ['query', 'transaction'],
+      description: t(
+        'Returns the columns of a table with the given numbers. A negative number counts from the last column.',
+      ),
+      parameters: [
+        { name: 'table', description: t('Table') },
+        { name: 'columns', description: t('One or more column numbers') },
+      ],
+    },
+    CHOOSEROWS: {
+      name: 'CHOOSEROWS',
+      category: 'other',
+      modes: ['query', 'transaction'],
+      description: t(
+        'Returns the rows of a table with the given numbers. A negative number counts from the last row.',
+      ),
+      parameters: [
+        { name: 'table', description: t('Table') },
+        { name: 'rows', description: t('One or more row numbers') },
+      ],
+    },
+    TAKE: {
+      name: 'TAKE',
+      category: 'other',
+      modes: ['query', 'transaction'],
+      description: t(
+        'Returns the first rows and columns of a table, or the last ones for a negative number.',
+      ),
+      parameters: [
+        { name: 'table', description: t('Table') },
+        { name: 'rows', description: t('Number of rows (optional)') },
+        { name: 'columns', description: t('Number of columns (optional)') },
+      ],
+    },
+    DROP: {
+      name: 'DROP',
+      category: 'other',
+      modes: ['query', 'transaction'],
+      description: t(
+        'Returns a table without its first rows and columns, or without the last ones for a negative number.',
+      ),
+      parameters: [
+        { name: 'table', description: t('Table') },
+        { name: 'rows', description: t('Number of rows to remove (optional)') },
+        {
+          name: 'columns',
+          description: t('Number of columns to remove (optional)'),
+        },
+      ],
+    },
+    FILTER: {
+      name: 'FILTER',
+      category: 'other',
+      modes: ['query', 'transaction'],
+      description: t(
+        'Returns the rows of a table where include is TRUE. A one-row include picks columns. Join conditions with * for and, and with + for or.',
+      ),
+      parameters: [
+        { name: 'table', description: t('Table') },
+        {
+          name: 'include',
+          description: t(
+            'One column of TRUE or FALSE for each row, for example CHOOSECOLS(table, 3) < 0',
+          ),
+        },
+        {
+          name: 'ifEmpty',
+          description: t('Value when no rows match (optional)'),
+        },
+      ],
+    },
     ISREF: {
       name: 'ISREF',
       category: 'other',

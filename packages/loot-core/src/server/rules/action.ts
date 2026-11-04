@@ -10,6 +10,10 @@ import {
   CustomFunctionsPlugin,
   customFunctionsTranslations,
 } from '#shared/formulas/customFunctions';
+import {
+  TableFunctionsPlugin,
+  tableFunctionsTranslations,
+} from '#shared/formulas/tableFunctions';
 import { currentDay, format, parseDate } from '#shared/months';
 import { FIELD_TYPES } from '#shared/rules';
 import { amountToInteger, integerToAmount } from '#shared/util';
@@ -22,6 +26,10 @@ if (!HyperFormula.getRegisteredLanguagesCodes().includes('enUS')) {
 HyperFormula.registerFunctionPlugin(
   CustomFunctionsPlugin,
   customFunctionsTranslations,
+);
+HyperFormula.registerFunctionPlugin(
+  TableFunctionsPlugin,
+  tableFunctionsTranslations,
 );
 
 const ACTION_OPS = [
