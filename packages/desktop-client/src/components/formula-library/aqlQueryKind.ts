@@ -25,6 +25,11 @@ export function describeAqlQuery(text: string): {
   }
 }
 
+// The function that a formula uses to read the query
+export function getAqlQueryFunctionName(text: string) {
+  return parseAqlQuery(text).query?.kind === 'table' ? 'QUERY_TABLE' : 'QUERY';
+}
+
 // A short name for the kind, for the library list
 export function getAqlQueryKindName(text: string) {
   const { query } = parseAqlQuery(text);

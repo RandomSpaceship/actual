@@ -13,6 +13,7 @@ import type {
 
 import {
   describeAqlQuery,
+  getAqlQueryFunctionName,
   getAqlQueryOneLine,
 } from '#components/formula-library/aqlQueryKind';
 import { QueryTimeFrameSummary } from '#components/formula-library/QueryTimeFrameSummary';
@@ -67,7 +68,7 @@ export function LibraryAqlQueryItem({
         }}
       >
         <Text style={{ fontWeight: 600, fontFamily: 'monospace' }}>
-          {`QUERY("${item.name}")`}
+          {`${getAqlQueryFunctionName(aql)}("${item.name}")`}
         </Text>
         <Button variant="bare" onPress={onEdit}>
           <Trans>Edit</Trans>
