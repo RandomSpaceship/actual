@@ -28,6 +28,7 @@ import { useFormat } from '#hooks/useFormat';
 import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
+import type { GraphFormat, GraphItemClickProps } from './graphItem';
 import { renderCustomLabel } from './renderCustomLabel';
 import { SeriesTooltip } from './SeriesTooltip';
 import { showActivity } from './showActivity';
@@ -67,7 +68,11 @@ type StackedBarGraphProps = {
   showOffBudget?: boolean;
   showTooltip?: boolean;
   interval?: string;
-};
+  // Shows the values in place of useFormat
+  format?: GraphFormat;
+  // false: the bars of an interval stand side by side
+  stacked?: boolean;
+} & GraphItemClickProps;
 
 export function StackedBarGraph({
   style,
@@ -81,13 +86,18 @@ export function StackedBarGraph({
   showOffBudget,
   showTooltip = true,
   interval,
+  format: formatProp,
+  stacked = true,
+  onItemClick,
+  isItemClickable,
 }: StackedBarGraphProps) {
   const animationProps = useRechartsAnimation();
   const navigate = useNavigate();
   const { data: categories = { grouped: [], list: [] } } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const privacyMode = usePrivacyMode();
-  const format = useFormat();
+  const defaultFormat = useFormat();
+  const format = formatProp ?? defaultFormat;
 
   const customLabelWithFormat = props => customLabel({ ...props, format });
 
@@ -155,29 +165,44 @@ export function StackedBarGraph({
                   tickSize={0}
                 />
               )}
-              {data.legend
-                .slice(0)
-                .reverse()
-                .map(entry => (
+              {/* A stack draws its first series at the top, so the legend
+                  order runs top to bottom. Side by side bars run left to
+                  right. */}
+              {(stacked ? data.legend.slice(0).reverse() : data.legend).map(
+                entry => (
                   <Bar
                     key={entry.dataKey}
                     dataKey={entry.dataKey}
-                    stackId="a"
+                    stackId={stacked ? 'a' : undefined}
                     fill={entry.color}
                     {...animationProps}
                     onMouseLeave={() => {
                       setPointer('');
                       setTooltip('');
                     }}
-                    onMouseEnter={() => {
+                    onMouseEnter={(_, index) => {
                       setTooltip(entry.dataKey);
-                      if (groupBy !== 'Interval') {
+                      const isClickable = onItemClick
+                        ? (isItemClickable?.({
+                            index,
+                            dataKey: entry.dataKey,
+                          }) ?? true)
+                        : groupBy !== 'Interval';
+                      if (isClickable) {
                         setPointer('pointer');
                       }
                     }}
-                    onClick={e =>
-                      ((compact && showTooltip) || !compact) &&
-                      groupBy !== 'Interval' &&
+                    onClick={(e, index) => {
+                      if (compact && !showTooltip) {
+                        return;
+                      }
+                      if (onItemClick) {
+                        onItemClick({ index, dataKey: entry.dataKey });
+                        return;
+                      }
+                      if (groupBy === 'Interval') {
+                        return;
+                      }
                       showActivity({
                         navigate,
                         categories,
@@ -195,8 +220,8 @@ export function StackedBarGraph({
                         bucketTagNames: entry.bucketTagNames,
                         scopeTagNames: data.scopeTagNames,
                         interval,
-                      })
-                    }
+                      });
+                    }}
                   >
                     {viewLabels && !compact && (
                       <LabelList
@@ -205,7 +230,8 @@ export function StackedBarGraph({
                       />
                     )}
                   </Bar>
-                ))}
+                ),
+              )}
             </BarChart>
           </div>
         )

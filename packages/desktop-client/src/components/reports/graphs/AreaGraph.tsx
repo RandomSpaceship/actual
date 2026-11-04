@@ -32,6 +32,7 @@ import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
 import { adjustTextSize } from './adjustTextSize';
+import type { GraphFormat, GraphItemClickProps } from './graphItem';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
 import { TooltipCard } from './TooltipCard';
@@ -53,6 +54,7 @@ type CustomTooltipProps = {
   payload?: PayloadItem[];
   balanceTypeOp: balanceTypeOpType;
   format: (value: unknown, type: FormatType) => string;
+  seriesName?: string;
 };
 
 const CustomTooltip = ({
@@ -60,8 +62,24 @@ const CustomTooltip = ({
   payload,
   balanceTypeOp,
   format,
+  seriesName,
 }: CustomTooltipProps) => {
   const { t } = useTranslation();
+
+  if (active && payload && payload.length && seriesName !== undefined) {
+    return (
+      <TooltipCard title={payload[0].payload.date}>
+        <AlignedText
+          left={seriesName}
+          right={
+            <FinancialText>
+              {format(payload[0].payload[balanceTypeOp], 'financial')}
+            </FinancialText>
+          }
+        />
+      </TooltipCard>
+    );
+  }
 
   if (active && payload && payload.length) {
     return (
@@ -171,6 +189,15 @@ function hasIntervalPayload(
   return value !== null && typeof value === 'object' && 'payload' in value;
 }
 
+function getDotIndex(dot: unknown) {
+  return typeof dot === 'object' &&
+    dot !== null &&
+    'index' in dot &&
+    typeof dot.index === 'number'
+    ? dot.index
+    : null;
+}
+
 type AreaGraphProps = {
   style?: CSSProperties;
   data: DataEntity;
@@ -181,7 +208,12 @@ type AreaGraphProps = {
   showHiddenCategories?: boolean;
   showOffBudget?: boolean;
   showTooltip?: boolean;
-};
+  // Shows the values in place of useFormat
+  format?: GraphFormat;
+  // The tooltip shows the value under this name, in place of the assets,
+  // debts and net of the interval
+  seriesName?: string;
+} & GraphItemClickProps;
 
 export function AreaGraph({
   style,
@@ -193,8 +225,13 @@ export function AreaGraph({
   showHiddenCategories = false,
   showOffBudget = false,
   showTooltip = true,
+  format: formatProp,
+  seriesName,
+  onItemClick,
+  isItemClickable,
 }: AreaGraphProps) {
-  const format = useFormat();
+  const defaultFormat = useFormat();
+  const format = formatProp ?? defaultFormat;
   const navigate = useNavigate();
   const { data: categories = { grouped: [], list: [] } } = useCategories();
   const { data: accounts = [] } = useAccounts();
@@ -295,6 +332,7 @@ export function AreaGraph({
                     <CustomTooltip
                       balanceTypeOp={balanceTypeOp}
                       format={format}
+                      seriesName={seriesName}
                     />
                   }
                   isAnimationActive={false}
@@ -344,9 +382,27 @@ export function AreaGraph({
                 dot={false}
                 activeDot={{
                   r: pointer && !compact ? 8 : 3,
-                  onMouseEnter: () => setPointer('pointer'),
+                  onMouseEnter: (_, dot: unknown) => {
+                    const index = getDotIndex(dot);
+                    if (
+                      !onItemClick ||
+                      (index !== null && (isItemClickable?.({ index }) ?? true))
+                    ) {
+                      setPointer('pointer');
+                    }
+                  },
                   onMouseLeave: () => setPointer(''),
                   onClick: (_, dot: unknown) => {
+                    if (onItemClick) {
+                      const index = getDotIndex(dot);
+                      if (
+                        index !== null &&
+                        ((compact && showTooltip) || !compact)
+                      ) {
+                        onItemClick({ index });
+                      }
+                      return;
+                    }
                     const intervalItem = hasIntervalPayload(dot)
                       ? dot.payload
                       : undefined;

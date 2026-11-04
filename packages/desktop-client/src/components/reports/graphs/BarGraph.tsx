@@ -38,6 +38,7 @@ import { useNavigate } from '#hooks/useNavigate';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
 
 import { adjustTextSize } from './adjustTextSize';
+import type { GraphFormat, GraphItemClickProps } from './graphItem';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
 import { TooltipCard } from './TooltipCard';
@@ -70,6 +71,7 @@ type CustomTooltipProps = {
   balanceTypeOp?: balanceTypeOpType;
   yAxis?: string;
   format: (value: unknown, type: FormatType) => string;
+  seriesName?: string;
 };
 
 const CustomTooltip = ({
@@ -78,8 +80,24 @@ const CustomTooltip = ({
   balanceTypeOp,
   yAxis,
   format,
+  seriesName,
 }: CustomTooltipProps) => {
   const { t } = useTranslation();
+
+  if (active && payload && payload.length && seriesName !== undefined) {
+    return (
+      <TooltipCard title={payload[0].payload[yAxis]}>
+        <AlignedText
+          left={seriesName}
+          right={
+            <FinancialText>
+              {format(payload[0].payload[balanceTypeOp], 'financial')}
+            </FinancialText>
+          }
+        />
+      </TooltipCard>
+    );
+  }
 
   if (active && payload && payload.length) {
     return (
@@ -199,7 +217,12 @@ type BarGraphProps = {
   showHiddenCategories?: boolean;
   showOffBudget?: boolean;
   showTooltip?: boolean;
-};
+  // Shows the values in place of useFormat
+  format?: GraphFormat;
+  // The tooltip shows the value under this name, in place of the assets,
+  // debts and net of the item
+  seriesName?: string;
+} & GraphItemClickProps;
 
 export function BarGraph({
   style,
@@ -212,13 +235,18 @@ export function BarGraph({
   showHiddenCategories,
   showOffBudget,
   showTooltip = true,
+  format: formatProp,
+  seriesName,
+  onItemClick,
+  isItemClickable,
 }: BarGraphProps) {
   const animationProps = useRechartsAnimation();
   const navigate = useNavigate();
   const { data: categories = { grouped: [], list: [] } } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const privacyMode = usePrivacyMode();
-  const format = useFormat();
+  const defaultFormat = useFormat();
+  const format = formatProp ?? defaultFormat;
 
   const [pointer, setPointer] = useState('');
 
@@ -277,6 +305,7 @@ export function BarGraph({
                       balanceTypeOp={balanceTypeOp}
                       yAxis={yAxis}
                       format={format}
+                      seriesName={seriesName}
                     />
                   }
                   formatter={numberFormatterTooltip}
@@ -312,9 +341,17 @@ export function BarGraph({
                 stackId="a"
                 {...animationProps}
                 onMouseLeave={() => setPointer('')}
-                onMouseEnter={() => setPointer('pointer')}
-                onClick={item => {
+                onMouseEnter={(_, index) => {
+                  if (!onItemClick || (isItemClickable?.({ index }) ?? true)) {
+                    setPointer('pointer');
+                  }
+                }}
+                onClick={(item, index) => {
                   if (compact && !showTooltip) {
+                    return;
+                  }
+                  if (onItemClick) {
+                    onItemClick({ index });
                     return;
                   }
 

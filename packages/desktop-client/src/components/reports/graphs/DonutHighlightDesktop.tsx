@@ -27,8 +27,10 @@ export function DonutHighlightDesktop({
   value,
   expandInward,
   chartInnerRadius,
+  format: formatProp,
 }: DonutHighlightProps) {
-  const format = useFormat();
+  const defaultFormat = useFormat();
+  const format = formatProp ?? defaultFormat;
   // Fix 2: guard against undefined payload.name  and payload.date
   const yAxis = payload.name ?? payload.date ?? '';
   const sin = Math.sin(-RADIAN * midAngle);

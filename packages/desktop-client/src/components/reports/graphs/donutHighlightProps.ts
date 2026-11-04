@@ -1,3 +1,5 @@
+import type { GraphFormat } from './graphItem';
+
 /**
  * What Recharts passes a donut's selected sector, and how to draw its highlight.
  */
@@ -17,4 +19,6 @@ export type DonutHighlightProps = {
   chartInnerRadius: number;
   chartMidRadius: number;
   chartOuterRadius: number;
+  // Shows the value in place of useFormat
+  format?: GraphFormat;
 };

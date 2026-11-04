@@ -30,6 +30,7 @@ import { DonutHighlightDesktop } from './DonutHighlightDesktop';
 import { DonutHighlightMobile } from './DonutHighlightMobile';
 import type { DonutHighlightProps } from './donutHighlightProps';
 import { DonutSector } from './DonutSector';
+import type { GraphFormat, GraphItem, GraphItemClickProps } from './graphItem';
 import { renderCustomLabel } from './renderCustomLabel';
 import { showActivity } from './showActivity';
 
@@ -109,7 +110,9 @@ type DonutGraphProps = {
   showHiddenCategories?: boolean;
   showOffBudget?: boolean;
   showTooltip?: boolean;
-};
+  // Shows the values in place of useFormat
+  format?: GraphFormat;
+} & GraphItemClickProps;
 
 export function DonutGraph({
   style,
@@ -121,6 +124,9 @@ export function DonutGraph({
   showHiddenCategories,
   showOffBudget,
   showTooltip = true,
+  format,
+  onItemClick,
+  isItemClickable,
 }: DonutGraphProps) {
   const animationProps = useRechartsAnimation({ animationDuration: 500 });
 
@@ -187,6 +193,17 @@ export function DonutGraph({
       new MouseEvent('mouseover', { bubbles: true }),
     );
     return false;
+  };
+
+  // With onItemClick, a click opens the item in place of showActivity
+  const openItem = (item: GraphItem) => {
+    if (!onItemClick) {
+      return false;
+    }
+    if (isItemClickable?.(item) ?? true) {
+      onItemClick(item);
+    }
+    return true;
   };
 
   const isCategoryGroup =
@@ -262,6 +279,7 @@ export function DonutGraph({
               chartInnerRadius={chartInnerRadius}
               chartMidRadius={chartMidRadius}
               chartOuterRadius={chartOuterRadius}
+              format={format}
             />
           );
         };
@@ -320,7 +338,8 @@ export function DonutGraph({
                           event,
                           showHighlight,
                         ) &&
-                        ((compact && showTooltip) || !compact)
+                        ((compact && showTooltip) || !compact) &&
+                        !openItem({ index, ring: 'group' })
                       ) {
                         showActivity({
                           navigate,
@@ -379,7 +398,8 @@ export function DonutGraph({
                           event,
                           showHighlight,
                         ) &&
-                        ((compact && showTooltip) || !compact)
+                        ((compact && showTooltip) || !compact) &&
+                        !openItem({ index, ring: 'item' })
                       ) {
                         showActivity({
                           navigate,
@@ -450,7 +470,8 @@ export function DonutGraph({
                   onClick={(item: ClickablePieItem, index, event) => {
                     if (
                       isOpeningClick(`slice-${index}`, event, showHighlight) &&
-                      ((compact && showTooltip) || !compact)
+                      ((compact && showTooltip) || !compact) &&
+                      !openItem({ index })
                     ) {
                       // Interval slices drill down by their own date range instead of a field
                       const drilldown =
