@@ -136,6 +136,7 @@ async function getDimensionKeys(
 // 1. A cell without transactions is 0. asc and desc sort the rows by the row
 // total. The columns stay in budget order (or name order).
 function getWideRows(
+  rowDimension: QueryGroupDimension,
   [rowKeys, columnKeys]: DimensionKeys[],
   values: Map<string, number>,
   sort: QueryGroupRequest['sort'],
@@ -153,10 +154,30 @@ function getWideRows(
     rows.sort((a, b) => direction * (a.total - b.total));
   }
   const headerRow = [
-    '',
+    getDimensionTitle(rowDimension),
     ...columnKeys.order.map(key => columnKeys.names.get(key) ?? key),
   ];
   return [headerRow, ...rows.map(row => [row.name, ...row.cells])];
+}
+
+// The title of the row-name column in a wide table
+function getDimensionTitle(dimension: QueryGroupDimension): string {
+  switch (dimension) {
+    case 'category':
+      return t('Category');
+    case 'category_group':
+      return t('Category group');
+    case 'payee':
+      return t('Payee');
+    case 'account':
+      return t('Account');
+    case 'month':
+      return t('Month');
+    case 'year':
+      return t('Year');
+    default:
+      return dimension;
+  }
 }
 
 // The rows for a QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or
@@ -211,7 +232,7 @@ export async function fetchQueryGroupRows({
   }
 
   if (request.shape === 'wide') {
-    return getWideRows(dimensionKeys, values, sort);
+    return getWideRows(dimensions[0], dimensionKeys, values, sort);
   }
 
   // With a period dimension, each combination gets a row. Without one, only

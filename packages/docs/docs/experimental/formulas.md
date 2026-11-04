@@ -297,9 +297,9 @@ This example gives the spending of each category, with one column for each month
 =QUERY_PIVOT("expenses", "category", "month")
 ```
 
-The first row has the names of the columns, for example the months. The first cell of this row is empty. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
+The first row has the names of the columns, for example the months. The first cell of this row has the name of the first dimension, for example `Category`. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
-The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. To give the first column a name, type it under **Columns**.
+The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. To give a column a different name, type it under **Columns**.
 
 With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", "month"), 2, 2)` gives the amount of the first category in the first month.
 

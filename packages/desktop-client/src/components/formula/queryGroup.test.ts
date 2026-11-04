@@ -197,11 +197,11 @@ describe('QUERY_GROUP', () => {
 });
 
 describe('QUERY_PIVOT', () => {
-  it('gives a header row and a column for each month', async () => {
+  it('gives a header row with the dimension names and a column for each month', async () => {
     expect(
       (await run('=QUERY_PIVOT("firstQuarter", "category", "month")')).table,
     ).toEqual([
-      ['', '2024-01', '2024-02', '2024-03'],
+      ['Category', '2024-01', '2024-02', '2024-03'],
       ['Power', -10, 0, 0],
       ['Groceries', 0, -30, 0],
     ]);
@@ -212,7 +212,7 @@ describe('QUERY_PIVOT', () => {
       (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "desc")'))
         .table,
     ).toEqual([
-      ['', '2024-01', '2024-02', '2024-03'],
+      ['Category', '2024-01', '2024-02', '2024-03'],
       ['Power', -10, 0, 0],
       ['Groceries', 0, -30, 0],
     ]);
@@ -220,7 +220,7 @@ describe('QUERY_PIVOT', () => {
       (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "asc")'))
         .table,
     ).toEqual([
-      ['', '2024-01', '2024-02', '2024-03'],
+      ['Category', '2024-01', '2024-02', '2024-03'],
       ['Groceries', 0, -30, 0],
       ['Power', -10, 0, 0],
     ]);
@@ -231,7 +231,7 @@ describe('QUERY_PIVOT', () => {
       (await run('=QUERY_PIVOT_COUNT("firstQuarter", "category", "month")'))
         .table,
     ).toEqual([
-      ['', '2024-01', '2024-02', '2024-03'],
+      ['Category', '2024-01', '2024-02', '2024-03'],
       ['Power', 1, 0, 0],
       ['Groceries', 0, 3, 0],
     ]);
