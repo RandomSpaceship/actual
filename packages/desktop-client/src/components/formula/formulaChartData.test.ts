@@ -38,7 +38,10 @@ describe('getFormulaChartData', () => {
       // An error cell and text give a gap
       { label: 'Fun', value0: null, value1: null },
     ]);
-    expect(chart.warnings).toEqual([]);
+    // The percent column shows in the money format of the first column
+    expect(chart.warnings).toEqual([
+      { kind: 'mixed-types', columnIndex: 2, firstColumnIndex: 1 },
+    ]);
   });
 
   it('takes the names from the header row and skips it', () => {

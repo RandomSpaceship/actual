@@ -67,7 +67,10 @@ export type FormulaChartWarning =
   | { kind: 'many-series'; count: number }
   // A donut shows the size of each value, so a negative value and a positive
   // value look the same
-  | { kind: 'donut-mixed-signs'; columnIndex: number };
+  | { kind: 'donut-mixed-signs'; columnIndex: number }
+  // All values show in the format of the first value column, and this
+  // value column has a different type
+  | { kind: 'mixed-types'; columnIndex: number; firstColumnIndex: number };
 
 export type FormulaChartData = {
   type: FormulaChartType;
@@ -176,6 +179,16 @@ export function getFormulaChartData(
   }
   if (valueColumns.length === 0) {
     warnings.push({ kind: 'no-values' });
+  }
+  const otherTypeColumn = valueColumns.find(
+    columnIndex => columnTypes[columnIndex] !== columnTypes[valueColumns[0]],
+  );
+  if (otherTypeColumn !== undefined) {
+    warnings.push({
+      kind: 'mixed-types',
+      columnIndex: otherTypeColumn,
+      firstColumnIndex: valueColumns[0],
+    });
   }
 
   function getRowLabel(row: FormulaTableCell[], rowIndex: number) {
@@ -478,6 +491,19 @@ export function getFormulaChartIssues(
           message: t(
             'Column {{columnNumber}} has positive and negative values. A donut shows the size of each value, so the signs do not show.',
             { columnNumber: warning.columnIndex + 1 },
+          ),
+        };
+      case 'mixed-types':
+        return {
+          severity: 'warning',
+          kind: 'chart',
+          name: String(warning.columnIndex + 1),
+          message: t(
+            'Column {{columnNumber}} has a different type from column {{firstColumnNumber}}. The chart shows all values in the format of column {{firstColumnNumber}}.',
+            {
+              columnNumber: warning.columnIndex + 1,
+              firstColumnNumber: warning.firstColumnIndex + 1,
+            },
           ),
         };
       default:

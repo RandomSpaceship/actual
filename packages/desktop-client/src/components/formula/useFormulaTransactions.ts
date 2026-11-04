@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 
 import { useNavigate } from '#hooks/useNavigate';
@@ -10,12 +9,14 @@ import {
 } from './formulaSourceMap';
 import type { FormulaSourceMap, TransactionsFilter } from './formulaSourceMap';
 
+// The items of the report graphs: bars, slices and the dot under the pointer
+const graphItemSelector =
+  '.recharts-bar-rectangle, .recharts-pie-sector, .recharts-active-dot';
+
 // Opens the transactions of the table cells that a chart item or a table cell
 // shows, as the custom report graphs do. Without a source map, nothing opens.
 export function useFormulaTransactions(sourceMap: FormulaSourceMap | null) {
   const navigate = useNavigate();
-  const [isOverItem, setIsOverItem] = useState(false);
-  const isOverItemRef = useRef(false);
 
   function getFilter(
     cells: FormulaTableCellPosition[] | undefined,
@@ -26,29 +27,28 @@ export function useFormulaTransactions(sourceMap: FormulaSourceMap | null) {
 
   function openFilter(filter: TransactionsFilter | null) {
     if (!filter) return;
-    isOverItemRef.current = false;
-    setIsOverItem(false);
     void navigate('/accounts', {
       state: { goBack: true, filterConditions: toFilterConditions(filter) },
     });
   }
 
   return {
-    // The pointer is over an item that opens transactions
-    isOverItem,
-    hoverCells: (cells: FormulaTableCellPosition[] | undefined) => {
-      const isClickable = getFilter(cells) !== null;
-      isOverItemRef.current = isClickable;
-      setIsOverItem(isClickable);
-    },
+    isClickable: (cells: FormulaTableCellPosition[] | undefined) =>
+      getFilter(cells) !== null,
     openCells: (cells: FormulaTableCellPosition[] | undefined) => {
       openFilter(getFilter(cells));
     },
     openFilter,
-    // A dashboard card is a button that opens the card editor. A press on an
-    // item opens its transactions, not the editor.
+    // A dashboard card is a button that opens the card editor. A press on a
+    // graph item opens its transactions, not the editor.
     onPointerDown: (event: PointerEvent) => {
-      if (isOverItemRef.current) event.stopPropagation();
+      if (
+        sourceMap &&
+        event.target instanceof Element &&
+        event.target.closest(graphItemSelector)
+      ) {
+        event.stopPropagation();
+      }
     },
   };
 }
