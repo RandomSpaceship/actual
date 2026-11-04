@@ -15,6 +15,7 @@ import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
 import { renameProviderInFormula } from '@actual-app/core/shared/formulas/providerNameUses';
 import type {
+  FormulaChartSettings,
   FormulaLibraryItemEntity,
   FormulaTableColumn,
   FormulaTableColumnType,
@@ -28,7 +29,16 @@ import { useQuery } from '@tanstack/react-query';
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import { ColorFormulaResult } from '#components/formula/ColorFormulaResult';
 import { maxShownTableColumns } from '#components/formula/executeFormula';
-import { isFormulaValueFormattable } from '#components/formula/formatFormulaValue';
+import {
+  isFormulaValueFormattable,
+  useFormulaValueFormatter,
+} from '#components/formula/formatFormulaValue';
+import { FormulaChart } from '#components/formula/FormulaChart';
+import {
+  getFormulaChartData,
+  getFormulaChartIssues,
+} from '#components/formula/formulaChartData';
+import { FormulaChartSettingsForm } from '#components/formula/FormulaChartSettingsForm';
 import {
   FormulaTable,
   getFormulaTableColumnNames,
@@ -126,8 +136,11 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   >(widget?.meta?.valueFormat ?? 'auto');
   const colorPresetTriggerRef = useRef<HTMLButtonElement>(null);
   const [isColorPresetMenuOpen, setIsColorPresetMenuOpen] = useState(false);
-  const [view, setView] = useState<'auto' | 'number' | 'table'>(
+  const [view, setView] = useState<'auto' | 'number' | 'table' | 'chart'>(
     widget?.meta?.view ?? 'auto',
+  );
+  const [chartSettings, setChartSettings] = useState<FormulaChartSettings>(
+    widget?.meta?.chart ?? {},
   );
   const [tableColumns, setTableColumns] = useState<FormulaTableColumn[]>(
     widget?.meta?.tableColumns ?? [],
@@ -190,7 +203,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     undefined,
     simpleAccounts,
     ranInputs.timeFrameOverrides,
-    view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
+    view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
     ranInputs.cardProviders,
   );
   const isManualRun = issues.some(
@@ -202,6 +215,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     runFormula();
   }
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
+  const isChartView = view === 'chart';
   const isHeaderRowShown = isFormulaTableHeaderRowShown(
     table ?? [],
     tableHeader,
@@ -216,38 +230,57 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     date: t('Date'),
     text: t('Text'),
   };
-  const formatIssues: FormulaIssue[] = isTableView
-    ? getFormulaTableUnformattableColumns(
-        table ?? [],
-        tableColumns,
-        isHeaderRowShown,
-      ).map(columnIndex => {
-        const format = formatNames[tableColumns[columnIndex]?.type ?? 'text'];
-        return {
-          severity: 'warning',
-          kind: 'unformattable',
-          name: String(columnIndex + 1),
-          message: t(
-            'The {{format}} format cannot show some values in column {{columnNumber}}. They show as the formula gives them.',
-            { columnNumber: columnIndex + 1, format },
-          ),
-        };
-      })
-    : valueFormat !== 'auto' &&
-        !error &&
-        !isFormulaValueFormattable(result, valueFormat)
-      ? [
-          {
+  const formatIssues: FormulaIssue[] =
+    isTableView || isChartView
+      ? getFormulaTableUnformattableColumns(
+          table ?? [],
+          tableColumns,
+          isHeaderRowShown,
+        ).map(columnIndex => {
+          const format = formatNames[tableColumns[columnIndex]?.type ?? 'text'];
+          return {
             severity: 'warning',
             kind: 'unformattable',
-            name: '',
+            name: String(columnIndex + 1),
             message: t(
-              'The {{format}} format cannot show this result, so it shows as the formula gives it.',
-              { format: formatNames[valueFormat] },
+              'The {{format}} format cannot show some values in column {{columnNumber}}. They show as the formula gives them.',
+              { columnNumber: columnIndex + 1, format },
             ),
-          },
-        ]
+          };
+        })
+      : valueFormat !== 'auto' &&
+          !error &&
+          !isFormulaValueFormattable(result, valueFormat)
+        ? [
+            {
+              severity: 'warning',
+              kind: 'unformattable',
+              name: '',
+              message: t(
+                'The {{format}} format cannot show this result, so it shows as the formula gives it.',
+                { format: formatNames[valueFormat] },
+              ),
+            },
+          ]
+        : [];
+
+  const formatFormulaValue = useFormulaValueFormatter();
+  const chart = getFormulaChartData(
+    table ?? [],
+    tableColumns,
+    isHeaderRowShown,
+    chartSettings,
+    formatFormulaValue,
+  );
+  const chartIssues =
+    isChartView && table && !error
+      ? getFormulaChartIssues(chart.warnings, t)
       : [];
+  const columnNames = getFormulaTableColumnNames(
+    table ?? [],
+    tableColumns,
+    isHeaderRowShown,
+  ).slice(0, maxShownTableColumns);
 
   const colorVariables = useMemo(
     () => ({
@@ -284,8 +317,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     error: colorError,
     issues: colorIssues,
   } = useFormulaExecution(
-    // The table view has no colour
-    isTableView ? '' : ranInputs.colorFormula,
+    // The table and chart views have no colour
+    isTableView || isChartView ? '' : ranInputs.colorFormula,
     ranInputs.queries,
     undefined,
     colorVariables,
@@ -361,6 +394,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           tableColumns,
           tableHeader,
           tableTotals,
+          chart: chartSettings,
         },
       },
     });
@@ -400,6 +434,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             tableColumns,
             tableHeader,
             tableTotals,
+            chart: chartSettings,
           },
         },
       },
@@ -528,7 +563,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               </div>
               <Select
                 value={view}
-                onChange={(value: 'auto' | 'number' | 'table') =>
+                onChange={(value: 'auto' | 'number' | 'table' | 'chart') =>
                   setView(value)
                 }
                 options={[
@@ -540,6 +575,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   ],
                   ['number', t('One value')],
                   ['table', t('Table')],
+                  ['chart', t('Chart')],
                 ]}
               />
             </View>
@@ -597,7 +633,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             </View>
             <View
               style={{
-                height: isTableView ? 240 : 120,
+                height: isChartView ? 300 : isTableView ? 240 : 120,
                 width: '100%',
                 overflow: 'auto',
                 backgroundColor: theme.cardBackground,
@@ -608,7 +644,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 },
               }}
             >
-              {isTableView && table && !error ? (
+              {isChartView && table && !error ? (
+                <FormulaChart chart={chart} style={{ padding: 10 }} />
+              ) : isTableView && table && !error ? (
                 <FormulaTable
                   table={table}
                   columns={tableColumns}
@@ -629,7 +667,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               )}
             </View>
             <FormulaWarnings
-              issues={[...issues, ...colorIssues, ...formatIssues]}
+              issues={[
+                ...issues,
+                ...colorIssues,
+                ...formatIssues,
+                ...chartIssues,
+              ]}
             />
           </View>
           <View
@@ -670,7 +713,32 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               />
             </Suspense>
           </View>
-          {isTableView ? (
+          {isChartView ? (
+            <View
+              style={{ padding: '0 20px 20px 20px', flexShrink: 0, gap: 20 }}
+            >
+              <FormulaChartSettingsForm
+                settings={chartSettings}
+                onChange={setChartSettings}
+                chart={chart}
+                columnNames={columnNames}
+              />
+              <FormulaTableColumnSettings
+                columnCount={columnNames.length}
+                columns={tableColumns}
+                onChange={setTableColumns}
+                header={tableHeader}
+                onHeaderChange={setTableHeader}
+                isHeaderRowShown={isHeaderRowShown}
+                isHeaderRowFound={isHeaderRowFound}
+                headerRowNames={getFormulaTableColumnNames(
+                  table ?? [],
+                  [],
+                  true,
+                )}
+              />
+            </View>
+          ) : isTableView ? (
             <View style={{ padding: '0 20px 20px 20px', flexShrink: 0 }}>
               <FormulaTableColumnSettings
                 columnCount={Math.min(

@@ -30,6 +30,8 @@ export type FormulaIssue = {
     | 'unformattable'
     // The table shows only part of the result
     | 'table-cut'
+    // The chart cannot show the table as the settings say
+    | 'chart'
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';

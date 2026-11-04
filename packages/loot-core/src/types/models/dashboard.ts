@@ -476,7 +476,7 @@ export type FormulaWidget = AbstractWidget<
     valueFormat?: 'auto' | FormulaTableColumnType;
     // 'auto' (the default) shows a table for a formula that gives a table,
     // and one value for other formulas
-    view?: 'auto' | 'number' | 'table';
+    view?: 'auto' | 'number' | 'table' | 'chart';
     // Settings for each table column, by position
     tableColumns?: FormulaTableColumn[];
     // 'first-row' uses the first row of the table as the header row. 'auto'
@@ -484,6 +484,9 @@ export type FormulaWidget = AbstractWidget<
     tableHeader?: FormulaTableHeader;
     // A totals row, a totals column or both. 'none' is the default.
     tableTotals?: FormulaTableTotals;
+    // The chart view. It uses the column names, types and header row of the
+    // table view.
+    chart?: FormulaChartSettings;
     queriesVersion?: number;
     queries?: Record<
       string,
@@ -522,6 +525,20 @@ export type FormulaTableTotals = 'none' | 'row' | 'column' | 'both';
 export type FormulaTableColumn = {
   name?: string;
   type?: FormulaTableColumnType;
+};
+
+export type FormulaChartType = 'bar' | 'line' | 'area' | 'donut';
+export type FormulaChartSettings = {
+  // 'bar' is the default
+  type?: FormulaChartType;
+  // The column of the labels, by position. -1 uses the row numbers. Without
+  // it, the first text or date column, or the row numbers.
+  labelColumn?: number;
+  // The columns of the values, by position. Without it, each money, percent
+  // or number column that is not the label column.
+  valueColumns?: number[];
+  // Shows each value with the opposite sign, for example spending
+  flipSign?: boolean;
 };
 
 export type SankeyWidget = AbstractWidget<

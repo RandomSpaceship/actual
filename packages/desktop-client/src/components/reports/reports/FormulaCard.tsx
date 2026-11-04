@@ -7,6 +7,12 @@ import type {
   FormulaWidget,
 } from '@actual-app/core/types/models';
 
+import { useFormulaValueFormatter } from '#components/formula/formatFormulaValue';
+import { FormulaChart } from '#components/formula/FormulaChart';
+import {
+  getFormulaChartData,
+  getFormulaChartIssues,
+} from '#components/formula/formulaChartData';
 import {
   FormulaTable,
   isFormulaTableHeaderRowShown,
@@ -41,6 +47,7 @@ export function FormulaCard({
   const { t } = useTranslation();
   const [nameMenuOpen, setNameMenuOpen] = useState(false);
   const themeColors = useThemeColors();
+  const formatFormulaValue = useFormulaValueFormatter();
   // Not `const { data: accounts = [] }` — a default inside a destructuring
   // pattern makes React Compiler bail out of the whole component, which leaves
   // the objects handed to `useFormulaExecution` unmemoized.
@@ -67,12 +74,33 @@ export function FormulaCard({
     undefined,
     simpleAccounts,
     meta?.timeFrameOverrides,
-    view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
+    view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
     meta?.providers,
   );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
-  // The table view has no colour
-  const colorFormula = isTableView ? '' : meta?.colorFormula || '';
+  const isChartView = view === 'chart';
+  // The table and chart views have no colour
+  const colorFormula =
+    isTableView || isChartView ? '' : meta?.colorFormula || '';
+  const isHeaderRowShown = isFormulaTableHeaderRowShown(
+    table ?? [],
+    meta?.tableHeader,
+  );
+  const chart = getFormulaChartData(
+    table ?? [],
+    meta?.tableColumns ?? [],
+    isHeaderRowShown,
+    meta?.chart ?? {},
+    formatFormulaValue,
+  );
+  // The other chart warnings are for the editor
+  const chartIssues =
+    isChartView && table && !error
+      ? getFormulaChartIssues(
+          chart.warnings.filter(warning => warning.kind === 'no-values'),
+          t,
+        )
+      : [];
 
   const colorVariables = useMemo(
     () => ({
@@ -121,7 +149,7 @@ export function FormulaCard({
               flexGrow: 0,
               flexShrink: 0,
               // A table has the title padding of the custom report card
-              padding: isTableView ? '10px 10px 5px' : 20,
+              padding: isTableView || isChartView ? '10px 10px 5px' : 20,
             }}
           >
             <ReportCardName
@@ -138,11 +166,17 @@ export function FormulaCard({
             />
           </View>
         )}
-        {isTableView && table && !error ? (
+        {isChartView && table && !error ? (
+          <FormulaChart
+            chart={chart}
+            compact
+            style={{ padding: showTitle ? '0 10px 10px' : 10 }}
+          />
+        ) : isTableView && table && !error ? (
           <FormulaTable
             table={table}
             columns={meta?.tableColumns}
-            headerRow={isFormulaTableHeaderRowShown(table, meta?.tableHeader)}
+            headerRow={isHeaderRowShown}
             totals={meta?.tableTotals}
             compact
             style={{
@@ -176,7 +210,7 @@ export function FormulaCard({
         {/* The size warning is for the editor, because a card can show a
             big table on purpose */}
         <FormulaWarnings
-          issues={[...issues, ...colorIssues].filter(
+          issues={[...issues, ...colorIssues, ...chartIssues].filter(
             issue => issue.kind !== 'large-table',
           )}
         />

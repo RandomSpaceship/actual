@@ -57,6 +57,7 @@
     "#components/formula/queryTimeFrame": "./src/components/formula/queryTimeFrame.ts",
     "#components/formula/executeFormula": "./src/components/formula/executeFormula.ts",
     "#components/formula/formatFormulaValue": "./src/components/formula/formatFormulaValue.ts",
+    "#components/formula/formulaChartData": "./src/components/formula/formulaChartData.ts",
     "#components/formula/resolveQuery": "./src/components/formula/resolveQuery.ts",
     "#components/formula/resolveProviders": "./src/components/formula/resolveProviders.ts",
     "#components/mobile/utils": "./src/components/mobile/utils.ts",

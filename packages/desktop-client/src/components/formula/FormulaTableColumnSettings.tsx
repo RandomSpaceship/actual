@@ -21,8 +21,9 @@ type FormulaTableColumnSettingsProps = {
   isHeaderRowShown: boolean;
   // The 'auto' setting finds a header row in the first row
   isHeaderRowFound: boolean;
-  totals: FormulaTableTotals;
-  onTotalsChange: (totals: FormulaTableTotals) => void;
+  // Without these, the totals setting does not show. A chart has no totals.
+  totals?: FormulaTableTotals;
+  onTotalsChange?: (totals: FormulaTableTotals) => void;
   // The names in the first row, for the placeholders
   headerRowNames: string[];
 };
@@ -92,19 +93,23 @@ export function FormulaTableColumnSettings({
             ['none', t('Column names only')],
           ]}
         />
-        <View style={{ ...labelStyle, marginLeft: 10 }}>
-          <Trans>Totals:</Trans>
-        </View>
-        <Select
-          value={totals}
-          onChange={(value: FormulaTableTotals) => onTotalsChange(value)}
-          options={[
-            ['none', t('None')],
-            ['row', t('Totals row')],
-            ['column', t('Totals column')],
-            ['both', t('Row and column')],
-          ]}
-        />
+        {totals && onTotalsChange && (
+          <>
+            <View style={{ ...labelStyle, marginLeft: 10 }}>
+              <Trans>Totals:</Trans>
+            </View>
+            <Select
+              value={totals}
+              onChange={(value: FormulaTableTotals) => onTotalsChange(value)}
+              options={[
+                ['none', t('None')],
+                ['row', t('Totals row')],
+                ['column', t('Totals column')],
+                ['both', t('Row and column')],
+              ]}
+            />
+          </>
+        )}
       </View>
       <View style={labelStyle}>
         <Trans>Columns:</Trans>

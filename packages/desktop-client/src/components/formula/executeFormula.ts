@@ -46,7 +46,7 @@ import { fetchQueryGroupRows } from './queryGroup';
 
 bootstrapHyperFormula();
 
-type FormulaCellValue = number | string | boolean | null;
+export type FormulaCellValue = number | string | boolean | null;
 
 // A cell of a table result. An error cell gives the error text, for example
 // #DIV/0!
