@@ -155,7 +155,7 @@ describe('getFormulaChartData', () => {
   });
 
   describe('long table', () => {
-    // As QUERY_GROUP("q", "month", "category") gives
+    // As QUERY_GROUP("q", "month", , "category") gives
     const monthsByCategory: FormulaTable = [
       ['2024-01', 'Food', -100],
       ['2024-01', 'Rent', -900],
@@ -262,7 +262,7 @@ describe('getFormulaChartData', () => {
     });
 
     it('gives a donut two rings that agree', () => {
-      // As QUERY_GROUP("q", "category group", "category") gives
+      // As QUERY_GROUP("q", "category group", , "category") gives
       const chart = getFormulaChartData(
         [
           ['Bills', 'Rent', -900],

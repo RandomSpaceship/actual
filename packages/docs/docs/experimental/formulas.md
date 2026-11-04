@@ -148,10 +148,10 @@ If a function isn’t listed here, it still might work. Actual uses HyperFormula
 | `QUERY_EXTRACT_CATEGORIES`      | Query        | Determines which categories to include based on a named query's category filters; used as the `categories` argument in `BUDGET_QUERY`.                                                                                                 | `=QUERY_EXTRACT_CATEGORIES("expenses")`                                                                                       | —                                                                                                               |
 | `QUERY_EXTRACT_TIMEFRAME_END`   | Query        | Extracts the end month from a named query's date range; used as the `endMonth` argument in `BUDGET_QUERY`.                                                                                                                             | `=QUERY_EXTRACT_TIMEFRAME_END("expenses")`                                                                                    | —                                                                                                               |
 | `QUERY_EXTRACT_TIMEFRAME_START` | Query        | Extracts the start month from a named query's date range; used as the `startMonth` argument in `BUDGET_QUERY`.                                                                                                                         | `=QUERY_EXTRACT_TIMEFRAME_START("expenses")`                                                                                  | —                                                                                                               |
-| `QUERY_GROUP`                   | Query        | Returns a table with one row for each group of transactions in a named query, with the total amount of each group. See [Group Transactions With `QUERY_GROUP`](#group-transactions-with-query_group).                                  | `=QUERY_GROUP("expenses", "category", "month")`                                                                               | Dimension 2 and sort                                                                                            |
-| `QUERY_GROUP_COUNT`             | Query        | Returns the same table as `QUERY_GROUP`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_GROUP_COUNT("expenses", "payee")`                                                                                     | Dimension 2 and sort                                                                                            |
-| `QUERY_PIVOT`                   | Query        | Returns a table with one row for each group of one dimension and one column for each group of a second dimension. The first row has the column names. See [Make a Wide Table With `QUERY_PIVOT`](#make-a-wide-table-with-query_pivot). | `=QUERY_PIVOT("expenses", "category", "month")`                                                                               | Sort                                                                                                            |
-| `QUERY_PIVOT_COUNT`             | Query        | Returns the same table as `QUERY_PIVOT`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_PIVOT_COUNT("expenses", "payee", "month")`                                                                            | Sort                                                                                                            |
+| `QUERY_GROUP`                   | Query        | Returns a table with one row for each group of transactions in a named query, with the total amount of each group. See [Group Transactions With `QUERY_GROUP`](#group-transactions-with-query_group).                                  | `=QUERY_GROUP("expenses", "category", , "month")`                                                                             | Sort and dimension 2                                                                                            |
+| `QUERY_GROUP_COUNT`             | Query        | Returns the same table as `QUERY_GROUP`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_GROUP_COUNT("expenses", "payee")`                                                                                     | Sort and dimension 2                                                                                            |
+| `QUERY_PIVOT`                   | Query        | Returns a table with one row for each group of one dimension and one column for each group of a second dimension. The first row has the column names. See [Make a Wide Table With `QUERY_PIVOT`](#make-a-wide-table-with-query_pivot). | `=QUERY_PIVOT("expenses", "category", , "month")`                                                                             | Sort                                                                                                            |
+| `QUERY_PIVOT_COUNT`             | Query        | Returns the same table as `QUERY_PIVOT`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_PIVOT_COUNT("expenses", "payee", , "month")`                                                                          | Sort                                                                                                            |
 | `QUERY_START_DATE`              | Query        | Returns the first day that a named query includes, as `YYYY-MM-DD` text.                                                                                                                                                               | `=QUERY_START_DATE("expenses")`                                                                                               | —                                                                                                               |
 | `RANK`                          | Query        | Returns the rank of a number in a list.                                                                                                                                                                                                | `=RANK(10, A1:A10, 0)`                                                                                                        | —                                                                                                               |
 | `RATE`                          | Query        | Calculates interest rate per period.                                                                                                                                                                                                   | `=RATE(60, -200, 10000)`                                                                                                      | —                                                                                                               |
@@ -248,26 +248,26 @@ Formulas can also subtract one date from the other. `=QUERY_END_DATE("expenses")
 `QUERY_GROUP` gives a table with one row for each group of transactions in a query. A formula card shows it in the [table view](#show-a-table).
 
 ```text
-=QUERY_GROUP("query", "dimension 1", "dimension 2", "sort")
+=QUERY_GROUP("query", "dimension 1", "sort", "dimension 2")
 ```
 
 - **query**: the name of a query.
 - **dimension 1**: how to put the transactions into groups. Use one of `category`, `category_group`, `payee`, `account`, `day`, `week`, `month`, `quarter` or `year`.
-- **dimension 2** (optional): a second dimension. Each row then has one group of dimension 1 and one group of dimension 2.
 - **sort** (optional): the order of the rows.
   - `budget` (the default): categories and category groups in the order of your budget, accounts in the order of the sidebar, payees by name, and periods by date.
   - `name`: by name, from A to Z. Periods stay in date order.
   - `asc` or `desc`: by amount, from the smallest or from the largest. With two dimensions, the order uses the total of each dimension 1 group, so that the rows of a group stay together.
+- **dimension 2** (optional): a second dimension. Each row then has one group of dimension 1 and one group of dimension 2.
 
 Each row has the name of each group, then the total amount. `QUERY_GROUP_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
 This example gives the spending for each category, with the largest spending first. Spending amounts are negative, so `asc` puts them first:
 
 ```text
-=QUERY_GROUP("expenses", "category", , "asc")
+=QUERY_GROUP("expenses", "category", "asc")
 ```
 
-To skip dimension 2, leave its place empty, as in the example above.
+To use the default sort with dimension 2, leave the place of the sort empty, for example `=QUERY_GROUP("expenses", "month", , "category")`.
 
 Some things to know:
 
@@ -286,25 +286,25 @@ Some things to know:
 `QUERY_PIVOT` gives the same totals as `QUERY_GROUP` with two dimensions, but in a wide table. Each group of the first dimension gets a row, and each group of the second dimension gets a column.
 
 ```text
-=QUERY_PIVOT("query", "rows", "columns", "sort")
+=QUERY_PIVOT("query", "rows", "sort", "columns")
 ```
 
 - **query**: the name of a query.
 - **rows**: the dimension for the rows. Use one of the `QUERY_GROUP` dimensions.
-- **columns**: the dimension for the columns. It must be different from **rows**.
 - **sort** (optional): the order of the rows. `budget`, `name`, `asc` and `desc` work as for `QUERY_GROUP`. `asc` and `desc` use the total of each row. The columns always stay in budget order, or in name order for `name`.
+- **columns**: the dimension for the columns. It must be different from **rows**.
 
 This example gives the spending of each category, with one column for each month:
 
 ```text
-=QUERY_PIVOT("expenses", "category", "month")
+=QUERY_PIVOT("expenses", "category", , "month")
 ```
 
 The first row has the names of the columns, for example the months. The first cell of this row has the name of the first dimension, for example `Category`. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
 The card shows the first row as the header row of the table. A month in the header row shows as the short month name and year, for example `Jan '24`. A day or a week shows in your date format. To give a column a different name, type it under **Columns**.
 
-With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", "month"), 2, 2)` gives the amount of the first category in the first month.
+With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", , "month"), 2, 2)` gives the amount of the first category in the first month.
 
 ### Account balances with `BALANCE_OF("name")`
 
@@ -623,11 +623,11 @@ The **Series** setting selects the column that splits the values:
 - **None**: each value column is a series.
 - A column: each different value of that column is a series.
 
-For example, `=QUERY_GROUP("expenses", "month", "category")` gives one bar for each category in each month. Turn on **Stack** to show one stacked bar for each month.
+For example, `=QUERY_GROUP("expenses", "month", , "category")` gives one bar for each category in each month. Turn on **Stack** to show one stacked bar for each month.
 
 With a series column, the chart shows only the first value column. If a label and series pair has no row, its value is zero. If two rows have the same pair, the chart adds their values. If the chart has more than 20 series, the editor shows a warning, because some colors repeat. The tooltip shows only the series with a value that is not zero.
 
-For a **Donut** chart, the setting is **Outer ring**. The chart then has two rings. For example, `=QUERY_GROUP("expenses", "category group", "category")` shows the category groups in the inner ring and their categories in the outer ring. Each slice of the inner ring is the sum of its outer slices, so the two rings always agree. The outer slices have lighter colors of their group color. The legend shows the groups.
+For a **Donut** chart, the setting is **Outer ring**. The chart then has two rings. For example, `=QUERY_GROUP("expenses", "category group", , "category")` shows the category groups in the inner ring and their categories in the outer ring. Each slice of the inner ring is the sum of its outer slices, so the two rings always agree. The outer slices have lighter colors of their group color. The legend shows the groups.
 
 On a dashboard card, the chart has no axes and no legend, as the other report cards. Point to a bar, a point or a slice to see its values. A click on the chart does not open the transactions.
 

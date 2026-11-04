@@ -321,13 +321,19 @@ export function getFormulaFunctionCatalog(): Record<
           ),
         },
         {
+          name: 'sort1',
+          description: t(
+            'The order of the groups: budget (budget order, the default), name, asc or desc (by value) (optional)',
+          ),
+        },
+        {
           name: 'dimension2',
           description: t('A second group (optional)'),
         },
         {
-          name: 'sort',
+          name: 'sort2',
           description: t(
-            'budget (budget order, the default), name, asc or desc (by value) (optional)',
+            'The order inside each group: budget, name, asc or desc (optional)',
           ),
         },
       ],
@@ -351,13 +357,19 @@ export function getFormulaFunctionCatalog(): Record<
           ),
         },
         {
+          name: 'sort1',
+          description: t(
+            'The order of the groups: budget (budget order, the default), name, asc or desc (by value) (optional)',
+          ),
+        },
+        {
           name: 'dimension2',
           description: t('A second group (optional)'),
         },
         {
-          name: 'sort',
+          name: 'sort2',
           description: t(
-            'budget (budget order, the default), name, asc or desc (by value) (optional)',
+            'The order inside each group: budget, name, asc or desc (optional)',
           ),
         },
       ],
@@ -381,13 +393,19 @@ export function getFormulaFunctionCatalog(): Record<
           ),
         },
         {
+          name: 'rowSort',
+          description: t(
+            'The order of the rows: budget (budget order, the default), name, asc or desc (by the row total) (optional)',
+          ),
+        },
+        {
           name: 'columns',
           description: t('One column for each: a different dimension'),
         },
         {
-          name: 'sort',
+          name: 'columnSort',
           description: t(
-            'budget (budget order, the default), name, asc or desc (by the row total) (optional)',
+            'The order of the columns: budget, name, asc or desc (by the column total) (optional)',
           ),
         },
       ],
@@ -411,13 +429,19 @@ export function getFormulaFunctionCatalog(): Record<
           ),
         },
         {
+          name: 'rowSort',
+          description: t(
+            'The order of the rows: budget (budget order, the default), name, asc or desc (by the row total) (optional)',
+          ),
+        },
+        {
           name: 'columns',
           description: t('One column for each: a different dimension'),
         },
         {
-          name: 'sort',
+          name: 'columnSort',
           description: t(
-            'budget (budget order, the default), name, asc or desc (by the row total) (optional)',
+            'The order of the columns: budget, name, asc or desc (by the column total) (optional)',
           ),
         },
       ],

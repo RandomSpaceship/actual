@@ -147,13 +147,20 @@ function parseQueryGroupDimension(value: string) {
   );
 }
 
+// The arguments of a QUERY_GROUP, QUERY_GROUP_COUNT, QUERY_PIVOT or
+// QUERY_PIVOT_COUNT call, as text. An empty argument is ''.
+export type QueryGroupArgs = {
+  queryName: string;
+  dimension1: string;
+  sort1: string;
+  dimension2: string;
+  sort2: string;
+};
+
 // An empty dimension 2 or sort gives the default. A wide table must have
 // dimension 2. Returns an error message for a bad argument.
 export function createQueryGroupRequest(
-  queryName: string,
-  dimension1: string,
-  dimension2: string,
-  sort: string,
+  { queryName, dimension1, sort1: sort, dimension2 }: QueryGroupArgs,
   measure: QueryGroupRequest['measure'],
   shape: QueryGroupRequest['shape'] = 'long',
 ): QueryGroupRequest | string {
@@ -484,14 +491,12 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
       (
         queryName: string,
         dimension1: string,
+        sort1: string,
         dimension2: string,
-        sort: string,
+        sort2: string,
       ) => {
         const request = createQueryGroupRequest(
-          queryName,
-          dimension1,
-          dimension2,
-          sort,
+          { queryName, dimension1, sort1, dimension2, sort2 },
           measure,
           shape,
         );
@@ -516,16 +521,14 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
     shape: QueryGroupRequest['shape'],
   ): ArraySize {
     const args = getLiteralArgs(ast);
-    if (!args || args.length < 2 || args.length > 4) {
+    if (!args || args.length < 2 || args.length > 5) {
       return ArraySize.scalar();
     }
-    const [queryName, dimension1, dimension2 = '', sort = ''] = args;
+    const [queryName, dimension1, sort1 = '', dimension2 = '', sort2 = ''] =
+      args;
 
     const request = createQueryGroupRequest(
-      queryName,
-      dimension1,
-      dimension2,
-      sort,
+      { queryName, dimension1, sort1, dimension2, sort2 },
       measure,
       shape,
     );
@@ -722,6 +725,19 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
   }
 }
 
+// The query name and dimension 1, then sort 1, dimension 2 and sort 2. HyperFormula
+// needs the optional arguments last, so the dimension 2 of QUERY_PIVOT is
+// optional here, and createQueryGroupRequest gives the error.
+const queryGroupParameters = [
+  { argumentType: FunctionArgumentType.STRING },
+  { argumentType: FunctionArgumentType.STRING },
+  ...Array.from({ length: 3 }, () => ({
+    argumentType: FunctionArgumentType.STRING,
+    optionalArg: true,
+    defaultValue: '',
+  })),
+];
+
 CustomFunctionsPlugin.implementedFunctions = {
   BALANCE_OF: {
     method: 'balanceOf',
@@ -785,66 +801,22 @@ CustomFunctionsPlugin.implementedFunctions = {
   QUERY_GROUP: {
     method: 'queryGroup',
     sizeOfResultArrayMethod: 'queryGroupSize',
-    parameters: [
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-    ],
+    parameters: queryGroupParameters,
   },
   QUERY_GROUP_COUNT: {
     method: 'queryGroupCount',
     sizeOfResultArrayMethod: 'queryGroupCountSize',
-    parameters: [
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-    ],
+    parameters: queryGroupParameters,
   },
   QUERY_PIVOT: {
     method: 'queryPivot',
     sizeOfResultArrayMethod: 'queryPivotSize',
-    parameters: [
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-    ],
+    parameters: queryGroupParameters,
   },
   QUERY_PIVOT_COUNT: {
     method: 'queryPivotCount',
     sizeOfResultArrayMethod: 'queryPivotCountSize',
-    parameters: [
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      { argumentType: FunctionArgumentType.STRING },
-      {
-        argumentType: FunctionArgumentType.STRING,
-        optionalArg: true,
-        defaultValue: '',
-      },
-    ],
+    parameters: queryGroupParameters,
   },
   BUDGET_QUERY: {
     method: 'budgetQuery',

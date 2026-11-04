@@ -124,19 +124,19 @@ describe('QUERY_GROUP', () => {
 
   it('sorts by name or by value', async () => {
     expect(
-      (await run('=QUERY_GROUP("all", "category", , "name")')).table,
+      (await run('=QUERY_GROUP("all", "category", "name")')).table,
     ).toEqual([
       ['Groceries', -120],
       ['Power', -50],
       ['Uncategorized', 3],
     ]);
-    expect(
-      (await run('=QUERY_GROUP("all", "Category", "", "ASC")')).table,
-    ).toEqual([
-      ['Groceries', -120],
-      ['Power', -50],
-      ['Uncategorized', 3],
-    ]);
+    expect((await run('=QUERY_GROUP("all", "Category", "ASC")')).table).toEqual(
+      [
+        ['Groceries', -120],
+        ['Power', -50],
+        ['Uncategorized', 3],
+      ],
+    );
   });
 
   it('gives a zero row for a month without transactions', async () => {
@@ -149,7 +149,7 @@ describe('QUERY_GROUP', () => {
 
   it('keeps the rows of a group together with two dimensions', async () => {
     expect(
-      (await run('=QUERY_GROUP("firstQuarter", "category", "month", "asc")'))
+      (await run('=QUERY_GROUP("firstQuarter", "category", "asc", "month")'))
         .table,
     ).toEqual([
       ['Groceries', '2024-01', 0],
@@ -252,7 +252,7 @@ describe('QUERY_GROUP', () => {
 describe('QUERY_PIVOT', () => {
   it('gives a header row with the dimension names and a column for each month', async () => {
     expect(
-      (await run('=QUERY_PIVOT("firstQuarter", "category", "month")')).table,
+      (await run('=QUERY_PIVOT("firstQuarter", "category", , "month")')).table,
     ).toEqual([
       ['Category', '2024-01', '2024-02', '2024-03'],
       ['Power', -10, 0, 0],
@@ -262,7 +262,7 @@ describe('QUERY_PIVOT', () => {
 
   it('sorts the rows by the row total', async () => {
     expect(
-      (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "desc")'))
+      (await run('=QUERY_PIVOT("firstQuarter", "category", "desc", "month")'))
         .table,
     ).toEqual([
       ['Category', '2024-01', '2024-02', '2024-03'],
@@ -270,7 +270,7 @@ describe('QUERY_PIVOT', () => {
       ['Groceries', 0, -30, 0],
     ]);
     expect(
-      (await run('=QUERY_PIVOT("firstQuarter", "category", "month", "asc")'))
+      (await run('=QUERY_PIVOT("firstQuarter", "category", "asc", "month")'))
         .table,
     ).toEqual([
       ['Category', '2024-01', '2024-02', '2024-03'],
@@ -281,7 +281,7 @@ describe('QUERY_PIVOT', () => {
 
   it('gives counts for QUERY_PIVOT_COUNT', async () => {
     expect(
-      (await run('=QUERY_PIVOT_COUNT("firstQuarter", "category", "month")'))
+      (await run('=QUERY_PIVOT_COUNT("firstQuarter", "category", , "month")'))
         .table,
     ).toEqual([
       ['Category', '2024-01', '2024-02', '2024-03'],
@@ -293,14 +293,16 @@ describe('QUERY_PIVOT', () => {
   it('works inside other functions', async () => {
     expect(
       await run(
-        '=INDEX(QUERY_PIVOT("firstQuarter", "category", "month"), 3, 3)',
+        '=INDEX(QUERY_PIVOT("firstQuarter", "category", , "month"), 3, 3)',
         'value',
       ),
     ).toEqual({ value: -30, issues: [] });
   });
 
   it('gives a warning for a table with more than 20 columns', async () => {
-    const result = await run('=QUERY_PIVOT("firstQuarter", "category", "day")');
+    const result = await run(
+      '=QUERY_PIVOT("firstQuarter", "category", , "day")',
+    );
 
     expect(result.table?.[0]).toHaveLength(92);
     // 92 columns is also more than the table view shows
@@ -311,7 +313,7 @@ describe('QUERY_PIVOT', () => {
   });
 
   it('gives an error without a dimension for the columns', async () => {
-    await expect(run('=QUERY_PIVOT("all", "category", "")')).rejects.toThrow(
+    await expect(run('=QUERY_PIVOT("all", "category")')).rejects.toThrow(
       'Give a dimension for the columns',
     );
   });
