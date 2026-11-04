@@ -27,6 +27,8 @@ export type FormulaIssue = {
     | 'table-result'
     // Only the editor shows it
     | 'large-table'
+    // The table shows only part of the result
+    | 'table-cut'
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';

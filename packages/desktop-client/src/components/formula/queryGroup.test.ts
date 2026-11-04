@@ -303,8 +303,10 @@ describe('QUERY_PIVOT', () => {
     const result = await run('=QUERY_PIVOT("firstQuarter", "category", "day")');
 
     expect(result.table?.[0]).toHaveLength(92);
+    // 92 columns is also more than the table view shows
     expect(result.issues).toEqual([
       expect.objectContaining({ severity: 'warning', kind: 'large-table' }),
+      expect.objectContaining({ severity: 'warning', kind: 'table-cut' }),
     ]);
   });
 

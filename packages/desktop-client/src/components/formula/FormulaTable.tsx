@@ -20,6 +20,7 @@ import { useDateFormat } from '#hooks/useDateFormat';
 import { useFormat } from '#hooks/useFormat';
 import { useLocale } from '#hooks/useLocale';
 
+import { maxShownTableColumns, maxShownTableRows } from './executeFormula';
 import type { FormulaTable as FormulaTableData } from './executeFormula';
 
 type FormulaTableProps = {
@@ -50,10 +51,24 @@ export function FormulaTable({
   const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
   const headerNames = getFormulaTableColumnNames(table, columns, headerRow);
   const hasHeader = headerNames.some(name => name !== '');
+  // The totals use the full table. Only the shown part is cut.
   const tableTotals = getFormulaTableTotals(bodyRows, columnTypes, totals);
+  const shownBodyRows = bodyRows.slice(
+    0,
+    maxShownTableRows - (headerRow ? 1 : 0),
+  );
+  const shownTypes = columnTypes.slice(0, maxShownTableColumns);
   const displayTypes = tableTotals.rowTotals
-    ? [...columnTypes, tableTotals.totalColumnType]
-    : columnTypes;
+    ? [...shownTypes, tableTotals.totalColumnType]
+    : shownTypes;
+  const shownColumnTotals =
+    tableTotals.columnTotals &&
+    (tableTotals.rowTotals
+      ? [
+          ...tableTotals.columnTotals.slice(0, shownTypes.length),
+          tableTotals.columnTotals[tableTotals.columnTotals.length - 1],
+        ]
+      : tableTotals.columnTotals.slice(0, shownTypes.length));
 
   // The same cell size as the custom report table. Its 20px rows overlap by
   // 1px, so each row starts 19px below the last.
@@ -179,7 +194,7 @@ export function FormulaTable({
                   }}
                 >
                   {/* A month in the header row shows as a date */}
-                  {columnIndex >= columnTypes.length
+                  {columnIndex >= shownTypes.length
                     ? t('Totals')
                     : headerRow && !columns[columnIndex]?.name
                       ? formatDate(headerNames[columnIndex], dateFormat, locale)
@@ -190,22 +205,22 @@ export function FormulaTable({
           </thead>
         )}
         <tbody>
-          {bodyRows.map((row, rowIndex) => (
+          {shownBodyRows.map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {columnTypes.map((type, columnIndex) =>
+              {shownTypes.map((type, columnIndex) =>
                 renderCell(row[columnIndex] ?? null, type, columnIndex),
               )}
               {tableTotals.rowTotals &&
                 renderCell(
                   tableTotals.rowTotals[rowIndex],
                   tableTotals.totalColumnType,
-                  columnTypes.length,
+                  shownTypes.length,
                   { fontWeight: 600 },
                 )}
             </tr>
           ))}
         </tbody>
-        {tableTotals.columnTotals && (
+        {shownColumnTotals && (
           <tfoot>
             <tr
               style={{
@@ -214,7 +229,7 @@ export function FormulaTable({
                 fontWeight: 600,
               }}
             >
-              {tableTotals.columnTotals.map((total, columnIndex) =>
+              {shownColumnTotals.map((total, columnIndex) =>
                 columnIndex === tableTotals.labelColumn
                   ? renderCell(t('Totals'), 'text', columnIndex, totalsBorder)
                   : renderCell(

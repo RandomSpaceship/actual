@@ -400,6 +400,9 @@ export async function executeFormula({
 
   // Only set for a table, so that a result with one value stays the same
   const spills = evaluation.table ? true : undefined;
+  if (evaluation.table && output !== 'value') {
+    addTableCutIssue(evaluation.table, addIssue);
+  }
 
   if (output === 'table') {
     return {
@@ -585,6 +588,47 @@ async function prefetchQueryGroups(
     }
   }
   return fetchCount;
+}
+
+// The table view shows at most this part of a table. The formula still gets
+// all of it.
+export const maxShownTableRows = 500;
+export const maxShownTableColumns = 60;
+
+function addTableCutIssue(table: FormulaTable, addIssue: AddIssue) {
+  const rowCount = table.length;
+  const columnCount = Math.max(0, ...table.map(row => row.length));
+  if (rowCount <= maxShownTableRows && columnCount <= maxShownTableColumns) {
+    return;
+  }
+  const values = {
+    shownRows: Math.min(rowCount, maxShownTableRows),
+    rowCount,
+    shownColumns: Math.min(columnCount, maxShownTableColumns),
+    columnCount,
+  };
+  const isRowsCut = rowCount > maxShownTableRows;
+  const isColumnsCut = columnCount > maxShownTableColumns;
+  addIssue({
+    severity: 'warning',
+    kind: 'table-cut',
+    name: '',
+    message:
+      isRowsCut && isColumnsCut
+        ? t(
+            'The table shows {{shownRows}} of {{rowCount}} rows and {{shownColumns}} of {{columnCount}} columns. The totals use all of them.',
+            values,
+          )
+        : isRowsCut
+          ? t(
+              'The table shows {{shownRows}} of {{rowCount}} rows. The totals use all of them.',
+              values,
+            )
+          : t(
+              'The table shows {{shownColumns}} of {{columnCount}} columns. The totals use all of them.',
+              values,
+            ),
+  });
 }
 
 // Over these sizes, a table is hard to read on a card and slow to show
