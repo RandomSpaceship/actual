@@ -564,6 +564,7 @@ If a formula gives a table but **Display** is **One value**, the card shows an e
 Formula cards support an optional **Conditional color** formula (single line) that returns a color string like `red` or `#ff0000`.
 
 - Use the **`RESULT`** variable to reference the main formula result.
+- Under the formula, the editor shows the color that the formula gives, with a small sample of the color. If the formula gives an error, or a value that is not a color, the editor shows a message, and the card uses the default color.
 
 ## Rule formulas
 

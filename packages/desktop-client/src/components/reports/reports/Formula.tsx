@@ -22,6 +22,7 @@ import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
+import { ColorFormulaResult } from '#components/formula/ColorFormulaResult';
 import { maxShownTableColumns } from '#components/formula/executeFormula';
 import {
   FormulaTable,
@@ -705,6 +706,14 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                     />
                   </Suspense>
                 </View>
+                {ranInputs.colorFormula && (
+                  <View style={{ marginTop: 5 }}>
+                    <ColorFormulaResult
+                      result={colorResult}
+                      error={colorError}
+                    />
+                  </View>
+                )}
                 <div
                   style={{
                     fontSize: 11,
