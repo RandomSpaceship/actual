@@ -51,12 +51,22 @@ export function AqlQueryPreview({ aql, timeFrame }: AqlQueryPreviewProps) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const { text, dateField, isCount } = aql;
   const timeFrameKey = JSON.stringify(timeFrame);
+  // Text, so that a new list with the same names does not run the query
+  const moneyColumnsKey = JSON.stringify(aql.moneyColumns);
 
   useEffect(() => {
     let isCurrent = true;
     const timeout = setTimeout(() => {
       void runPreview(
-        { text, dateField, isCount },
+        {
+          text,
+          dateField,
+          isCount,
+          moneyColumns:
+            moneyColumnsKey === undefined
+              ? undefined
+              : JSON.parse(moneyColumnsKey),
+        },
         timeFrameKey === undefined ? undefined : JSON.parse(timeFrameKey),
       ).then(result => {
         if (isCurrent) setPreview(result);
@@ -66,7 +76,7 @@ export function AqlQueryPreview({ aql, timeFrame }: AqlQueryPreviewProps) {
       isCurrent = false;
       clearTimeout(timeout);
     };
-  }, [text, dateField, isCount, timeFrameKey]);
+  }, [text, dateField, isCount, timeFrameKey, moneyColumnsKey]);
 
   const boxStyle = {
     minHeight: 40,
@@ -129,11 +139,24 @@ export function AqlQueryPreview({ aql, timeFrame }: AqlQueryPreviewProps) {
               columns={preview.columns}
               compact
             />
-            <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
-              <Trans count={previewRowCount}>
-                The first {{ count: previewRowCount }} rows
-              </Trans>
-            </Text>
+            {preview.table.length >= previewRowCount && (
+              <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
+                <Trans count={previewRowCount}>
+                  The first {{ count: previewRowCount }} rows
+                </Trans>
+              </Text>
+            )}
+            {findIdColumns(preview).map(column => (
+              <Text
+                key={column}
+                style={{ color: theme.warningText, fontSize: 12 }}
+              >
+                <Trans>
+                  The column "{{ column }}" shows ids. To show names, select a
+                  field of it, for example "{{ column }}.name".
+                </Trans>
+              </Text>
+            ))}
           </View>
         ))}
     </View>
@@ -185,4 +208,26 @@ async function runPreview(
           : String(error instanceof Error ? error.message : error),
     };
   }
+}
+
+const idPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A ref field such as category gives the id of the category. The id field of
+// the table is not a ref.
+function findIdColumns(preview: {
+  table: FormulaTableCell[][];
+  columns: FormulaTableColumn[];
+}) {
+  return preview.columns.flatMap((column, columnIndex) => {
+    const name = column.name ?? '';
+    if (name === 'id' || name.endsWith('.id')) return [];
+    const values = preview.table
+      .map(row => row[columnIndex])
+      .filter(cell => cell !== null && cell !== '');
+    return values.length > 0 &&
+      values.every(cell => typeof cell === 'string' && idPattern.test(cell))
+      ? [name]
+      : [];
+  });
 }

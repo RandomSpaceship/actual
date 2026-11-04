@@ -8,7 +8,10 @@ import { Select } from '@actual-app/components/select';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import { parseAqlQuery } from '@actual-app/core/shared/formulas/aqlQuery';
+import {
+  maxAqlRowLimit,
+  parseAqlQuery,
+} from '@actual-app/core/shared/formulas/aqlQuery';
 import {
   isNamedQueryItem,
   isSameQueryName,
@@ -42,6 +45,7 @@ import {
 
 import { describeAqlQuery } from './aqlQueryKind';
 import { AqlQueryPreview } from './AqlQueryPreview';
+import { AqlTableSettings } from './AqlTableSettings';
 import { FormulaQueryUsesList } from './FormulaQueryUsesList';
 import { useFindFormulaQueryUses } from './useFindFormulaQueryUses';
 
@@ -79,6 +83,12 @@ export function EditFormulaLibraryAqlQueryModal({
   const [dateField, setDateField] = useState(item?.data.dateField);
   const [timeFrame, setTimeFrame] = useState(item?.data.timeFrame);
   const [isCount, setIsCount] = useState(item?.data.isCount ?? false);
+  // undefined: the columns that read a field named amount
+  const [moneyColumns, setMoneyColumns] = useState(item?.data.moneyColumns);
+  const [rowLimitText, setRowLimitText] = useState(
+    item?.data.rowLimit === undefined ? '' : String(item.data.rowLimit),
+  );
+  const [isRowLimitErrorShown, setIsRowLimitErrorShown] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [isAqlErrorShown, setIsAqlErrorShown] = useState(false);
   // Set when a rename needs the user to choose the cards to change
@@ -104,6 +114,30 @@ export function EditFormulaLibraryAqlQueryModal({
   };
   const isCountShown =
     parsedQuery?.kind === 'value' && !parsedQuery.isCountCalculation;
+  const isTable = parsedQuery?.kind === 'table';
+  const tableColumns = isTable ? parsedQuery.columns : null;
+  const defaultMoneyColumns = (tableColumns ?? [])
+    .filter(column => column.usesAmount)
+    .map(column => column.name);
+  // Only the columns that the query still has
+  const shownMoneyColumns = tableColumns
+    ? (moneyColumns ?? defaultMoneyColumns).filter(name =>
+        tableColumns.some(column => column.name === name),
+      )
+    : undefined;
+  // Saved only when it is not the default, so that the default follows a
+  // change to the select
+  const savedMoneyColumns =
+    shownMoneyColumns && !isSameNames(shownMoneyColumns, defaultMoneyColumns)
+      ? shownMoneyColumns
+      : undefined;
+  const rowLimit = parseRowLimit(rowLimitText);
+  const rowLimitError =
+    isTable && rowLimit === null
+      ? t('Enter a whole number from 1 to {{maxAqlRowLimit}}', {
+          maxAqlRowLimit: maxAqlRowLimit.toLocaleString(),
+        })
+      : null;
 
   function validateName() {
     if (trimmedName === '') {
@@ -131,6 +165,8 @@ export function EditFormulaLibraryAqlQueryModal({
       dateField,
       timeFrame,
       isCount: isCountShown && isCount ? true : undefined,
+      moneyColumns: savedMoneyColumns,
+      rowLimit: isTable && rowLimit !== null ? rowLimit : undefined,
     };
 
     if (item) {
@@ -154,7 +190,8 @@ export function EditFormulaLibraryAqlQueryModal({
     const error = validateName();
     setNameError(error);
     setIsAqlErrorShown(true);
-    if (error || aqlDescription.error !== undefined) return;
+    setIsRowLimitErrorShown(true);
+    if (error || aqlDescription.error !== undefined || rowLimitError) return;
 
     if (isRename && uses.length + providerUses.length > 0) {
       setRenameWidgetIds(new Set(uses.map(use => use.widgetId)));
@@ -342,6 +379,16 @@ export function EditFormulaLibraryAqlQueryModal({
                   </View>
                 )}
               </View>
+              {isTable && (
+                <AqlTableSettings
+                  columns={tableColumns}
+                  moneyColumns={shownMoneyColumns ?? []}
+                  onMoneyColumnsChange={setMoneyColumns}
+                  rowLimit={rowLimitText}
+                  onRowLimitChange={setRowLimitText}
+                  rowLimitError={isRowLimitErrorShown ? rowLimitError : null}
+                />
+              )}
               <FormField style={{ marginBottom: 10 }}>
                 <FormLabel title={t('Result')} />
                 <AqlQueryPreview
@@ -349,6 +396,7 @@ export function EditFormulaLibraryAqlQueryModal({
                     text: aql,
                     dateField,
                     isCount: isCountShown && isCount,
+                    moneyColumns: savedMoneyColumns,
                   }}
                   timeFrame={shownDateField === null ? undefined : timeFrame}
                 />
@@ -372,7 +420,8 @@ export function EditFormulaLibraryAqlQueryModal({
                   query: table, filter, options, groupBy, select, orderBy,
                   calculate, limit and offset. A transactions query with only a
                   filter works as a filter query. A query with calculate gives
-                  one value.
+                  one value for QUERY. A query with select or groupBy gives a
+                  table for QUERY_TABLE.
                 </Trans>
               </Text>
               <ModalButtons>
@@ -395,4 +444,17 @@ export function EditFormulaLibraryAqlQueryModal({
       )}
     </Modal>
   );
+}
+
+// '' is the default. null: not a whole number from 1 to maxAqlRowLimit.
+function parseRowLimit(text: string): number | undefined | null {
+  const trimmed = text.trim().replace(/[,\s]/g, '');
+  if (trimmed === '') return undefined;
+  if (!/^\d+$/.test(trimmed)) return null;
+  const rowLimit = Number(trimmed);
+  return rowLimit >= 1 && rowLimit <= maxAqlRowLimit ? rowLimit : null;
+}
+
+function isSameNames(a: string[], b: string[]) {
+  return a.length === b.length && a.every(name => b.includes(name));
 }
