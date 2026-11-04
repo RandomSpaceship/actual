@@ -21,6 +21,24 @@ type SentQuery = {
   calculation: boolean;
   withDead: boolean;
   rawMode: boolean;
+  limit: number | null;
+};
+
+// The rows that a table query gets, before its limit
+const tableRows = [
+  { 'payee.name': 'Cafe', total: -1250, count: 3 },
+  { 'payee.name': 'Shop', total: -500, count: 1 },
+  { 'payee.name': null, total: 200, count: 1 },
+];
+
+const spendByPayee = {
+  table: 'transactions',
+  groupBy: ['payee.name'],
+  select: [
+    'payee.name',
+    { total: { $sum: '$amount' } },
+    { count: { $count: '$id' } },
+  ],
 };
 
 const january = {
@@ -70,6 +88,10 @@ const library = [
     groupBy: ['payee.name'],
     select: ['payee.name'],
   }),
+  aqlItem('spendByPayee', spendByPayee),
+  aqlItem('countIsMoney', spendByPayee, { moneyColumns: ['count'] }),
+  aqlItem('twoRows', spendByPayee, { rowLimit: 2 }),
+  aqlItem('ownLimit', { ...spendByPayee, limit: 2 }, { rowLimit: 2 }),
   aqlItem('badField', {
     table: 'transactions',
     filter: { nope: 1 },
@@ -85,13 +107,14 @@ const library = [
 
 let sentQueries: SentQuery[] = [];
 
-function run(formula: string) {
+function run(formula: string, output: 'value' | 'table' = 'value') {
   return executeFormula({
     formula,
     resolveQuery: name => resolveQuery(name, { localQueries: {}, library }),
     accounts: [],
     library,
     language: 'en-US',
+    output,
   });
 }
 
@@ -104,6 +127,12 @@ beforeEach(() => {
   ) => {
     if (name !== 'query') return { data: undefined, error: undefined };
     sentQueries.push(query);
+    if (!query.calculation) {
+      return {
+        data: { data: tableRows.slice(0, query.limit ?? undefined) },
+        error: undefined,
+      };
+    }
     if (JSON.stringify(query.filterExpressions).includes('nope')) {
       return {
         data: undefined,
@@ -206,7 +235,7 @@ describe('AQL queries in formulas', () => {
       },
     ]);
     expect((await run('=QUERY("byPayee")')).issues[0]?.message).toBe(
-      'Query "byPayee": This AQL query gives a table, because it has select, groupBy, orderBy, limit or offset',
+      'Query "byPayee": This AQL query gives a table, because it has select, groupBy, orderBy, limit or offset. Use it in QUERY_TABLE',
     );
     expect(
       (await run('=QUERY_EXTRACT_CATEGORIES("coffee")')).issues[0]?.message,
@@ -226,6 +255,73 @@ describe('AQL queries in formulas', () => {
     // the error to every part of the app
     expect(vi.mocked(send).mock.calls.some(([name]) => name === 'query')).toBe(
       false,
+    );
+  });
+});
+
+describe('QUERY_TABLE', () => {
+  it('gives the rows in select order, with amounts in the money columns', async () => {
+    const result = await run('=QUERY_TABLE("spendByPayee")', 'table');
+    expect(result.issues).toEqual([]);
+    expect(result.table).toEqual([
+      ['Cafe', -12.5, 3],
+      ['Shop', -5, 1],
+      [null, 2, 1],
+    ]);
+    // One more row than the row limit, to find a cut
+    expect(sentQueries.at(-1)?.limit).toBe(1001);
+  });
+
+  it('adds the column names as the first row with TRUE()', async () => {
+    const result = await run('=QUERY_TABLE("spendByPayee", TRUE())', 'table');
+    expect(result.table?.[0]).toEqual(['payee.name', 'total', 'count']);
+    expect(result.table).toHaveLength(4);
+  });
+
+  it('uses the money columns of the library query', async () => {
+    const result = await run('=QUERY_TABLE("countIsMoney")', 'table');
+    expect(result.table?.[0]).toEqual(['Cafe', -1250, 0.03]);
+  });
+
+  it('works inside other functions', async () => {
+    expect(
+      await run('=SUM(CHOOSECOLS(QUERY_TABLE("spendByPayee"), 2))'),
+    ).toEqual({ value: -15.5, issues: [] });
+  });
+
+  it('warns when the row limit cuts the rows', async () => {
+    const result = await run('=QUERY_TABLE("twoRows")', 'table');
+    expect(result.table).toHaveLength(2);
+    expect(result.issues).toEqual([
+      {
+        severity: 'warning',
+        kind: 'rows-cut',
+        name: 'twoRows',
+        message:
+          'Query "twoRows" gives more than 2 rows, so the table stops there. Add a filter or a limit to the query, or change its row limit',
+      },
+    ]);
+  });
+
+  it('does not warn for a limit in the query', async () => {
+    const result = await run('=QUERY_TABLE("ownLimit")', 'table');
+    expect(result.table).toHaveLength(2);
+    expect(result.issues).toEqual([]);
+    expect(sentQueries.at(-1)?.limit).toBe(2);
+  });
+
+  it('gives an error for a query that is not a table query', async () => {
+    expect((await run('=QUERY_TABLE("total")')).issues[0]?.message).toBe(
+      'Query "total": This AQL query gives one value. Use it in QUERY',
+    );
+    expect((await run('=QUERY_TABLE("coffee")')).issues[0]?.message).toBe(
+      'Query "coffee": This AQL query is a filter. Use it in QUERY, QUERY_COUNT, QUERY_GROUP or QUERY_PIVOT, or add select to use it in QUERY_TABLE',
+    );
+  });
+
+  it('gives an error for a header that is not in the formula', async () => {
+    await expect(run('=QUERY_TABLE("spendByPayee", 1 = 1)')).rejects.toThrow(
+      /must be in the formula/,
     );
   });
 });

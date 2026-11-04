@@ -30,6 +30,8 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     budgetQueryErrors: new Map(),
     queryGroupRequests: new Map(),
     queryGroupPrefetch: new Map(),
+    queryTableNames: new Set(),
+    queryTablePrefetch: new Map(),
   };
 }
 

@@ -1,5 +1,10 @@
 import { sendCatch } from '@actual-app/core/platform/client/connection';
-import { parseAqlQuery } from '@actual-app/core/shared/formulas/aqlQuery';
+import {
+  defaultAqlRowLimit,
+  isAmountField,
+  maxAqlRowLimit,
+  parseAqlQuery,
+} from '@actual-app/core/shared/formulas/aqlQuery';
 import type { ParsedAqlQuery } from '@actual-app/core/shared/formulas/aqlQuery';
 import type { QueryDateRange } from '@actual-app/core/shared/formulas/customFunctions';
 import type { Query } from '@actual-app/core/shared/query';
@@ -77,23 +82,68 @@ export async function fetchAqlQueryCount(
   return toNumber(await runAqlQuery(query.calculate({ $count: '*' })));
 }
 
-// The first rows of a table query, as the database gives them, for the
-// editor preview
-export async function fetchAqlQueryRows(
+export type AqlQueryTable = {
+  columns: string[];
+  // As the database gives them: a money cell is an integer
+  rows: Array<Array<string | number | boolean | null>>;
+  isMoneyColumn: boolean[];
+  // The query gives more rows than rowLimit, so the rows stop there
+  isCut: boolean;
+  rowLimit: number;
+};
+
+// For QUERY_TABLE and the editor preview. The rows stop at the row limit of
+// the query, or at a smaller limit that the query has.
+export async function fetchAqlQueryTable(
   aql: FormulaAqlConfig,
   dateRange: QueryDateRange | null,
-  limit: number,
-): Promise<Array<Record<string, unknown>>> {
+  rowLimit = getAqlRowLimit(aql),
+): Promise<AqlQueryTable> {
   const parsed = parseAqlConfig(aql);
   if (parsed.kind !== 'table') {
-    throw new FormulaQueryError(getKindMessage(parsed));
+    throw new FormulaQueryError(getQueryTableKindMessage(parsed));
   }
   let query = addDateRange(parsed.query, aql, dateRange);
-  if (query.state.limit === null || query.state.limit > limit) {
-    query = query.limit(limit);
+  const ownLimit = query.state.limit;
+  const isLimitChecked = ownLimit === null || ownLimit > rowLimit;
+  if (isLimitChecked) {
+    // One more row shows that the limit cuts the result
+    query = query.limit(rowLimit + 1);
   }
-  const rows = await runAqlQuery(query);
-  return Array.isArray(rows) ? rows : [];
+  const data = await runAqlQuery(query);
+  const records: Array<Record<string, unknown>> = Array.isArray(data)
+    ? data
+    : [];
+  const isCut = isLimitChecked && records.length > rowLimit;
+  const shownRecords = isCut ? records.slice(0, rowLimit) : records;
+
+  const columns =
+    parsed.columns?.map(column => column.name) ??
+    Object.keys(shownRecords[0] ?? {});
+  const moneyColumns =
+    aql.moneyColumns ??
+    (parsed.columns
+      ? parsed.columns
+          .filter(column => column.usesAmount)
+          .map(column => column.name)
+      : columns.filter(isAmountField));
+  return {
+    columns,
+    rows: shownRecords.map(record =>
+      columns.map(column => toTableValue(record[column])),
+    ),
+    isMoneyColumn: columns.map(column => moneyColumns.includes(column)),
+    isCut,
+    rowLimit,
+  };
+}
+
+export function getAqlRowLimit(aql: FormulaAqlConfig) {
+  const { rowLimit } = aql;
+  if (rowLimit === undefined || !Number.isInteger(rowLimit) || rowLimit < 1) {
+    return defaultAqlRowLimit;
+  }
+  return Math.min(rowLimit, maxAqlRowLimit);
 }
 
 // The fields that the time frame can filter, for each table
@@ -123,13 +173,35 @@ function getKindMessage(parsed: ParsedAqlQuery) {
   }
   if (parsed.table !== 'transactions') {
     return t(
-      'This AQL query reads {{table}}, not transactions, so it gives a table',
+      'This AQL query reads {{table}}, not transactions, so it gives a table. Use it in QUERY_TABLE',
       { table: parsed.table },
     );
   }
   return t(
-    'This AQL query gives a table, because it has select, groupBy, orderBy, limit or offset',
+    'This AQL query gives a table, because it has select, groupBy, orderBy, limit or offset. Use it in QUERY_TABLE',
   );
+}
+
+function getQueryTableKindMessage(parsed: ParsedAqlQuery) {
+  if (parsed.kind === 'value') {
+    return t('This AQL query gives one value. Use it in QUERY');
+  }
+  return t(
+    'This AQL query is a filter. Use it in QUERY, QUERY_COUNT, QUERY_GROUP or QUERY_PIVOT, or add select to use it in QUERY_TABLE',
+  );
+}
+
+// A value that is not text, a number or a boolean shows as JSON
+function toTableValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  return JSON.stringify(value);
 }
 
 function addDateRange(

@@ -81,6 +81,14 @@ export type QueryGroupRequest = {
 // name of the row, then the sum for each column.
 export type QueryGroupRow = Array<string | number>;
 
+// The result of a table AQL query for QUERY_TABLE. A null cell is empty.
+export type QueryTableResult = {
+  // The column names, in select order. The header argument adds them as the
+  // first row.
+  columns: string[];
+  rows: Array<Array<string | number | boolean | null>>;
+};
+
 export type FormulaQueryContext = {
   queryNames?: Set<string>;
   queryCountNames?: Set<string>;
@@ -102,6 +110,8 @@ export type FormulaQueryContext = {
   // Keyed by createQueryGroupPrefetchKey
   queryGroupRequests?: Map<string, QueryGroupRequest>;
   queryGroupPrefetch?: Map<string, QueryGroupRow[]>;
+  queryTableNames?: Set<string>;
+  queryTablePrefetch?: Map<string, QueryTableResult>;
 };
 
 type CustomFunctionsContext = {
@@ -275,6 +285,43 @@ function getQueryGroupRowsOrEmpty(
     ];
   }
   return [[...request.dimensions.map(() => ''), 0]];
+}
+
+// The cells of a QUERY_TABLE result. A table cannot have zero rows, so a
+// query without rows gives one row of empty cells, or only the header row.
+function getQueryTableCells(
+  result: QueryTableResult | undefined,
+  hasHeader: boolean,
+): Array<Array<string | number | boolean | typeof EmptyValue>> {
+  const columns = result?.columns ?? [];
+  const width = Math.max(1, columns.length);
+  const rows = (result?.rows ?? []).map(row =>
+    Array.from({ length: width }, (_, columnIndex) => {
+      const cell = row[columnIndex];
+      return cell === null || cell === undefined ? EmptyValue : cell;
+    }),
+  );
+  const headerRow = Array.from(
+    { length: width },
+    (_, columnIndex) => columns[columnIndex] ?? '',
+  );
+  if (hasHeader) return [headerRow, ...rows];
+  return rows.length > 0
+    ? rows
+    : [Array.from({ length: width }, () => EmptyValue)];
+}
+
+// The header argument of QUERY_TABLE as it is in the formula: TRUE(), FALSE()
+// or a number. undefined: a different value, so the size is not known.
+function getLiteralBoolean(arg: ProcedureAst['args'][number] | undefined) {
+  if (arg === undefined || arg.type === 'EMPTY') return false;
+  if (arg.type === 'NUMBER') return arg.value !== 0;
+  if (arg.type === 'FUNCTION_CALL' && arg.args.length === 0) {
+    const name = arg.procedureName.toUpperCase();
+    if (name === 'TRUE') return true;
+    if (name === 'FALSE') return false;
+  }
+  return undefined;
 }
 
 function categoryRangeToIds(categories: SimpleRangeValue): string[] {
@@ -632,6 +679,55 @@ export class CustomFunctionsPlugin extends FunctionPlugin {
     return this.queryGroupSizeFor(ast, 'count', 'wide');
   }
 
+  queryTable(ast: ProcedureAst, state: InterpreterState) {
+    const [queryNameAst, headerAst] = ast.args;
+    if (
+      queryNameAst?.type !== 'STRING' ||
+      getLiteralBoolean(headerAst) === undefined
+    ) {
+      return new CellError(
+        ErrorType.VALUE,
+        'The arguments of QUERY_TABLE must be in the formula, for example QUERY_TABLE("name", TRUE())',
+      );
+    }
+    return this.runFunction(
+      ast.args,
+      state,
+      this.metadata('QUERY_TABLE'),
+      (queryName: string, hasHeader: boolean) => {
+        const ctx = this.getFormulaQueryContext();
+        ctx?.queryTableNames?.add(queryName);
+        return SimpleRangeValue.onlyValues(
+          getQueryTableCells(
+            ctx?.queryTablePrefetch?.get(queryName),
+            hasHeader,
+          ),
+        );
+      },
+    );
+  }
+
+  // The size comes from the fetched rows. A bad argument gives one cell for
+  // the error.
+  queryTableSize(ast: ProcedureAst): ArraySize {
+    const [queryNameAst, headerAst] = ast.args;
+    const hasHeader = getLiteralBoolean(headerAst);
+    if (
+      queryNameAst?.type !== 'STRING' ||
+      hasHeader === undefined ||
+      ast.args.length > 2
+    ) {
+      return ArraySize.scalar();
+    }
+    const cells = getQueryTableCells(
+      this.getFormulaQueryContext()?.queryTablePrefetch?.get(
+        queryNameAst.value,
+      ),
+      hasHeader,
+    );
+    return new ArraySize(cells[0].length, cells.length);
+  }
+
   budgetQuery(ast: ProcedureAst, state: InterpreterState) {
     return this.runFunction(
       ast.args,
@@ -874,6 +970,18 @@ CustomFunctionsPlugin.implementedFunctions = {
     sizeOfResultArrayMethod: 'queryPivotCountSize',
     parameters: queryGroupParameters,
   },
+  QUERY_TABLE: {
+    method: 'queryTable',
+    sizeOfResultArrayMethod: 'queryTableSize',
+    parameters: [
+      { argumentType: FunctionArgumentType.STRING },
+      {
+        argumentType: FunctionArgumentType.BOOLEAN,
+        optionalArg: true,
+        defaultValue: false,
+      },
+    ],
+  },
   BUDGET_QUERY: {
     method: 'budgetQuery',
     parameters: [
@@ -959,6 +1067,7 @@ export const customFunctionsTranslations = {
     QUERY_GROUP_COUNT: 'QUERY_GROUP_COUNT',
     QUERY_PIVOT: 'QUERY_PIVOT',
     QUERY_PIVOT_COUNT: 'QUERY_PIVOT_COUNT',
+    QUERY_TABLE: 'QUERY_TABLE',
     BUDGET_QUERY: 'BUDGET_QUERY',
     FORMATNUMBER: 'FORMATNUMBER',
     FORMATCURRENCY: 'FORMATCURRENCY',

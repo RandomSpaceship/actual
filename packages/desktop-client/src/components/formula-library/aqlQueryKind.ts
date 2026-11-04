@@ -21,7 +21,7 @@ export function describeAqlQuery(text: string): {
     case 'value':
       return { label: t('One value. It works in QUERY') };
     default:
-      return { label: t('A table. No formula function reads it yet') };
+      return { label: t('A table. It works in QUERY_TABLE') };
   }
 }
 

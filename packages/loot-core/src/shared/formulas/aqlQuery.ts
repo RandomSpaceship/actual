@@ -14,6 +14,11 @@ export const aqlQueryTables = [
   'reflect_budgets',
 ] as const;
 
+// The most rows that a table query gives, if the query has no smaller limit.
+// The library query can change it up to maxAqlRowLimit.
+export const defaultAqlRowLimit = 1000;
+export const maxAqlRowLimit = 10000;
+
 // 'grouped' gives nested rows, which a formula cannot use
 const aqlSplitOptions = ['inline', 'none', 'all'];
 
@@ -35,12 +40,19 @@ const aqlQueryKeys = [
 // table: the query gives rows.
 export type AqlQueryKind = 'filter' | 'value' | 'table';
 
+// A column of a table query. usesAmount: the expression reads a field named
+// amount, so the column is money by default.
+export type AqlQueryColumn = { name: string; usesAmount: boolean };
+
 export type ParsedAqlQuery = {
   kind: AqlQueryKind;
   table: string;
   query: Query;
   // A value query whose calculate is $count gives a count, not an amount
   isCountCalculation: boolean;
+  // The columns of a table query, in select order. null: the select has a *,
+  // so only the rows give the columns.
+  columns: AqlQueryColumn[] | null;
 };
 
 export type AqlQueryParseResult =
@@ -165,6 +177,7 @@ export function parseAqlQuery(text: string): AqlQueryParseResult {
         query: query.calculate(calculate),
         isCountCalculation:
           isPlainObject(calculate) && Object.keys(calculate)[0] === '$count',
+        columns: null,
       },
     };
   }
@@ -177,8 +190,54 @@ export function parseAqlQuery(text: string): AqlQueryParseResult {
       // A table without select gives all fields
       query: isFilter || 'select' in json ? query : query.select('*'),
       isCountCalculation: false,
+      columns:
+        !isFilter && isExpressionList(json.select)
+          ? getSelectColumns(json.select)
+          : null,
     },
   };
+}
+
+// A select item is a field name, which is also the column name, or an object
+// with the column name as its key. null: a field name has a *.
+function getSelectColumns(
+  select: ObjectExpression | string | Array<ObjectExpression | string>,
+): AqlQueryColumn[] | null {
+  const items = Array.isArray(select) ? select : [select];
+  if (items.some(item => typeof item === 'string' && item.includes('*'))) {
+    return null;
+  }
+  return items.flatMap(item =>
+    typeof item === 'string'
+      ? [{ name: item, usesAmount: isAmountField(item) }]
+      : Object.entries(item).map(([name, expression]) => ({
+          name,
+          usesAmount:
+            typeof expression === 'string'
+              ? isAmountField(expression)
+              : usesAmountField(expression),
+        })),
+  );
+}
+
+// "amount" or a path that ends in it, such as "parent.amount"
+export function isAmountField(field: string) {
+  return field === 'amount' || field.endsWith('.amount');
+}
+
+// A field in an expression starts with $, for example {"$sum": "$amount"}.
+// Other text is a value.
+function usesAmountField(expression: unknown): boolean {
+  if (typeof expression === 'string') {
+    return expression.startsWith('$') && isAmountField(expression.slice(1));
+  }
+  if (Array.isArray(expression)) {
+    return expression.some(usesAmountField);
+  }
+  if (isPlainObject(expression)) {
+    return Object.values(expression).some(usesAmountField);
+  }
+  return false;
 }
 
 function isAqlQueryTable(

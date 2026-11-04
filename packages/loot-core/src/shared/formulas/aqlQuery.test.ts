@@ -32,6 +32,38 @@ describe('parseAqlQuery', () => {
     expect(parse({ table: 'payees' }).query?.kind).toBe('table');
   });
 
+  it('gives the columns of a table query, and the ones that read amount', () => {
+    expect(
+      parseAqlQuery(
+        JSON.stringify({
+          table: 'transactions',
+          groupBy: ['payee.name'],
+          select: [
+            'payee.name',
+            'parent.amount',
+            { total: { $sum: '$amount' } },
+            { count: { $count: '$id' } },
+            { plain: 'amount' },
+            { text: { $eq: ['$notes', 'amount'] } },
+          ],
+        }),
+      ).query?.columns,
+    ).toEqual([
+      { name: 'payee.name', usesAmount: false },
+      { name: 'parent.amount', usesAmount: true },
+      { name: 'total', usesAmount: true },
+      { name: 'count', usesAmount: false },
+      { name: 'plain', usesAmount: true },
+      { name: 'text', usesAmount: false },
+    ]);
+    // A * gives the columns only with the rows
+    expect(
+      parseAqlQuery('{"table": "payees", "select": ["id", "*"]}').query
+        ?.columns,
+    ).toBeNull();
+    expect(parseAqlQuery('{"table": "payees"}').query?.columns).toBeNull();
+  });
+
   it('marks a $count calculation as a count', () => {
     expect(
       parse({ table: 'transactions', calculate: { $count: '*' } }).query

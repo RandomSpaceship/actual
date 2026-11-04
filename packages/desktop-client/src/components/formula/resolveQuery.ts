@@ -20,6 +20,11 @@ export type FormulaAqlConfig = {
   // transactions. null: no date field.
   dateField?: string | null;
   isCount?: boolean;
+  // The money columns of a table query, by name. undefined: the columns that
+  // read a field named amount.
+  moneyColumns?: string[];
+  // The most rows that a table query gives. undefined: defaultAqlRowLimit.
+  rowLimit?: number;
 };
 
 export type FormulaQueryConfig = {
@@ -46,6 +51,8 @@ export type FormulaIssue = {
     | 'unformattable'
     // The table shows only part of the result
     | 'table-cut'
+    // A table AQL query gives more rows than its row limit
+    | 'rows-cut'
     // The chart cannot show the table as the settings say
     | 'chart'
     | 'shadowed'
@@ -199,6 +206,8 @@ export function resolveQuery(
                   text: libraryItem.data.aql,
                   dateField: libraryItem.data.dateField,
                   isCount: libraryItem.data.isCount,
+                  moneyColumns: libraryItem.data.moneyColumns,
+                  rowLimit: libraryItem.data.rowLimit,
                 },
               }
             : {

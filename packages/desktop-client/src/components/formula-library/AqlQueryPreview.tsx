@@ -4,17 +4,22 @@ import { Trans } from 'react-i18next';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import type { TimeFrame } from '@actual-app/core/types/models';
+import type {
+  FormulaTableColumn,
+  TimeFrame,
+} from '@actual-app/core/types/models';
 
 import { FinancialText } from '#components/FinancialText';
 import {
   fetchAqlQueryCount,
-  fetchAqlQueryRows,
   fetchAqlQueryValue,
   FormulaQueryError,
   parseAqlConfig,
 } from '#components/formula/aqlSource';
-import { getQueryDateRange } from '#components/formula/executeFormula';
+import {
+  fetchQueryTable,
+  getQueryDateRange,
+} from '#components/formula/executeFormula';
 import type { FormulaTableCell } from '#components/formula/executeFormula';
 import { FormulaTable } from '#components/formula/FormulaTable';
 import type { FormulaAqlConfig } from '#components/formula/resolveQuery';
@@ -28,7 +33,11 @@ const previewDelayMs = 400;
 type Preview =
   | { kind: 'filter'; sum: number; count: number }
   | { kind: 'value'; value: number; isAmount: boolean }
-  | { kind: 'table'; table: FormulaTableCell[][] }
+  | {
+      kind: 'table';
+      table: FormulaTableCell[][];
+      columns: FormulaTableColumn[];
+    }
   | { kind: 'error'; message: string };
 
 type AqlQueryPreviewProps = {
@@ -109,17 +118,20 @@ export function AqlQueryPreview({ aql, timeFrame }: AqlQueryPreviewProps) {
         </Text>
       )}
       {preview.kind === 'table' &&
-        (preview.table.length <= 1 ? (
+        (preview.table.length === 0 ? (
           <Text style={{ color: theme.pageTextSubdued }}>
             <Trans>No rows</Trans>
           </Text>
         ) : (
           <View style={{ gap: 5 }}>
-            <FormulaTable table={preview.table} headerRow compact />
+            <FormulaTable
+              table={preview.table}
+              columns={preview.columns}
+              compact
+            />
             <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
               <Trans count={previewRowCount}>
-                The first {{ count: previewRowCount }} rows, with the values as
-                the database stores them (amounts in cents)
+                The first {{ count: previewRowCount }} rows
               </Trans>
             </Text>
           </View>
@@ -148,8 +160,20 @@ async function runPreview(
         return { kind: 'value', value, isAmount };
       }
       default: {
-        const rows = await fetchAqlQueryRows(aql, dateRange, previewRowCount);
-        return { kind: 'table', table: toTable(rows) };
+        const { columns, rows, isMoneyColumn } = await fetchQueryTable(
+          { aql, timeFrame },
+          previewRowCount,
+        );
+        return {
+          kind: 'table',
+          table: rows,
+          // Text, so that a number column such as a year does not show as
+          // money or with a thousands separator
+          columns: columns.map((name, columnIndex) => ({
+            name,
+            type: isMoneyColumn[columnIndex] ? 'money' : 'text',
+          })),
+        };
       }
     }
   } catch (error) {
@@ -161,18 +185,4 @@ async function runPreview(
           : String(error instanceof Error ? error.message : error),
     };
   }
-}
-
-// A header row with the field names, then a row for each database row
-function toTable(rows: Array<Record<string, unknown>>): FormulaTableCell[][] {
-  const fields = Object.keys(rows[0] ?? {});
-  return [fields, ...rows.map(row => fields.map(field => toCell(row[field])))];
-}
-
-function toCell(value: unknown): FormulaTableCell {
-  if (value === null || value === undefined) return null;
-  // Text, so that the table does not show cents as money
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'string' || typeof value === 'boolean') return value;
-  return JSON.stringify(value);
 }

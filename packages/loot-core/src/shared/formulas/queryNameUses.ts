@@ -17,6 +17,7 @@ const QUERY_NAME_FUNCTIONS = new Set([
   'QUERY_GROUP_COUNT',
   'QUERY_PIVOT',
   'QUERY_PIVOT_COUNT',
+  'QUERY_TABLE',
 ]);
 
 export type QueryNameReference = {

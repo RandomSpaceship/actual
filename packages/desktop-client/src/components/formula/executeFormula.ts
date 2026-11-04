@@ -45,6 +45,7 @@ import { bootstrapHyperFormula } from '#util/bootstrapHyperFormula';
 import {
   buildAqlFilterQuery,
   fetchAqlQueryCount,
+  fetchAqlQueryTable,
   fetchAqlQueryValue,
   FormulaQueryError,
   getAqlDateField,
@@ -100,6 +101,8 @@ function createFormulaQueryContext(): Required<FormulaQueryContext> {
     budgetQueryErrors: new Map(),
     queryGroupRequests: new Map(),
     queryGroupPrefetch: new Map(),
+    queryTableNames: new Set(),
+    queryTablePrefetch: new Map(),
   };
 }
 
@@ -466,7 +469,8 @@ export async function executeFormula({
         addIssue,
       )) +
       (await prefetchAccountBalances(formulaQueryContext, accounts, addIssue)) +
-      (await prefetchQueryGroups(formulaQueryContext, resolveQuery, addIssue));
+      (await prefetchQueryGroups(formulaQueryContext, resolveQuery, addIssue)) +
+      (await prefetchQueryTables(formulaQueryContext, resolveQuery, addIssue));
     if (
       fetchCount === 0 &&
       (await prefetchBudgetQueries(formulaQueryContext)) === 0
@@ -558,7 +562,7 @@ async function prefetchQueryValues<T>({
   fallback: T;
   resolveQuery: QueryResolver;
   addIssue: AddIssue;
-  fetchValue: (config: FormulaQueryConfig) => Promise<T>;
+  fetchValue: (config: FormulaQueryConfig, queryName: string) => Promise<T>;
 }) {
   let fetchCount = 0;
   for (const queryName of names) {
@@ -574,7 +578,7 @@ async function prefetchQueryValues<T>({
     }
 
     try {
-      prefetch.set(queryName, await fetchValue(query.config));
+      prefetch.set(queryName, await fetchValue(query.config, queryName));
     } catch (err) {
       console.error(`Error running query "${queryName}":`, err);
       addIssue(getQueryFailedIssue(queryName, err));
@@ -706,7 +710,7 @@ async function prefetchQueryGroups(
         request,
         dateRange: getQueryDateRange(query.config),
       });
-      addLargeTableIssue(request, rows, addIssue);
+      addQueryGroupLargeTableIssue(request, rows, addIssue);
       formulaQueryContext.queryGroupPrefetch.set(
         key,
         // The names are text, so each number is a sum or a count
@@ -724,6 +728,72 @@ async function prefetchQueryGroups(
     }
   }
   return fetchCount;
+}
+
+// Returns the number of names that were not fetched before
+async function prefetchQueryTables(
+  formulaQueryContext: Required<FormulaQueryContext>,
+  resolveQuery: QueryResolver,
+  addIssue: AddIssue,
+) {
+  return prefetchQueryValues({
+    names: formulaQueryContext.queryTableNames,
+    prefetch: formulaQueryContext.queryTablePrefetch,
+    fallback: { columns: [], rows: [] },
+    resolveQuery,
+    addIssue,
+    fetchValue: async (config, queryName) => {
+      const queryTable = await fetchQueryTable(config);
+      addLargeTableIssue({
+        queryName,
+        rowCount: queryTable.rows.length,
+        columnCount: undefined,
+        addIssue,
+      });
+      if (queryTable.isCut) {
+        addIssue({
+          severity: 'warning',
+          kind: 'rows-cut',
+          name: queryName,
+          message: t(
+            'Query "{{name}}" gives more than {{rowLimit}} rows, so the table stops there. Add a filter or a limit to the query, or change its row limit',
+            { name: queryName, rowLimit: queryTable.rowLimit },
+          ),
+        });
+      }
+      return queryTable;
+    },
+  });
+}
+
+// The rows of a table AQL query, with amounts in the money columns. A filter
+// query gives an error, because it has no columns.
+export async function fetchQueryTable(
+  config: FormulaQueryConfig,
+  rowLimit?: number,
+) {
+  if (!config.aql) {
+    throw new FormulaQueryError(
+      t(
+        'QUERY_TABLE needs an AQL query with select or groupBy, not a query from the query editor',
+      ),
+    );
+  }
+  const queryTable = await fetchAqlQueryTable(
+    config.aql,
+    getQueryDateRange(config),
+    rowLimit,
+  );
+  return {
+    ...queryTable,
+    rows: queryTable.rows.map(row =>
+      row.map((cell, columnIndex) =>
+        queryTable.isMoneyColumn[columnIndex] && typeof cell === 'number'
+          ? integerToFormulaAmount(cell)
+          : cell,
+      ),
+    ),
+  };
 }
 
 // The table view shows at most this part of a table. The formula still gets
@@ -771,35 +841,57 @@ function addTableCutIssue(table: FormulaTable, addIssue: AddIssue) {
 const largeTableRows = 50;
 const largeTableColumns = 20;
 
-function addLargeTableIssue(
+function addQueryGroupLargeTableIssue(
   request: QueryGroupRequest,
   rows: QueryGroupRow[],
   addIssue: AddIssue,
 ) {
-  // A wide table has a header row and a name column
+  // A wide table has a header row and a name column. The columns of a long
+  // table do not grow with the data.
   const isWide = request.shape === 'wide';
-  const rowCount = isWide ? rows.length - 1 : rows.length;
-  const columnCount = isWide ? (rows[0]?.length ?? 1) - 1 : 0;
-  if (rowCount <= largeTableRows && columnCount <= largeTableColumns) return;
+  addLargeTableIssue({
+    queryName: request.queryName,
+    rowCount: isWide ? rows.length - 1 : rows.length,
+    columnCount: isWide ? (rows[0]?.length ?? 1) - 1 : undefined,
+    addIssue,
+  });
+}
+
+// columnCount: undefined when the query sets the columns
+function addLargeTableIssue({
+  queryName,
+  rowCount,
+  columnCount,
+  addIssue,
+}: {
+  queryName: string;
+  rowCount: number;
+  columnCount: number | undefined;
+  addIssue: AddIssue;
+}) {
+  if (rowCount <= largeTableRows && (columnCount ?? 0) <= largeTableColumns) {
+    return;
+  }
   addIssue({
     severity: 'warning',
     kind: 'large-table',
-    name: request.queryName,
-    message: isWide
-      ? t(
-          'The table for query "{{name}}" has {{rowCount}} rows and {{columnCount}} columns. A table with more than {{largeTableRows}} rows or {{largeTableColumns}} columns is hard to read and slow to show.',
-          {
-            name: request.queryName,
-            rowCount,
-            columnCount,
-            largeTableRows,
-            largeTableColumns,
-          },
-        )
-      : t(
-          'The table for query "{{name}}" has {{rowCount}} rows. A table with more than {{largeTableRows}} rows is hard to read and slow to show.',
-          { name: request.queryName, rowCount, largeTableRows },
-        ),
+    name: queryName,
+    message:
+      columnCount !== undefined
+        ? t(
+            'The table for query "{{name}}" has {{rowCount}} rows and {{columnCount}} columns. A table with more than {{largeTableRows}} rows or {{largeTableColumns}} columns is hard to read and slow to show.',
+            {
+              name: queryName,
+              rowCount,
+              columnCount,
+              largeTableRows,
+              largeTableColumns,
+            },
+          )
+        : t(
+            'The table for query "{{name}}" has {{rowCount}} rows. A table with more than {{largeTableRows}} rows is hard to read and slow to show.',
+            { name: queryName, rowCount, largeTableRows },
+          ),
   });
 }
 

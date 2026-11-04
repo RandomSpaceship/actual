@@ -446,6 +446,26 @@ export function getFormulaFunctionCatalog(): Record<
         },
       ],
     },
+    QUERY_TABLE: {
+      name: 'QUERY_TABLE',
+      category: 'query',
+      modes: ['query'],
+      description: t(
+        'Get the rows of a named AQL query that has select or groupBy, with one column for each select item. The arguments must be in the formula.',
+      ),
+      parameters: [
+        {
+          name: 'queryName',
+          description: t('Name of the saved AQL query (string)'),
+        },
+        {
+          name: 'header',
+          description: t(
+            'TRUE() adds the column names as the first row (optional)',
+          ),
+        },
+      ],
+    },
     FLOOR: {
       name: 'FLOOR',
       category: 'math',

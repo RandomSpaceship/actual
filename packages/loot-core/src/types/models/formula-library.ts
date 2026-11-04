@@ -45,6 +45,12 @@ export type FormulaLibraryAqlQueryData = {
   timeFrame?: Partial<TimeFrame>;
   // A value query gives a count, not an amount
   isCount?: boolean;
+  // The money columns of a table query, by name. undefined: the columns that
+  // read a field named amount.
+  moneyColumns?: string[];
+  // The most rows that a table query gives, up to maxAqlRowLimit. undefined:
+  // defaultAqlRowLimit.
+  rowLimit?: number;
 };
 
 // A query in AQL. Formulas use its name as the name of a filter query

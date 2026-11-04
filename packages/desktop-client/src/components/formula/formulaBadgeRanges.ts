@@ -113,6 +113,7 @@ const queryNameFunctions = new Set([
   'QUERY_GROUP_COUNT',
   'QUERY_PIVOT',
   'QUERY_PIVOT_COUNT',
+  'QUERY_TABLE',
 ]);
 
 const budgetDimensions = new Set<string>(budgetQueryDimensions);
