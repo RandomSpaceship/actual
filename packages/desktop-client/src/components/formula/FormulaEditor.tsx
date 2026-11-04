@@ -4,7 +4,8 @@ import { Trans } from 'react-i18next';
 
 import { styles } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
-import { EditorView } from '@codemirror/view';
+import { Prec } from '@codemirror/state';
+import { EditorView, keymap } from '@codemirror/view';
 import CodeMirror, { EditorState } from '@uiw/react-codemirror';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 
@@ -41,6 +42,8 @@ type FormulaEditorProps = {
   showLineNumbers?: boolean;
   // Gives the CodeMirror view, for example to insert text at the cursor
   onCreateEditor?: ReactCodeMirrorProps['onCreateEditor'];
+  // Ctrl+Enter (Cmd+Enter on a Mac) calls it
+  onRun?: () => void;
 };
 
 type BadgePickerState = {
@@ -77,8 +80,14 @@ export function FormulaEditor({
   singleLine = false,
   showLineNumbers = true,
   onCreateEditor,
+  onRun,
 }: FormulaEditorProps) {
   const [activeTheme] = useTheme();
+  // A ref, so that a new onRun does not make new extensions
+  const onRunRef = useRef(onRun);
+  useEffect(() => {
+    onRunRef.current = onRun;
+  });
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
   const [queryPicker, setQueryPicker] = useState<BadgePickerState | null>(null);
   const [dimensionPicker, setDimensionPicker] =
@@ -315,6 +324,18 @@ export function FormulaEditor({
       ),
       EditorView.lineWrapping,
       EditorView.editable.of(!disabled),
+      Prec.highest(
+        keymap.of([
+          {
+            key: 'Mod-Enter',
+            run: () => {
+              if (!onRunRef.current) return false;
+              onRunRef.current();
+              return true;
+            },
+          },
+        ]),
+      ),
       // Must come late + highest precedence so Tab accepts completion when the popup is open
       autocompleteTabAcceptHighest,
     ],

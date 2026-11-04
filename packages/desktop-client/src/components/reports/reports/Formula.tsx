@@ -22,6 +22,7 @@ import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
+import { maxShownTableColumns } from '#components/formula/executeFormula';
 import {
   FormulaTable,
   getFormulaTableColumnNames,
@@ -121,6 +122,25 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     widget?.meta?.tableTotals ?? 'none',
   );
 
+  // The editor runs these inputs, not the inputs as you type them, so that
+  // a formula that is half typed does not start a slow query. Run, Ctrl+Enter
+  // and Save update them.
+  const [ranInputs, setRanInputs] = useState(() => ({
+    formula,
+    colorFormula,
+    queries,
+    timeFrameOverrides,
+  }));
+  function runFormula() {
+    setRanInputs({ formula, colorFormula, queries, timeFrameOverrides });
+  }
+  const isChanged =
+    formula !== ranInputs.formula ||
+    colorFormula !== ranInputs.colorFormula ||
+    JSON.stringify(queries) !== JSON.stringify(ranInputs.queries) ||
+    JSON.stringify(timeFrameOverrides) !==
+      JSON.stringify(ranInputs.timeFrameOverrides);
+
   const title = widget?.meta?.name || t('Formula');
 
   const simpleAccounts = useMemo(
@@ -139,12 +159,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     error,
     issues,
   } = useFormulaExecution(
-    formula,
-    queries,
+    ranInputs.formula,
+    ranInputs.queries,
     undefined,
     undefined,
     simpleAccounts,
-    timeFrameOverrides,
+    ranInputs.timeFrameOverrides,
     view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
   );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
@@ -190,12 +210,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     issues: colorIssues,
   } = useFormulaExecution(
     // The table view has no colour
-    isTableView ? '' : colorFormula,
-    queries,
+    isTableView ? '' : ranInputs.colorFormula,
+    ranInputs.queries,
     undefined,
     colorVariables,
     simpleAccounts,
-    timeFrameOverrides,
+    ranInputs.timeFrameOverrides,
   );
 
   // For autocomplete and badges: card queries and library queries
@@ -277,6 +297,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
       return;
     }
 
+    // The editor then shows the result of the saved formula
+    runFormula();
     updateDashboardWidgetMutation.mutate(
       {
         widget: {
@@ -376,6 +398,10 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
+            // A table with many columns has many column settings. The pane
+            // scrolls, so that no section shrinks over another.
+            overflowY: 'auto',
+            minHeight: 0,
           }}
         >
           <View
@@ -385,6 +411,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               flexDirection: 'row',
               flexWrap: 'wrap',
               gap: 20,
+              flexShrink: 0,
             }}
           >
             <View>
@@ -440,16 +467,38 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               justifyContent: 'space-between',
               gap: 10,
               minHeight: 120,
+              flexShrink: 0,
             }}
           >
-            <div
+            <View
               style={{
-                fontSize: 14,
-                color: theme.pageTextSubdued,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
               }}
             >
-              <Trans>Result:</Trans>
-            </div>
+              <div
+                style={{
+                  fontSize: 14,
+                  color: theme.pageTextSubdued,
+                }}
+              >
+                <Trans>Result:</Trans>
+              </div>
+              <View style={{ flex: 1 }} />
+              {isChanged && (
+                <div style={{ fontSize: 13, color: theme.pageTextSubdued }}>
+                  <Trans>Changed. Select Run, or press Ctrl+Enter.</Trans>
+                </div>
+              )}
+              <Button
+                variant={isChanged ? 'primary' : 'normal'}
+                onPress={runFormula}
+              >
+                <Trans>Run</Trans>
+              </Button>
+            </View>
             <View
               style={{
                 height: isTableView ? 240 : 120,
@@ -487,7 +536,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           <View
             style={{
               flex: 1,
-              minHeight: 50,
+              minHeight: 150,
+              flexShrink: 0,
               margin: 20,
               overflow: 'hidden',
             }}
@@ -511,6 +561,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 categoryBadges={categoryBadges}
                 singleLine={false}
                 showLineNumbers
+                onRun={runFormula}
                 onCreateEditor={view => {
                   formulaEditorViewRef.current = view;
                   view.contentDOM.addEventListener('focus', () => {
@@ -521,9 +572,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             </Suspense>
           </View>
           {isTableView ? (
-            <View style={{ padding: '0 20px 20px 20px' }}>
+            <View style={{ padding: '0 20px 20px 20px', flexShrink: 0 }}>
               <FormulaTableColumnSettings
-                columnCount={table?.[0]?.length ?? 0}
+                columnCount={Math.min(
+                  table?.[0]?.length ?? 0,
+                  maxShownTableColumns,
+                )}
                 columns={tableColumns}
                 onChange={setTableColumns}
                 header={tableHeader}
@@ -627,6 +681,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                       categoryBadges={categoryBadges}
                       singleLine
                       showLineNumbers={false}
+                      onRun={runFormula}
                     />
                   </Suspense>
                 </View>
