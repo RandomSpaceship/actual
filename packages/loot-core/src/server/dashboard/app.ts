@@ -125,7 +125,7 @@ const exportModel = {
 
       // The file can hold any value here
       const type: unknown = item.type;
-      if (type !== 'query' && type !== 'provider') {
+      if (type !== 'query' && type !== 'aql-query' && type !== 'provider') {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.type value ${String(type)}.`,
         );
@@ -154,6 +154,12 @@ const exportModel = {
       ) {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.data.formula value.`,
+        );
+      }
+
+      if (item.type === 'aql-query' && typeof item.data.aql !== 'string') {
+        throw new ValidationError(
+          `Invalid formulaLibrary.${idx}.data.aql value.`,
         );
       }
     });

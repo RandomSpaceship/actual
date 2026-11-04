@@ -397,3 +397,170 @@ describe('providers in a dashboard export and import', () => {
     });
   });
 });
+
+describe('AQL queries in a dashboard export and import', () => {
+  const coffeeAql =
+    '{"table": "transactions", "filter": {"payee.name": "Cafe"}}';
+  const exportedCoffee = {
+    id: 'exported-coffee-id',
+    type: 'aql-query' as const,
+    name: 'coffee',
+    data: { aql: coffeeAql },
+  };
+
+  function aqlQuery(
+    id: string,
+    name: string,
+    createdAt: number,
+    aql: string,
+  ): FormulaLibraryItemEntity {
+    return {
+      id,
+      type: 'aql-query',
+      name,
+      data: { aql },
+      created_at: createdAt,
+    };
+  }
+
+  function createIds() {
+    let count = 0;
+    return () => `new-id-${++count}`;
+  }
+
+  it('exports the AQL queries that the cards use', () => {
+    const library = [
+      aqlQuery('coffee-id', 'coffee', 1, coffeeAql),
+      aqlQuery('unused-id', 'unused', 2, coffeeAql),
+    ];
+
+    expect(
+      collectFormulaLibraryForExport(
+        [formulaWidget({ formula: '=QUERY("Coffee")' })],
+        library,
+      ),
+    ).toEqual([
+      {
+        id: 'coffee-id',
+        type: 'aql-query',
+        name: 'coffee',
+        data: { aql: coffeeAql },
+      },
+    ]);
+  });
+
+  it('creates a new AQL query, and uses an identical one', () => {
+    const widgets = [formulaWidget({ formula: '=QUERY("coffee")' })];
+
+    expect(
+      planFormulaLibraryImport(widgets, [exportedCoffee], [], createIds())
+        .itemsToCreate,
+    ).toEqual([{ ...exportedCoffee, id: 'new-id-1' }]);
+
+    // The same JSON with another layout is the same query
+    const plan = planFormulaLibraryImport(
+      [
+        formulaWidget({
+          formula: '=QUERY("coffee")',
+          timeFrameOverrides: {
+            'exported-coffee-id': { name: 'coffee', timeFrame: february },
+          },
+        }),
+      ],
+      [exportedCoffee],
+      [
+        aqlQuery(
+          'local-coffee-id',
+          'Coffee',
+          1,
+          JSON.stringify(JSON.parse(coffeeAql), null, 2),
+        ),
+      ],
+      createIds(),
+    );
+    expect(plan.itemsToCreate).toEqual([]);
+    expect(plan.widgets[0].meta?.timeFrameOverrides).toEqual({
+      'local-coffee-id': { name: 'coffee', timeFrame: february },
+    });
+  });
+
+  it('gives a different AQL query with the same name a new name in the imported formulas', () => {
+    const plan = planFormulaLibraryImport(
+      [
+        formulaWidget({
+          formula: '=QUERY("coffee") + Spend',
+          providers: { Card: { formula: '=QUERY_COUNT("Coffee")' } },
+          timeFrameOverrides: {
+            'exported-coffee-id': { name: 'coffee', timeFrame: february },
+          },
+        }),
+        // A card query hides the library query in this card
+        formulaWidget({
+          formula: '=QUERY("coffee")',
+          queries: { coffee: {} },
+        }),
+      ],
+      [
+        exportedCoffee,
+        {
+          id: 'exported-spend-id',
+          type: 'provider',
+          name: 'Spend',
+          data: { formula: '=QUERY("coffee") * 2' },
+        },
+      ],
+      [
+        aqlQuery('local-coffee-id', 'coffee', 1, '{"table": "payees"}'),
+        libraryQuery('local-coffee-2-id', 'Coffee_2', 2),
+      ],
+      createIds(),
+    );
+
+    expect(plan.itemsToCreate).toEqual([
+      // The providers get their ids first
+      { ...exportedCoffee, id: 'new-id-2', name: 'coffee_3' },
+      {
+        id: 'new-id-1',
+        type: 'provider',
+        name: 'Spend',
+        data: { formula: '=QUERY("coffee_3") * 2' },
+      },
+    ]);
+    expect(plan.widgets.map(({ meta }) => meta)).toEqual([
+      {
+        formula: '=QUERY("coffee_3") + Spend',
+        colorFormula: undefined,
+        providers: { Card: { formula: '=QUERY_COUNT("coffee_3")' } },
+        timeFrameOverrides: {
+          'new-id-2': { name: 'coffee_3', timeFrame: february },
+        },
+      },
+      { formula: '=QUERY("coffee")', queries: { coffee: {} } },
+    ]);
+  });
+
+  it('copies a filter query into the card when an AQL query has its name', () => {
+    const plan = planFormulaLibraryImport(
+      [formulaWidget({ formula: '=QUERY("food")' })],
+      [
+        {
+          id: 'exported-food-id',
+          type: 'query',
+          name: 'food',
+          data: { conditions: [...foodConditions], timeFrame: january },
+        },
+      ],
+      [aqlQuery('local-food-id', 'food', 1, coffeeAql)],
+      createIds(),
+    );
+
+    expect(plan.itemsToCreate).toEqual([]);
+    expect(plan.widgets[0].meta?.queries).toEqual({
+      food: {
+        conditions: foodConditions,
+        conditionsOp: 'and',
+        timeFrame: january,
+      },
+    });
+  });
+});

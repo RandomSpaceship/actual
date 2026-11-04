@@ -142,8 +142,13 @@ describe('dashboard-import', () => {
   });
 
   async function importFile(dashboard: ExportImportDashboard) {
+    return importJson(JSON.stringify(dashboard));
+  }
+
+  // For a file that the types do not allow
+  async function importJson(json: string) {
     const filePath = join(importDir, 'dashboard.json');
-    writeFileSync(filePath, JSON.stringify(dashboard));
+    writeFileSync(filePath, json);
     return runMutator(() =>
       dashboardApp.handlers['dashboard-import']({
         filePath,
@@ -243,6 +248,41 @@ describe('dashboard-import', () => {
     expect(foodCard?.meta?.queries).toEqual({
       Food: { conditions: [], conditionsOp: 'and', timeFrame: january },
     });
+  });
+
+  it('imports an AQL query, and rejects one without its text', async () => {
+    const aql = '{"table": "transactions"}';
+    await importFile({
+      version: 1,
+      widgets: [formulaCard('=QUERY("all")')],
+      formulaLibrary: [
+        {
+          id: 'exported-all-id',
+          type: 'aql-query',
+          name: 'all',
+          data: { aql },
+        },
+      ],
+    });
+    expect(
+      (await getLibrary()).map(({ type, name, data }) => ({
+        type,
+        name,
+        data,
+      })),
+    ).toEqual([{ type: 'aql-query', name: 'all', data: { aql } }]);
+
+    await expect(
+      importJson(
+        JSON.stringify({
+          version: 1,
+          widgets: [],
+          formulaLibrary: [
+            { id: 'item-id', type: 'aql-query', name: 'bad', data: {} },
+          ],
+        }),
+      ),
+    ).rejects.toThrow('formulaLibrary.0.data.aql');
   });
 
   it('rejects a formula library item without a name', async () => {

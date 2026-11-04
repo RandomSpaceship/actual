@@ -2,9 +2,11 @@ import { isEqual } from 'es-toolkit';
 
 import * as monthUtils from '#shared/months';
 import type {
+  ExportImportFormulaLibraryAqlQuery,
   ExportImportFormulaLibraryItem,
   ExportImportFormulaLibraryProvider,
   ExportImportFormulaLibraryQuery,
+  FormulaLibraryAqlQueryData,
   FormulaLibraryItemEntity,
   FormulaLibraryQueryData,
   FormulaWidget,
@@ -17,7 +19,11 @@ import {
   isValidProviderName,
   renameProviderInFormula,
 } from './providerNameUses';
-import { findQueryNameReferences, isSameQueryName } from './queryNameUses';
+import {
+  findQueryNameReferences,
+  isSameQueryName,
+  renameQueryInFormula,
+} from './queryNameUses';
 
 type FormulaMeta = NonNullable<FormulaWidget['meta']>;
 
@@ -114,16 +120,33 @@ function findLibraryItem<
   );
 }
 
-type ExportableLibraryItem = Exclude<
-  FormulaLibraryItemEntity,
-  { type: 'aql-query' }
->;
-
-// AQL queries are not in a dashboard export yet
 function sortOldestFirst(library: FormulaLibraryItemEntity[]) {
-  return library
-    .filter((item): item is ExportableLibraryItem => item.type !== 'aql-query')
-    .sort((a, b) => a.created_at - b.created_at);
+  return [...library].sort((a, b) => a.created_at - b.created_at);
+}
+
+// Filter queries and AQL queries share one set of names
+type ExportImportNamedQuery =
+  | ExportImportFormulaLibraryQuery
+  | ExportImportFormulaLibraryAqlQuery;
+
+function isNamedQuery(item: Pick<FormulaLibraryItemEntity, 'type'>): boolean {
+  return item.type === 'query' || item.type === 'aql-query';
+}
+
+function isExportImportNamedQuery(
+  item: ExportImportFormulaLibraryItem,
+): item is ExportImportNamedQuery {
+  return isNamedQuery(item);
+}
+
+// The library must be oldest first, because the oldest item wins a
+// duplicate name
+function findLibraryNamedQuery<
+  Item extends Pick<FormulaLibraryItemEntity, 'type' | 'name'>,
+>(library: Item[], name: string) {
+  return library.find(
+    item => isNamedQuery(item) && isSameQueryName(item.name, name),
+  );
 }
 
 // The winning provider of each name, as formulas use them
@@ -141,11 +164,16 @@ function getProviderFormulas(
 }
 
 function toExportItem(
-  item: ExportableLibraryItem,
+  item: FormulaLibraryItemEntity,
 ): ExportImportFormulaLibraryItem {
-  return item.type === 'provider'
-    ? { id: item.id, type: item.type, name: item.name, data: item.data }
-    : { id: item.id, type: item.type, name: item.name, data: item.data };
+  switch (item.type) {
+    case 'provider':
+      return { id: item.id, type: item.type, name: item.name, data: item.data };
+    case 'aql-query':
+      return { id: item.id, type: item.type, name: item.name, data: item.data };
+    default:
+      return { id: item.id, type: item.type, name: item.name, data: item.data };
+  }
 }
 
 // The library queries and providers that the formula cards use, for a
@@ -158,7 +186,7 @@ export function collectFormulaLibraryForExport(
   const providers = getProviderFormulas(oldestFirst);
   const items = new Map<string, ExportImportFormulaLibraryItem>();
 
-  function add(item: ExportableLibraryItem | undefined) {
+  function add(item: FormulaLibraryItemEntity | undefined) {
     if (item && !items.has(item.id)) {
       items.set(item.id, toExportItem(item));
     }
@@ -168,7 +196,7 @@ export function collectFormulaLibraryForExport(
     if (!isFormulaMeta(type, meta)) continue;
 
     for (const name of findLibraryQueryNames(meta, providers)) {
-      add(findLibraryItem(oldestFirst, 'query', name));
+      add(findLibraryNamedQuery(oldestFirst, name));
     }
     for (const name of findLibraryProviderNames(meta, providers)) {
       add(findLibraryItem(oldestFirst, 'provider', name));
@@ -187,6 +215,58 @@ function isSameQueryData(
     (a.conditionsOp ?? 'and') === (b.conditionsOp ?? 'and') &&
     isEqual(a.timeFrame, b.timeFrame)
   );
+}
+
+// The same query, as JSON. A change in the layout of the text does not count.
+function isSameAqlQueryData(
+  a: FormulaLibraryAqlQueryData,
+  b: FormulaLibraryAqlQueryData,
+) {
+  return (
+    isSameAqlText(a.aql, b.aql) &&
+    (a.dateField ?? undefined) === (b.dateField ?? undefined) &&
+    Boolean(a.isCount) === Boolean(b.isCount) &&
+    isEqual(a.timeFrame, b.timeFrame)
+  );
+}
+
+function isSameAqlText(a: string, b: string) {
+  try {
+    return isEqual(JSON.parse(a), JSON.parse(b));
+  } catch {
+    return a === b;
+  }
+}
+
+function isSameNamedQuery(
+  a: ExportImportNamedQuery,
+  b: ExportImportNamedQuery,
+) {
+  if (a.type === 'query' && b.type === 'query') {
+    return isSameQueryData(a.data, b.data);
+  }
+  if (a.type === 'aql-query' && b.type === 'aql-query') {
+    return isSameAqlQueryData(a.data, b.data);
+  }
+  return false;
+}
+
+// The first name of the form name_2, name_3 ... that no item in names has
+function findFreeQueryName(name: string, names: string[]) {
+  for (let suffix = 2; ; suffix++) {
+    const candidate = `${name}_${suffix}`;
+    if (!names.some(usedName => isSameQueryName(usedName, candidate))) {
+      return candidate;
+    }
+  }
+}
+
+function renameQueries(formula: string, renames: Map<string, string>) {
+  let renamed = formula;
+  for (const [oldName, newName] of renames) {
+    renamed = renameQueryInFormula(renamed, oldName, newName);
+  }
+  return renamed;
 }
 
 // A library time frame can leave out fields. A card query time frame cannot.
@@ -234,7 +314,7 @@ type ProviderImportPlan = {
 // - The library has no provider with the name: it gets a new item.
 function planProviderImport(
   exportedProviders: ExportImportFormulaLibraryProvider[],
-  library: ExportableLibraryItem[],
+  library: FormulaLibraryItemEntity[],
   createId: () => string,
 ): ProviderImportPlan {
   const localProviders = getProviderFormulas(library.map(toExportItem));
@@ -337,30 +417,44 @@ export function planFormulaLibraryImport<
 
   const libraryQueries = oldestFirst
     .map(toExportItem)
-    .filter(
-      (item): item is ExportImportFormulaLibraryQuery => item.type === 'query',
-    );
-  const queriesToCreate: ExportImportFormulaLibraryQuery[] = [];
+    .filter(isExportImportNamedQuery);
+  const exportedQueries = exportedItems.filter(isExportImportNamedQuery);
+  const queriesToCreate: ExportImportNamedQuery[] = [];
   const newIds = new Map<string, string>();
   const cardQueryItems = new Map<string, ExportImportFormulaLibraryQuery>();
+  // Exported AQL query names that the import changes, keyed by the old name
+  const queryRenames = new Map<string, string>();
+  // The new names, keyed by the exported id
+  const newNames = new Map<string, string>();
+  const usedQueryNames = [
+    ...libraryQueries.map(item => item.name),
+    ...exportedQueries.map(item => item.name),
+  ];
 
-  for (const exportedItem of exportedItems) {
-    if (exportedItem.type !== 'query') continue;
-
-    const existingItem = findLibraryItem(
+  for (const exportedItem of exportedQueries) {
+    const existingItem = findLibraryNamedQuery(
       libraryQueries,
-      'query',
       exportedItem.name,
     );
-    if (!existingItem) {
-      const newItem = { ...exportedItem, id: createId() };
+    if (existingItem && isSameNamedQuery(existingItem, exportedItem)) {
+      newIds.set(exportedItem.id, existingItem.id);
+    } else if (existingItem && exportedItem.type === 'query') {
+      cardQueryItems.set(exportedItem.id, exportedItem);
+    } else {
+      // A card query cannot be an AQL query, so a different AQL query with
+      // the same name gets a new name
+      const name = existingItem
+        ? findFreeQueryName(exportedItem.name, usedQueryNames)
+        : exportedItem.name;
+      if (name !== exportedItem.name) {
+        queryRenames.set(exportedItem.name, name);
+        newNames.set(exportedItem.id, name);
+        usedQueryNames.push(name);
+      }
+      const newItem = { ...exportedItem, id: createId(), name };
       queriesToCreate.push(newItem);
       libraryQueries.push(newItem);
       newIds.set(exportedItem.id, newItem.id);
-    } else if (isSameQueryData(existingItem.data, exportedItem.data)) {
-      newIds.set(exportedItem.id, existingItem.id);
-    } else {
-      cardQueryItems.set(exportedItem.id, exportedItem);
     }
   }
 
@@ -389,25 +483,34 @@ export function planFormulaLibraryImport<
       Object.entries(meta.timeFrameOverrides ?? {}).flatMap(
         ([exportedId, override]) => {
           const newId = newIds.get(exportedId);
-          return newId ? [[newId, override]] : [];
+          const name = newNames.get(exportedId) ?? override.name;
+          return newId ? [[newId, { ...override, name }]] : [];
         },
       ),
     );
 
-    // A name that a card provider hides is not the library provider
+    // A name that a card provider hides is not the library provider, and a
+    // name that a card query hides is not the library query
     const cardRenames = new Map(
       [...providerPlan.renames].filter(
         ([oldName]) => !isCardProviderName(meta, oldName),
       ),
     );
+    const cardQueryRenames = new Map(
+      [...queryRenames].filter(
+        ([oldName]) => findLocalQueryName(meta, oldName) === undefined,
+      ),
+    );
+    const renameFormula = (formula: string) =>
+      renameQueries(renameProviders(formula, cardRenames), cardQueryRenames);
     const rename = (formula: string | undefined) =>
-      formula === undefined ? undefined : renameProviders(formula, cardRenames);
+      formula === undefined ? undefined : renameFormula(formula);
 
     return {
       ...widget,
       meta: {
         ...meta,
-        ...(cardRenames.size > 0 && {
+        ...((cardRenames.size > 0 || cardQueryRenames.size > 0) && {
           formula: rename(meta.formula),
           colorFormula: rename(meta.colorFormula),
           ...(meta.providers && {
@@ -416,7 +519,7 @@ export function planFormulaLibraryImport<
                 name,
                 {
                   ...provider,
-                  formula: renameProviders(provider.formula, cardRenames),
+                  formula: renameFormula(provider.formula),
                 },
               ]),
             ),
@@ -430,6 +533,16 @@ export function planFormulaLibraryImport<
 
   return {
     widgets: newWidgets,
-    itemsToCreate: [...queriesToCreate, ...providerPlan.itemsToCreate],
+    itemsToCreate: [
+      ...queriesToCreate,
+      // An imported provider uses the new names of the AQL queries
+      ...providerPlan.itemsToCreate.map(item => ({
+        ...item,
+        data: {
+          ...item.data,
+          formula: renameQueries(item.data.formula, queryRenames),
+        },
+      })),
+    ],
   };
 }

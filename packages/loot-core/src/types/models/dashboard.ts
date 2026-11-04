@@ -1,5 +1,6 @@
 import type { ForecastSeries, ForecastSource } from './forecast';
 import type {
+  FormulaLibraryAqlQueryEntity,
   FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
@@ -421,8 +422,14 @@ export type ExportImportFormulaLibraryProvider = Pick<
   'id' | 'type' | 'name' | 'data'
 >;
 
+export type ExportImportFormulaLibraryAqlQuery = Pick<
+  FormulaLibraryAqlQueryEntity,
+  'id' | 'type' | 'name' | 'data'
+>;
+
 export type ExportImportFormulaLibraryItem =
   | ExportImportFormulaLibraryQuery
+  | ExportImportFormulaLibraryAqlQuery
   | ExportImportFormulaLibraryProvider;
 
 export type SummaryWidget = AbstractWidget<
