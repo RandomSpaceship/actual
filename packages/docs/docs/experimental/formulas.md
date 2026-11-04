@@ -540,6 +540,15 @@ The **Header row** setting has three options:
 
 A name under **Columns** replaces the name from the first row. If the table has no header row and no column has a name, the table shows no header row. A cell with an error shows the error, for example `#DIV/0!`. On a narrow card, scroll the table to the side to see all of the columns.
 
+The **Totals** setting adds totals to the table:
+
+- **None** (the default): no totals.
+- **Totals row**: a row at the end with the total of each **Money** and **Number** column. The first **Text** column shows **Total**.
+- **Totals column**: a column at the end with the total of the **Money** and **Number** cells of each row.
+- **Row and column**: both. The last cell of the totals row has the total of all rows.
+
+**Percent**, **Date** and **Text** columns get no total, and a cell with an error does not count. The totals show only on the card. They are not part of the formula result, so `INDEX` and other functions do not see them.
+
 The table view has no font size and no conditional color.
 
 If a formula gives a table but **Display** is **One value**, the card shows an error. Set **Display** to **Automatic** or **Table**, or use `INDEX` to get one cell from the table.

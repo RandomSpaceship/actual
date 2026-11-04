@@ -3,4 +3,4 @@ category: Features
 authors: [RandomSpaceship]
 ---
 
-Add formula functions that give a table with one column for each month or other group
+Add totals to formula card tables, and formula functions that give a column for each month or other group
