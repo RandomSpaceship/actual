@@ -9,6 +9,7 @@ import type {
   QueryGroupRequest,
   QueryGroupRow,
 } from '@actual-app/core/shared/formulas/customFunctions';
+import { findProviderNameReferences } from '@actual-app/core/shared/formulas/providerNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import { q } from '@actual-app/core/shared/query';
 import type { Query } from '@actual-app/core/shared/query';
@@ -116,9 +117,127 @@ type FormulaEvaluation = {
   cellError: { type: string; message?: string } | null;
   // The error type of each provider whose value is an error
   providerErrors: Map<string, string>;
-  // The upper-case names of the providers whose formula gives a table
-  tableProviders: Set<string>;
 };
+
+// The column letters of a 1-based column number, for example 28 gives AB
+function toColumnLetters(columnNumber: number) {
+  let letters = '';
+  for (let rest = columnNumber; rest > 0; rest = Math.floor((rest - 1) / 26)) {
+    letters = String.fromCharCode(65 + ((rest - 1) % 26)) + letters;
+  }
+  return letters;
+}
+
+// Puts each provider after the providers that it uses. The resolver already
+// stops a cycle, so a provider never uses itself.
+function sortProvidersByUse(providers: ResolvedProvider[]) {
+  const providersByKey = new Map(
+    providers.map(provider => [provider.name.toUpperCase(), provider]),
+  );
+  const sorted: ResolvedProvider[] = [];
+  const visited = new Set<string>();
+  function visit(provider: ResolvedProvider) {
+    const key = provider.name.toUpperCase();
+    if (visited.has(key)) return;
+    visited.add(key);
+    for (const usedName of provider.uses) {
+      const usedProvider = providersByKey.get(usedName.toUpperCase());
+      if (usedProvider) visit(usedProvider);
+    }
+    sorted.push(provider);
+  }
+  providers.forEach(visit);
+  return sorted;
+}
+
+// The range of a provider that gives a table, for each upper-case name
+type ProviderTableRanges = Map<
+  string,
+  { range: string; rows: number; columns: number }
+>;
+
+// A formula in a cell can use a range, but not a named range, as a table:
+// HyperFormula must know the size of a table when it parses the formula. Thus
+// each name of a provider that gives a table changes to its range. When the
+// name is all of the formula, the range alone gives #VALUE!, so
+// ARRAY_CONSTRAIN makes it a table. Lookup functions such as VLOOKUP need a
+// range, so other names stay a plain range.
+function replaceTableProviderNames(
+  formula: string,
+  tableRanges: ProviderTableRanges,
+) {
+  const tableReferences = findProviderNameReferences(formula).flatMap(
+    reference => {
+      const tableRange = tableRanges.get(reference.name.toUpperCase());
+      return tableRange ? [{ ...reference, ...tableRange }] : [];
+    },
+  );
+  const [onlyReference] = tableReferences;
+  if (
+    tableReferences.length === 1 &&
+    formula.slice(0, onlyReference.start).trim() === '=' &&
+    formula.slice(onlyReference.end).trim() === ''
+  ) {
+    const { range, rows, columns } = onlyReference;
+    return `=ARRAY_CONSTRAIN(${range}, ${rows}, ${columns})`;
+  }
+
+  let changed = formula;
+  // Replace from the end, so that the earlier positions stay correct
+  for (const reference of tableReferences.reverse()) {
+    changed =
+      changed.slice(0, reference.start) +
+      reference.range +
+      changed.slice(reference.end);
+  }
+  return changed;
+}
+
+// A named expression cannot hold a table. Thus each provider goes in cell A1
+// of its own sheet. A provider that gives one value gets a named range to its
+// cell. Formulas get the range of a provider that gives a table in place of
+// its name. A provider must come after the providers that it uses, because
+// their formulas change first.
+function addProviders(
+  hfInstance: ReturnType<typeof HyperFormula.buildEmpty>,
+  providers: ResolvedProvider[],
+) {
+  // The error type of each provider whose value is one error
+  const providerErrors = new Map<string, string>();
+  const tableRanges: ProviderTableRanges = new Map();
+  sortProvidersByUse(providers).forEach((provider, index) => {
+    const providerSheetName = hfInstance.addSheet(`__provider_${index + 1}`);
+    const providerSheetId = hfInstance.getSheetId(providerSheetName);
+    if (providerSheetId === undefined) {
+      throw new Error('Failed to create provider sheet');
+    }
+    const firstCell = { sheet: providerSheetId, col: 0, row: 0 };
+    hfInstance.setCellContents(firstCell, [
+      [replaceTableProviderNames(provider.formula, tableRanges)],
+    ]);
+
+    const firstCellReference = `'${providerSheetName}'!$A$1`;
+    const { width, height } = hfInstance.getSheetDimensions(providerSheetId);
+    if (width > 1 || height > 1) {
+      tableRanges.set(provider.name.toUpperCase(), {
+        range: `${firstCellReference}:$${toColumnLetters(width)}$${height}`,
+        rows: height,
+        columns: width,
+      });
+      return;
+    }
+
+    hfInstance.addNamedExpression(provider.name, `=${firstCellReference}`);
+    const providerValue = hfInstance.getCellValue(firstCell);
+    if (isHyperFormulaError(providerValue)) {
+      providerErrors.set(
+        provider.name.toUpperCase(),
+        providerValue.value ?? providerValue.type,
+      );
+    }
+  });
+  return { providerErrors, tableRanges };
+}
 
 function evaluateFormulaWithContext({
   formula,
@@ -162,12 +281,11 @@ function evaluateFormulaWithContext({
       }
     }
 
-    // HyperFormula finds the order and the cycles of the providers
-    for (const provider of providers) {
-      hfInstance.addNamedExpression(provider.name, provider.formula);
-    }
+    const { providerErrors, tableRanges } = addProviders(hfInstance, providers);
 
-    hfInstance.setCellContents({ sheet: sheetId, col: 0, row: 0 }, [[formula]]);
+    hfInstance.setCellContents({ sheet: sheetId, col: 0, row: 0 }, [
+      [replaceTableProviderNames(formula, tableRanges)],
+    ]);
 
     const cellValue = hfInstance.getCellValue({
       sheet: sheetId,
@@ -175,32 +293,12 @@ function evaluateFormulaWithContext({
       row: 0,
     });
 
-    const providerErrors = new Map<string, string>();
-    const tableProviders = new Set<string>();
-    for (const provider of providers) {
-      const providerValue = hfInstance.getNamedExpressionValue(provider.name);
-      if (!isHyperFormulaError(providerValue)) continue;
-      providerErrors.set(
-        provider.name.toUpperCase(),
-        providerValue.value ?? providerValue.type,
-      );
-      // A named expression cannot hold a table, so its value is #VALUE!. The
-      // same formula in calculateFormula gives the table.
-      if (
-        providerValue.type === 'VALUE' &&
-        Array.isArray(hfInstance.calculateFormula(provider.formula, sheetId))
-      ) {
-        tableProviders.add(provider.name.toUpperCase());
-      }
-    }
-
     if (isHyperFormulaError(cellValue)) {
       return {
         value: null,
         table: null,
         cellError: cellValue,
         providerErrors,
-        tableProviders,
       };
     }
 
@@ -217,7 +315,6 @@ function evaluateFormulaWithContext({
       table,
       cellError: null,
       providerErrors,
-      tableProviders,
     };
   } finally {
     hfInstance?.destroy();
@@ -250,9 +347,8 @@ const MAX_EVALUATION_PASSES = 20;
 // Problems with names (an unknown query, account or provider, or providers
 // that use each other) and failed fetches are returned as issues. An error
 // issue replaces the value. A provider whose value is an error also gives an
-// error issue. A provider gives one value only, so a provider whose formula
-// gives a table also gives an error issue. Other formula errors, and a formula
-// that does not start with "=", throw.
+// error issue. A provider can give a table, as a formula can. Other formula
+// errors, and a formula that does not start with "=", throw.
 //
 // A formula that spills into more than one cell gives a table. For the
 // 'value' output, a table is an error issue.
@@ -361,22 +457,6 @@ export async function executeFormula({
   }
 
   if (issues.some(issue => issue.severity === 'error')) {
-    return { value: null, issues };
-  }
-
-  const tableProvider = resolvedProviders.providers.find(provider =>
-    evaluation.tableProviders.has(provider.name.toUpperCase()),
-  );
-  if (tableProvider) {
-    addIssue({
-      severity: 'error',
-      kind: 'provider-table',
-      name: tableProvider.name,
-      message: t(
-        'Provider "{{name}}" gives a table. A provider can give only one value',
-        { name: tableProvider.name },
-      ),
-    });
     return { value: null, issues };
   }
 

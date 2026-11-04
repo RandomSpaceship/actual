@@ -217,7 +217,69 @@ describe('executeFormula', () => {
     ]);
   });
 
-  it('gives an error for a provider that gives a table', async () => {
+  it('uses a provider that gives one value in a table formula', async () => {
+    expect(
+      await run('={Base, Base + 1}', [provider('Base', '=QUERY("a")')], 'auto'),
+    ).toEqual({
+      value: null,
+      table: [[123.45, 124.45]],
+      spills: true,
+      issues: [],
+    });
+  });
+
+  it('uses a provider that gives a table', async () => {
+    const grid = provider('Grid', '=SEQUENCE(3, 2)');
+
+    expect(await run('=INDEX(Grid, 3, 2) + SUM(Grid)', [grid])).toEqual({
+      value: 6 + 21,
+      issues: [],
+    });
+    expect(await run('=TRANSPOSE(Grid)', [grid], 'auto')).toEqual({
+      value: null,
+      table: [
+        [1, 3, 5],
+        [2, 4, 6],
+      ],
+      spills: true,
+      issues: [],
+    });
+    expect((await run('= Grid ', [grid], 'auto')).table).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
+    expect(
+      (await run('=VLOOKUP(3, Grid, 2, FALSE()) + ROWS(Grid)', [grid])).value,
+    ).toBe(4 + 3);
+  });
+
+  it('uses a provider that gives a table in another provider', async () => {
+    const result = await run(
+      '=Sorted',
+      [
+        provider('Sorted', '=SORT(Grid, 1, -1)'),
+        provider('Grid', '={1, "a"; 3, "b"; 2, "c"}'),
+      ],
+      'auto',
+    );
+
+    expect(result.table).toEqual([
+      [3, 'b'],
+      [2, 'c'],
+      [1, 'a'],
+    ]);
+  });
+
+  it('gives a table with more than 26 columns from a provider', async () => {
+    const result = await run('=INDEX(Wide, 1, 30)', [
+      provider('Wide', '=TRANSPOSE(SEQUENCE(30))'),
+    ]);
+
+    expect(result.value).toBe(30);
+  });
+
+  it('names the provider that gives an error, also next to a table provider', async () => {
     const result = await run('=SUM(Grid) + Other', [
       provider('Grid', '=SEQUENCE(2, 2)'),
       provider('Other', '=1 / 0'),
@@ -226,11 +288,7 @@ describe('executeFormula', () => {
     expect(result).toEqual({
       value: null,
       issues: [
-        expect.objectContaining({
-          kind: 'provider-table',
-          message:
-            'Provider "Grid" gives a table. A provider can give only one value',
-        }),
+        expect.objectContaining({ kind: 'provider-error', name: 'Other' }),
       ],
     });
   });

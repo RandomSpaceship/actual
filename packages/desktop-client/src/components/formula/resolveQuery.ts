@@ -23,7 +23,6 @@ export type FormulaIssue = {
     | 'missing-provider'
     | 'provider-cycle'
     | 'provider-error'
-    | 'provider-table'
     | 'table-result'
     // Only the editor shows it
     | 'large-table'
