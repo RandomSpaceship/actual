@@ -251,11 +251,11 @@ Formulas can also subtract one date from the other. `=QUERY_END_DATE("expenses")
 ```
 
 - **query**: the name of a query.
-- **dimension 1**: how to put the transactions into groups. Use one of `category`, `category_group`, `payee`, `account`, `month` or `year`.
+- **dimension 1**: how to put the transactions into groups. Use one of `category`, `category_group`, `payee`, `account`, `day`, `week`, `month`, `quarter` or `year`.
 - **dimension 2** (optional): a second dimension. Each row then has one group of dimension 1 and one group of dimension 2.
 - **sort** (optional): the order of the rows.
-  - `budget` (the default): categories and category groups in the order of your budget, accounts in the order of the sidebar, payees by name, and months and years by date.
-  - `name`: by name, from A to Z. Months and years stay in date order.
+  - `budget` (the default): categories and category groups in the order of your budget, accounts in the order of the sidebar, payees by name, and periods by date.
+  - `name`: by name, from A to Z. Periods stay in date order.
   - `asc` or `desc`: by amount, from the smallest or from the largest. With two dimensions, the order uses the total of each dimension 1 group, so that the rows of a group stay together.
 
 Each row has the name of each group, then the total amount. `QUERY_GROUP_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
@@ -272,7 +272,9 @@ Some things to know:
 
 - Transactions without a category go in an **Uncategorized** row. This row also has transfers and the transactions of off-budget accounts, if the query does not filter them out. Transactions without a payee go in a **No payee** row.
 - A transfer payee gets the name of its account.
-- A `month` or `year` dimension gives a row for each period of the query date range, also for a period without transactions. If the query has no date range, the rows go from the first to the last period with transactions.
+- A period dimension (`day`, `week`, `month`, `quarter` or `year`) gives a row for each period of the query date range, also for a period without transactions. If the query has no date range, the rows go from the first to the last period with transactions.
+- A week has the date of its first day, for example `2024-01-07`. The **First day of the week** setting on the **Settings** page gives the first day of a week. A quarter has a name such as `Q1 2024`.
+- The editor shows a warning for a table with more than 50 rows, or with more than 20 columns. A table that large is hard to read on a card. The card does not show this warning.
 - A query without transactions gives one row with empty names and 0.
 - The arguments must be text in the formula, for example `"category"`. A cell reference or a function does not work here.
 
@@ -299,7 +301,7 @@ This example gives the spending of each category, with one column for each month
 
 The first row has the names of the columns, for example the months. The first cell of this row has the name of the first dimension, for example `Category`. A cell without transactions shows 0. `QUERY_PIVOT_COUNT` takes the same arguments and gives the number of transactions in place of the amount.
 
-The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. To give a column a different name, type it under **Columns**.
+The card shows the first row as the header row of the table. A month in the header row shows as the month name and year, for example `Jan 2024`. A day or a week shows in your date format. To give a column a different name, type it under **Columns**.
 
 With the header row in the table, `INDEX` counts it as row 1. For example, `=INDEX(QUERY_PIVOT("expenses", "category", "month"), 2, 2)` gives the amount of the first category in the first month.
 
