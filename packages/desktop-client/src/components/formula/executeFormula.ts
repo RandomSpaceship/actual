@@ -128,6 +128,20 @@ function toColumnLetters(columnNumber: number) {
   return letters;
 }
 
+// The size of the cells with values. The sheet size can be larger: a function
+// such as FILTER gets space for its largest result before it runs, and the
+// unused cells stay empty.
+function getUsedSize(
+  hfInstance: ReturnType<typeof HyperFormula.buildEmpty>,
+  sheetId: number,
+) {
+  const rows = hfInstance.getSheetValues(sheetId);
+  return {
+    width: Math.max(1, ...rows.map(row => row.length)),
+    height: Math.max(1, rows.length),
+  };
+}
+
 // Puts each provider after the providers that it uses. The resolver already
 // stops a cycle, so a provider never uses itself.
 function sortProvidersByUse(providers: ResolvedProvider[]) {
@@ -217,7 +231,7 @@ function addProviders(
     ]);
 
     const firstCellReference = `'${providerSheetName}'!$A$1`;
-    const { width, height } = hfInstance.getSheetDimensions(providerSheetId);
+    const { width, height } = getUsedSize(hfInstance, providerSheetId);
     if (width > 1 || height > 1) {
       tableRanges.set(provider.name.toUpperCase(), {
         range: `${firstCellReference}:$${toColumnLetters(width)}$${height}`,
@@ -302,7 +316,7 @@ function evaluateFormulaWithContext({
       };
     }
 
-    const { width, height } = hfInstance.getSheetDimensions(sheetId);
+    const { width, height } = getUsedSize(hfInstance, sheetId);
     const table =
       width > 1 || height > 1
         ? hfInstance

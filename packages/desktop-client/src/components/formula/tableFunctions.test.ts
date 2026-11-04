@@ -161,4 +161,16 @@ describe('FILTER', () => {
       ['Food', 'Groceries', -120],
     ]);
   });
+
+  it('gives a provider only the rows that match', async () => {
+    // FILTER gets space for 3 rows before it runs, but 2 rows match
+    expect(
+      await run('=ROWS(Matches)', [
+        provider(
+          'Matches',
+          `=FILTER(${spending}, CHOOSECOLS(${spending}, 3) < -30)`,
+        ),
+      ]),
+    ).toEqual([[2]]);
+  });
 });
