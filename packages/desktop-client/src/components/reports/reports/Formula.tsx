@@ -134,6 +134,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const {
     result,
     table,
+    spills,
     isLoading: isExecuting,
     error,
     issues,
@@ -422,7 +423,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 options={[
                   [
                     'auto',
-                    isTableView
+                    spills
                       ? t('Automatic (table)')
                       : t('Automatic (one value)'),
                   ],

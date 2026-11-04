@@ -155,6 +155,7 @@ describe('executeFormula', () => {
         [1, { error: '#DIV/0!' }],
         ['a', 123.45],
       ],
+      spills: true,
       issues: [],
     });
   });
@@ -171,12 +172,19 @@ describe('executeFormula', () => {
     expect(await run('=SEQUENCE(2, 1)', [], 'auto')).toEqual({
       value: null,
       table: [[1], [2]],
+      spills: true,
       issues: [],
     });
     expect(await run('=QUERY("a")', [], 'auto')).toEqual({
       value: 123.45,
       issues: [],
     });
+  });
+
+  it('tells each output that a formula spills', async () => {
+    expect((await run('=SEQUENCE(2, 1)', [], 'value')).spills).toBe(true);
+    expect((await run('=SEQUENCE(2, 1)', [], 'table')).spills).toBe(true);
+    expect((await run('=QUERY("a")', [], 'table')).spills).toBeUndefined();
   });
 
   it('gives an error for a table when the output is one value', async () => {

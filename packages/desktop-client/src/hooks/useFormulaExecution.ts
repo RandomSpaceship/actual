@@ -50,6 +50,7 @@ export function useFormulaExecution(
   const [language] = useGlobalPref('language');
   const [result, setResult] = useState<number | string | null>(null);
   const [table, setTable] = useState<FormulaTable | null>(null);
+  const [spills, setSpills] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<FormulaIssue[]>(NO_ISSUES);
@@ -143,6 +144,7 @@ export function useFormulaExecution(
             : (execution.value as number | string | null),
         );
         setTable(errorMessages.length > 0 ? null : (execution.table ?? null));
+        setSpills(execution.spills ?? false);
         setError(errorMessages.length > 0 ? errorMessages.join('; ') : null);
         setIssues(execution.issues);
       } catch (err) {
@@ -151,6 +153,7 @@ export function useFormulaExecution(
         setError(err instanceof Error ? err.message : 'Unknown error');
         setResult(null);
         setTable(null);
+        setSpills(false);
         setIssues(NO_ISSUES);
       } finally {
         if (!cancelled) {
@@ -177,5 +180,5 @@ export function useFormulaExecution(
     output,
   ]);
 
-  return { result, table, isLoading, error, issues };
+  return { result, table, spills, isLoading, error, issues };
 }

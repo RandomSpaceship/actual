@@ -273,6 +273,9 @@ export async function executeFormula({
   value: FormulaCellValue;
   // Only for a table result, or for each result of the 'table' output
   table?: FormulaTable;
+  // The formula gives a table, in each output. The 'auto' output shows a
+  // table only then.
+  spills?: boolean;
   issues: FormulaIssue[];
 }> {
   if (!formula || !formula.startsWith('=')) {
@@ -393,18 +396,22 @@ export async function executeFormula({
     return { value: null, issues };
   }
 
+  // Only set for a table, so that a result with one value stays the same
+  const spills = evaluation.table ? true : undefined;
+
   if (output === 'table') {
     return {
       value: evaluation.value,
       table: evaluation.table ?? [[evaluation.value]],
+      spills,
       issues,
     };
   }
 
   if (output === 'auto') {
     return evaluation.table
-      ? { value: null, table: evaluation.table, issues }
-      : { value: evaluation.value, issues };
+      ? { value: null, table: evaluation.table, spills, issues }
+      : { value: evaluation.value, spills, issues };
   }
 
   if (evaluation.table) {
@@ -416,10 +423,10 @@ export async function executeFormula({
         'The formula gives a table, not one value. Set Display to Automatic or Table, or use INDEX to get one cell, for example INDEX(formula, 1, 2)',
       ),
     });
-    return { value: null, table: evaluation.table, issues };
+    return { value: null, table: evaluation.table, spills, issues };
   }
 
-  return { value: evaluation.value, issues };
+  return { value: evaluation.value, spills, issues };
 }
 
 async function prefetchQueryValues<T>({
