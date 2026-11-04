@@ -7,7 +7,12 @@ import {
   useRechartsAnimation,
 } from '#components/reports/chart-theme';
 
-import type { FormulaChartData, FormulaChartRow } from './formulaChartData';
+import type {
+  FormulaChartData,
+  FormulaChartRow,
+  FormulaChartRowCells,
+  FormulaTableCellPosition,
+} from './formulaChartData';
 
 type FormulaDonutChartProps = {
   chart: FormulaChartData;
@@ -16,6 +21,9 @@ type FormulaDonutChartProps = {
   height: number;
   // The Tooltip element of the chart
   tooltip: ReactNode;
+  // The table cells of the slice under the pointer, or undefined
+  onHoverCells: (cells: FormulaTableCellPosition[] | undefined) => void;
+  onOpenCells: (cells: FormulaTableCellPosition[] | undefined) => void;
 };
 
 // The ring sizes of the custom report donut, as parts of the outer radius
@@ -31,6 +39,8 @@ export function FormulaDonutChart({
   width,
   height,
   tooltip,
+  onHoverCells,
+  onOpenCells,
 }: FormulaDonutChartProps) {
   const animationProps = useRechartsAnimation();
   const colors = getColorScale('qualitative');
@@ -49,6 +59,18 @@ export function FormulaDonutChart({
   };
   // In row order, not A to Z
   const legend = !compact && <Legend itemSorter={null} />;
+  // The slices of a ring are its rows, in order
+  const getCellProps = (ringCells: FormulaChartRowCells[] | undefined) => {
+    const getCells = (sliceIndex: number) =>
+      ringCells?.[sliceIndex]?.[valueSeries.key];
+    return {
+      onMouseEnter: (_: unknown, sliceIndex: number) =>
+        onHoverCells(getCells(sliceIndex)),
+      onMouseLeave: () => onHoverCells(undefined),
+      onClick: (_: unknown, sliceIndex: number) =>
+        onOpenCells(getCells(sliceIndex)),
+    };
+  };
 
   if (!chart.groups) {
     return (
@@ -65,6 +87,7 @@ export function FormulaDonutChart({
           }))}
           innerRadius={radius * 0.5}
           outerRadius={radius}
+          {...getCellProps(chart.rowCells)}
         />
       </PieChart>
     );
@@ -89,6 +112,7 @@ export function FormulaDonutChart({
         }))}
         innerRadius={radius * innerRingStart}
         outerRadius={radius * outerRingStart}
+        {...getCellProps(chart.groupCells)}
       />
       <Pie
         {...ringProps}
@@ -97,6 +121,7 @@ export function FormulaDonutChart({
         data={getOuterSlices(chart.rows, colorOfGroup)}
         innerRadius={radius * outerRingStart}
         outerRadius={radius}
+        {...getCellProps(chart.rowCells)}
       />
     </PieChart>
   );

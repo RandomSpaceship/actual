@@ -6,6 +6,7 @@ import type {
 import * as monthUtils from '@actual-app/core/shared/months';
 import type { ObjectExpression } from '@actual-app/core/shared/query';
 import type { RuleConditionEntity } from '@actual-app/core/types/models';
+import { isEqual } from 'es-toolkit/compat';
 import { t } from 'i18next';
 
 import { getAqlDateField, parseAqlConfig } from './aqlSource';
@@ -92,6 +93,60 @@ export function getCellTransactionsFilter(
   const columnFilter = sourceMap.columns[columnIndex] ?? null;
   if (!rowFilter && !columnFilter) return null;
   return combineTransactionsFilters(sourceMap.query, rowFilter, columnFilter);
+}
+
+// The transactions of a chart value, which can add up more than one cell.
+// The cells must be in the value column of a long table. Their transactions
+// are the ones that match the conditions that all of their rows have. Thus no
+// other row can have all of these conditions, or it would add its
+// transactions too. null: the cells have no shared filter.
+export function getCellsTransactionsFilter(
+  sourceMap: FormulaSourceMap,
+  cells: Array<{ rowIndex: number; columnIndex: number }>,
+): TransactionsFilter | null {
+  if (cells.length === 1) {
+    const [{ rowIndex, columnIndex }] = cells;
+    return getCellTransactionsFilter(sourceMap, rowIndex, columnIndex);
+  }
+  if (cells.length === 0 || sourceMap.columns || !sourceMap.isComplete) {
+    return null;
+  }
+  const rowIndexes = new Set(cells.map(cell => cell.rowIndex));
+  const rowFilters = [...rowIndexes].map(
+    rowIndex => sourceMap.rows[rowIndex] ?? null,
+  );
+  const [firstFilter, ...otherFilters] = rowFilters;
+  if (!firstFilter || otherFilters.some(filter => filter === null)) {
+    return null;
+  }
+  const hasCondition = (
+    filter: TransactionsFilter,
+    condition: TransactionsCondition,
+  ) => filter.conditions.some(other => isEqual(other, condition));
+  const sharedConditions = firstFilter.conditions.filter(condition =>
+    otherFilters.every(filter => filter && hasCondition(filter, condition)),
+  );
+  // Rows with different periods do not share a date range
+  const sharedDateRange = otherFilters.every(filter =>
+    isEqual(filter?.dateRange, firstFilter.dateRange),
+  )
+    ? firstFilter.dateRange
+    : null;
+
+  const isMatchedByOtherRow = sourceMap.rows.some(
+    (filter, rowIndex) =>
+      filter !== null &&
+      !rowIndexes.has(rowIndex) &&
+      sharedConditions.every(condition => hasCondition(filter, condition)) &&
+      (sharedDateRange === null ||
+        filter.dateRange === null ||
+        isEqual(filter.dateRange, sharedDateRange)),
+  );
+  if (isMatchedByOtherRow) return null;
+  return combineTransactionsFilters(sourceMap.query, {
+    dateRange: sharedDateRange,
+    conditions: sharedConditions,
+  });
 }
 
 // For the total of a row
@@ -182,7 +237,8 @@ export function getDimensionTransactionsFilter(
       if (key === '') {
         return toFilter({
           customName: t('Category: {{name}}', { name: t('Uncategorized') }),
-          queryFilter: { category: null },
+          // A split parent has no category, but its children do
+          queryFilter: { category: null, is_parent: false },
         });
       }
       return toFilter(

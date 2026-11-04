@@ -351,7 +351,7 @@ describe('QUERY_TABLE source map', () => {
           conditions: [
             {
               customName: 'payee.name: Cafe',
-              queryFilter: { $and: [{ 'payee.name': 'Cafe' }] },
+              queryFilter: { 'payee.name': 'Cafe' },
             },
           ],
         },
@@ -360,7 +360,7 @@ describe('QUERY_TABLE source map', () => {
           conditions: [
             {
               customName: 'payee.name: Shop',
-              queryFilter: { $and: [{ 'payee.name': 'Shop' }] },
+              queryFilter: { 'payee.name': 'Shop' },
             },
           ],
         },
@@ -369,7 +369,7 @@ describe('QUERY_TABLE source map', () => {
           conditions: [
             {
               customName: 'payee.name: ',
-              queryFilter: { $and: [{ 'payee.name': null }] },
+              queryFilter: { 'payee.name': null },
             },
           ],
         },
@@ -404,7 +404,7 @@ describe('QUERY_TABLE source map', () => {
   it('gives one transaction for each row with an id column', async () => {
     const { sourceMap } = await run('=QUERY_TABLE("transactionIds")', 'table');
     expect(sourceMap?.rows[1]?.conditions).toEqual([
-      { customName: 'id: shop-1', queryFilter: { $and: [{ id: 'shop-1' }] } },
+      { customName: 'id: shop-1', queryFilter: { id: 'shop-1' } },
     ]);
   });
 

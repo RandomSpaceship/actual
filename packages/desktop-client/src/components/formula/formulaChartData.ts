@@ -43,6 +43,17 @@ export type FormulaChartRow = { label: string } & Record<
   string | number | null
 >;
 
+// A cell of the table result
+export type FormulaTableCellPosition = {
+  rowIndex: number;
+  columnIndex: number;
+};
+
+// The table cells of each value of one chart row, by series key. A value
+// that adds up more than one row has more than one cell. A value without a
+// row (0 in a long table) has none.
+export type FormulaChartRowCells = Record<string, FormulaTableCellPosition[]>;
+
 export type FormulaChartWarning =
   // The chart has no value column
   | { kind: 'no-values' }
@@ -66,10 +77,14 @@ export type FormulaChartData = {
   stacked: boolean;
   series: FormulaChartSeries[];
   rows: FormulaChartRow[];
+  // One for each row
+  rowCells: FormulaChartRowCells[];
   // The inner ring of a two-ring donut: one row for each group, with the sum
   // of its outer slices. The rows are then the outer slices, in group order,
   // and each one has a 'group' label.
   groups?: FormulaChartRow[];
+  // One for each group
+  groupCells?: FormulaChartRowCells[];
   warnings: FormulaChartWarning[];
 };
 
@@ -92,6 +107,8 @@ export function getFormulaChartData(
     (settings.stacked ?? false) && (type === 'bar' || type === 'area');
   const width = Math.max(0, ...table.map(row => row.length));
   const bodyRows = headerRow ? table.slice(1) : table;
+  const toTableRowIndex = (bodyRowIndex: number) =>
+    headerRow ? bodyRowIndex + 1 : bodyRowIndex;
   const columnTypes = getFormulaTableColumnTypes(table, columns, headerRow);
   const columnNames = getFormulaTableColumnNames(table, columns, headerRow);
   const warnings: FormulaChartWarning[] = [];
@@ -173,6 +190,7 @@ export function getFormulaChartData(
   if (hasSeriesColumn && valueColumns.length > 0) {
     const [valueColumn] = valueColumns;
     const longRows = bodyRows.map((row, rowIndex) => ({
+      tableRowIndex: toTableRowIndex(rowIndex),
       label: labels[rowIndex],
       seriesName: getLabel(
         row[seriesColumn] ?? null,
@@ -200,7 +218,7 @@ export function getFormulaChartData(
       seriesColumn,
       stacked,
       series,
-      rows: getLongRows(longRows, series),
+      ...getLongRows(longRows, series, valueColumn),
       warnings,
     };
   }
@@ -214,26 +232,28 @@ export function getFormulaChartData(
     }),
   );
 
-  let rows = bodyRows.map((row, rowIndex): FormulaChartRow => {
+  let rowsWithCells = bodyRows.map((row, rowIndex) => {
     const chartRow: FormulaChartRow = { label: labels[rowIndex] };
+    const cells: FormulaChartRowCells = {};
     for (const { key, columnIndex } of series) {
       chartRow[key] = getValue(row[columnIndex]);
+      cells[key] = [{ rowIndex: toTableRowIndex(rowIndex), columnIndex }];
     }
-    return chartRow;
+    return { chartRow, cells };
   });
 
   if (type === 'donut' && series.length > 0) {
     const [{ key, columnIndex }] = series;
     warnAboutMixedSigns(
-      rows.map(row => row[key]),
+      rowsWithCells.map(({ chartRow }) => chartRow[key]),
       columnIndex,
     );
     // A slice has a size, so it cannot be negative. Rows without a value
     // have no slice.
-    rows = rows.flatMap(row => {
-      const value = row[key];
+    rowsWithCells = rowsWithCells.flatMap(({ chartRow, cells }) => {
+      const value = chartRow[key];
       return typeof value === 'number' && value !== 0
-        ? [{ ...row, [key]: Math.abs(value) }]
+        ? [{ chartRow: { ...chartRow, [key]: Math.abs(value) }, cells }]
         : [];
     });
   }
@@ -244,7 +264,8 @@ export function getFormulaChartData(
     seriesColumn,
     stacked,
     series,
-    rows,
+    rows: rowsWithCells.map(({ chartRow }) => chartRow),
+    rowCells: rowsWithCells.map(({ cells }) => cells),
     warnings,
   };
 
@@ -264,26 +285,43 @@ export function getFormulaChartData(
 
   // One row for each label. A label and series pair without a row gives 0,
   // because the table holds sums. Two rows with the same pair add up.
-  function getLongRows(longRows: LongRow[], series: FormulaChartSeries[]) {
+  function getLongRows(
+    longRows: LongRow[],
+    series: FormulaChartSeries[],
+    valueColumn: number,
+  ) {
     const keyOfSeries = new Map(
       series.map(oneSeries => [oneSeries.name, oneSeries.key]),
     );
-    const rowOfLabel = new Map<string, FormulaChartRow>();
-    for (const { label, seriesName, value } of longRows) {
-      let chartRow = rowOfLabel.get(label);
-      if (!chartRow) {
-        chartRow = { label };
+    const rowOfLabel = new Map<
+      string,
+      { chartRow: FormulaChartRow; cells: FormulaChartRowCells }
+    >();
+    for (const { tableRowIndex, label, seriesName, value } of longRows) {
+      let labelRow = rowOfLabel.get(label);
+      if (!labelRow) {
+        labelRow = { chartRow: { label }, cells: {} };
         for (const { key } of series) {
-          chartRow[key] = 0;
+          labelRow.chartRow[key] = 0;
+          labelRow.cells[key] = [];
         }
-        rowOfLabel.set(label, chartRow);
+        rowOfLabel.set(label, labelRow);
       }
       const key = keyOfSeries.get(seriesName);
-      if (key !== undefined && value !== null) {
-        chartRow[key] = Number(chartRow[key] ?? 0) + value;
+      if (key === undefined) continue;
+      labelRow.cells[key]?.push({
+        rowIndex: tableRowIndex,
+        columnIndex: valueColumn,
+      });
+      if (value !== null) {
+        labelRow.chartRow[key] = Number(labelRow.chartRow[key] ?? 0) + value;
       }
     }
-    return [...rowOfLabel.values()];
+    const labelRows = [...rowOfLabel.values()];
+    return {
+      rows: labelRows.map(({ chartRow }) => chartRow),
+      rowCells: labelRows.map(({ cells }) => cells),
+    };
   }
 
   // The label column gives the inner ring and the series column gives the
@@ -303,20 +341,41 @@ export function getFormulaChartData(
       longRows.map(row => row.value),
       valueColumn,
     );
-    const slicesOfGroup = new Map<string, FormulaChartRow[]>();
-    for (const { label, seriesName, value } of longRows) {
+    const slicesOfGroup = new Map<
+      string,
+      Array<{ chartRow: FormulaChartRow; cell: FormulaTableCellPosition }>
+    >();
+    // Also the rows without a slice, because the group adds them up
+    const cellsOfGroup = new Map<string, FormulaTableCellPosition[]>();
+    for (const { tableRowIndex, label, seriesName, value } of longRows) {
+      const groupCells = cellsOfGroup.get(label) ?? [];
+      groupCells.push({ rowIndex: tableRowIndex, columnIndex: valueColumn });
+      cellsOfGroup.set(label, groupCells);
       if (value === null || value === 0) continue;
       const slices = slicesOfGroup.get(label) ?? [];
-      slices.push({ label: seriesName, group: label, [key]: Math.abs(value) });
+      slices.push({
+        chartRow: { label: seriesName, group: label, [key]: Math.abs(value) },
+        cell: { rowIndex: tableRowIndex, columnIndex: valueColumn },
+      });
       slicesOfGroup.set(label, slices);
     }
-    const groups = [...slicesOfGroup].map(
-      ([label, slices]): FormulaChartRow => ({
+    const groupSlices = [...slicesOfGroup];
+    const slices = groupSlices.flatMap(([, oneGroupSlices]) => oneGroupSlices);
+    return {
+      series,
+      rows: slices.map(({ chartRow }) => chartRow),
+      rowCells: slices.map(({ cell }) => ({ [key]: [cell] })),
+      groups: groupSlices.map(([label, oneGroupSlices]): FormulaChartRow => ({
         label,
-        [key]: slices.reduce((sum, slice) => sum + Number(slice[key]), 0),
-      }),
-    );
-    return { series, rows: [...slicesOfGroup.values()].flat(), groups };
+        [key]: oneGroupSlices.reduce(
+          (sum, slice) => sum + Number(slice.chartRow[key]),
+          0,
+        ),
+      })),
+      groupCells: groupSlices.map(([label]) => ({
+        [key]: cellsOfGroup.get(label) ?? [],
+      })),
+    };
   }
 
   function warnAboutMixedSigns(
@@ -340,6 +399,7 @@ export function getFormulaChartData(
 }
 
 type LongRow = {
+  tableRowIndex: number;
   label: string;
   seriesName: string;
   value: number | null;

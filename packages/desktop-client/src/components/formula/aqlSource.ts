@@ -90,16 +90,16 @@ export type AqlQueryTable = {
   // The query gives more rows than rowLimit, so the rows stop there
   isCut: boolean;
   rowLimit: number;
-  // The transactions of each row, for the transactions page. null: the rows
-  // do not come from transactions, or a row has no field values that find
-  // them.
-  rowFilters: AqlRowFilter[] | null;
+  // The transactions of each row, for the transactions page: one filter for
+  // each groupBy field. null: the rows do not come from transactions, or a
+  // row has no field values that find them.
+  rowFilters: AqlRowFilter[][] | null;
   // The rows have all of the transactions of the query: the rows are not cut,
   // and the query has no limit or offset
   hasAllRows: boolean;
 };
 
-// The filter of one row, and its name on the transactions page
+// The filter of one field of a row, and its name on the transactions page
 export type AqlRowFilter = { name: string; filter: ObjectExpression };
 
 // For QUERY_TABLE and the editor preview. The rows stop at the row limit of
@@ -160,7 +160,7 @@ function getAqlRowFilters(
   parsed: ParsedAqlQuery,
   columns: string[],
   rows: AqlQueryTable['rows'],
-): AqlRowFilter[] | null {
+): AqlRowFilter[][] | null {
   if (parsed.table !== 'transactions' || !parsed.columns) return null;
   const { groupExpressions } = parsed.query.state;
   const fields = groupExpressions.length > 0 ? [...groupExpressions] : ['id'];
@@ -170,19 +170,15 @@ function getAqlRowFilters(
       : -1,
   );
   if (fieldColumns.some(columnIndex => columnIndex === -1)) return null;
-  return rows.map(row => {
-    const values = fieldColumns.map(columnIndex => row[columnIndex]);
-    return {
-      name: fields
-        .map((field, index) => `${String(field)}: ${values[index] ?? ''}`)
-        .join(', '),
-      filter: {
-        $and: fields.map((field, index) => ({
-          [String(field)]: values[index],
-        })),
-      },
-    };
-  });
+  return rows.map(row =>
+    fields.map((field, index) => {
+      const value = row[fieldColumns[index]];
+      return {
+        name: `${String(field)}: ${value ?? ''}`,
+        filter: { [String(field)]: value },
+      };
+    }),
+  );
 }
 
 export function getAqlRowLimit(aql: FormulaAqlConfig) {

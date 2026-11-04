@@ -833,9 +833,12 @@ async function prefetchQueryTables(
       const queryTable = await fetchQueryTable(config);
       if (queryTable.rowFilters) {
         sourceRows.set(queryName, {
-          rows: queryTable.rowFilters.map(({ name, filter }) => ({
+          rows: queryTable.rowFilters.map(fieldFilters => ({
             dateRange: null,
-            conditions: [{ customName: name, queryFilter: filter }],
+            conditions: fieldFilters.map(({ name, filter }) => ({
+              customName: name,
+              queryFilter: filter,
+            })),
           })),
           columns: null,
           isComplete: queryTable.hasAllRows,

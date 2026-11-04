@@ -25,6 +25,7 @@ import type {
 } from '@actual-app/core/types/models';
 import type { EditorView } from '@codemirror/view';
 import { useQuery } from '@tanstack/react-query';
+import { isEqual } from 'es-toolkit/compat';
 
 import { EditablePageHeaderTitle } from '#components/EditablePageHeaderTitle';
 import { ColorFormulaResult } from '#components/formula/ColorFormulaResult';
@@ -171,6 +172,27 @@ function FormulaInner({ widget }: FormulaInnerProps) {
       cardProviders,
     });
   }
+  // The settings that Save widget writes
+  const editedMeta = {
+    formula,
+    queries,
+    timeFrameOverrides,
+    providers: cardProviders,
+    fontSizeMode,
+    staticFontSize,
+    showTitle,
+    colorFormula,
+    valueFormat,
+    view,
+    tableColumns,
+    tableHeader,
+    tableTotals,
+    chart: chartSettings,
+  };
+  const [savedMeta, setSavedMeta] = useState(editedMeta);
+  // A click that opens transactions leaves the page, and the changes would
+  // be lost
+  const hasUnsavedChanges = !isEqual(editedMeta, savedMeta);
   const isChanged =
     formula !== ranInputs.formula ||
     colorFormula !== ranInputs.colorFormula ||
@@ -193,6 +215,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     result,
     table,
     spills,
+    sourceMap,
     isLoading: isExecuting,
     error,
     issues,
@@ -415,27 +438,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
 
     // The editor then shows the result of the saved formula
     runFormula();
+    setSavedMeta(editedMeta);
     updateDashboardWidgetMutation.mutate(
       {
         widget: {
           id: widget.id,
-          meta: {
-            ...(widget.meta ?? {}),
-            formula,
-            queries,
-            timeFrameOverrides,
-            providers: cardProviders,
-            fontSizeMode,
-            staticFontSize,
-            showTitle,
-            colorFormula,
-            valueFormat,
-            view,
-            tableColumns,
-            tableHeader,
-            tableTotals,
-            chart: chartSettings,
-          },
+          meta: { ...(widget.meta ?? {}), ...editedMeta },
         },
       },
       {
@@ -645,7 +653,11 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               }}
             >
               {isChartView && table && !error ? (
-                <FormulaChart chart={chart} style={{ padding: 10 }} />
+                <FormulaChart
+                  chart={chart}
+                  sourceMap={hasUnsavedChanges ? null : sourceMap}
+                  style={{ padding: 10 }}
+                />
               ) : isTableView && table && !error ? (
                 <FormulaTable
                   table={table}

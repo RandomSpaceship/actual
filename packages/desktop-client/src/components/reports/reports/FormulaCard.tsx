@@ -67,16 +67,17 @@ export function FormulaCard({
     [accounts],
   );
 
-  const { result, table, isLoading, error, issues } = useFormulaExecution(
-    formula,
-    meta?.queries ?? EMPTY_QUERIES,
-    meta?.queriesVersion,
-    undefined,
-    simpleAccounts,
-    meta?.timeFrameOverrides,
-    view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
-    meta?.providers,
-  );
+  const { result, table, sourceMap, isLoading, error, issues } =
+    useFormulaExecution(
+      formula,
+      meta?.queries ?? EMPTY_QUERIES,
+      meta?.queriesVersion,
+      undefined,
+      simpleAccounts,
+      meta?.timeFrameOverrides,
+      view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
+      meta?.providers,
+    );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
   const isChartView = view === 'chart';
   // The table and chart views have no colour
@@ -169,6 +170,7 @@ export function FormulaCard({
         {isChartView && table && !error ? (
           <FormulaChart
             chart={chart}
+            sourceMap={sourceMap}
             compact
             style={{ padding: showTitle ? '0 10px 10px' : 10 }}
           />

@@ -292,4 +292,88 @@ describe('getFormulaChartData', () => {
       ]);
     });
   });
+
+  describe('table cells', () => {
+    const cell = (rowIndex: number, columnIndex: number) => ({
+      rowIndex,
+      columnIndex,
+    });
+
+    it('gives the table cell of each value, after the header row', () => {
+      const chart = getFormulaChartData(
+        [
+          ['Month', 'Food', 'Rent'],
+          ['2024-01', -1, -2],
+        ],
+        [{ type: 'date' }],
+        true,
+        {},
+        formatLabel,
+      );
+      expect(chart.rowCells).toEqual([
+        { value0: [cell(1, 1)], value1: [cell(1, 2)] },
+      ]);
+    });
+
+    it('keeps the cells of the donut slices that it shows', () => {
+      const chart = getFormulaChartData(
+        [
+          ['Food', -1],
+          ['Rent', 0],
+          ['Fun', -3],
+        ],
+        [],
+        false,
+        { type: 'donut' },
+        formatLabel,
+      );
+      expect(chart.rowCells).toEqual([
+        { value0: [cell(0, 1)] },
+        { value0: [cell(2, 1)] },
+      ]);
+    });
+
+    it('gives all the rows that a value of a long table adds up', () => {
+      const chart = getFormulaChartData(
+        [
+          ['2024-01', 'Food', -100],
+          ['2024-01', 'Rent', -900],
+          ['2024-02', 'Food', -50],
+          ['2024-02', 'Food', -5],
+        ],
+        [{ type: 'date' }],
+        false,
+        {},
+        formatLabel,
+      );
+      expect(chart.rowCells).toEqual([
+        { value0: [cell(0, 2)], value1: [cell(1, 2)] },
+        // February has no Rent row
+        { value0: [cell(2, 2), cell(3, 2)], value1: [] },
+      ]);
+    });
+
+    it('gives the cells of each slice and each group of a two-ring donut', () => {
+      const chart = getFormulaChartData(
+        [
+          ['Bills', 'Rent', -900],
+          ['Food', 'Groceries', -100],
+          ['Bills', 'Power', -50],
+        ],
+        [],
+        false,
+        { type: 'donut' },
+        formatLabel,
+      );
+      expect(chart.rowCells).toEqual([
+        { value0: [cell(0, 2)] },
+        { value0: [cell(2, 2)] },
+        { value0: [cell(1, 2)] },
+      ]);
+      expect(chart.groupCells).toEqual([
+        { value0: [cell(0, 2), cell(2, 2)] },
+        { value0: [cell(1, 2)] },
+      ]);
+    });
+  });
 });

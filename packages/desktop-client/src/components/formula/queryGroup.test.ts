@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeFormula } from './executeFormula';
 import {
+  getCellsTransactionsFilter,
   getCellTransactionsFilter,
   getColumnTransactionsFilter,
   getRowTransactionsFilter,
@@ -419,7 +420,7 @@ describe('source map', () => {
       conditions: [
         {
           customName: 'Category: Uncategorized',
-          queryFilter: { category: null },
+          queryFilter: { category: null, is_parent: false },
         },
       ],
     });
@@ -478,6 +479,41 @@ describe('source map', () => {
     expect(getColumnTransactionsFilter(sourceMap, 1)).toEqual({
       dateRange: january,
       conditions: [],
+    });
+  });
+
+  it('gives the shared conditions of the rows that a chart value adds up', async () => {
+    const { sourceMap } = await run(
+      '=QUERY_GROUP("all", "category group", , "category")',
+    );
+    if (!sourceMap) throw new Error('No source map');
+    const cells = (...rowIndexes: number[]) =>
+      rowIndexes.map(rowIndex => ({ rowIndex, columnIndex: 2 }));
+    // The rows of Bills: Rent and Power
+    expect(getCellsTransactionsFilter(sourceMap, cells(0, 1))).toEqual({
+      dateRange: null,
+      conditions: [
+        { field: 'category_group', op: 'is', value: 'bills', type: 'id' },
+      ],
+    });
+    // Rent and Groceries share no condition, and Power is not in the cells
+    expect(getCellsTransactionsFilter(sourceMap, cells(0, 2))).toBeNull();
+  });
+
+  it('gives all periods of the rows of one category', async () => {
+    const { sourceMap } = await run(
+      '=QUERY_GROUP("firstQuarter", "category", , "month")',
+    );
+    if (!sourceMap) throw new Error('No source map');
+    // The three months of Power
+    expect(
+      getCellsTransactionsFilter(
+        sourceMap,
+        [0, 1, 2].map(rowIndex => ({ rowIndex, columnIndex: 2 })),
+      ),
+    ).toEqual({
+      dateRange: firstQuarterDates,
+      conditions: [{ field: 'category', op: 'is', value: 'power', type: 'id' }],
     });
   });
 
