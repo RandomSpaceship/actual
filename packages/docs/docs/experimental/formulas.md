@@ -395,7 +395,7 @@ A card time frame stays with its library query, also after a rename. If a differ
 
 #### Export and Import a Dashboard
 
-When you export a dashboard, the file also holds the library queries and the providers that its formula cards use. When you import the file, Actual does one of these for each library query in the file:
+When you export a dashboard, the file also holds the library queries and the library providers that its formula cards use. The card providers are part of their cards. When you import the file, Actual does one of these for each library query in the file:
 
 - If your formula library has a query with the same name, filters, and time frame, the cards use your query.
 - If your formula library has a different query with the same name, each card that uses the name gets a copy of the query from the file. The card query has priority over the library query, so the card shows the same result as before the export.
@@ -411,15 +411,20 @@ The import does not change or delete the queries and providers that are already 
 
 ### Reuse a Formula With Providers
 
-A provider is a named formula in the formula library. A card formula uses a provider by its name, with no quotes. For example, the provider `NetIncome` has the formula `=QUERY("income") + QUERY("expenses")`. This card formula then gives the average for each month of a year:
+A provider is a named formula. A card formula uses a provider by its name, with no quotes. For example, the provider `NetIncome` has the formula `=QUERY("income") + QUERY("expenses")`. This card formula then gives the average for each month of a year:
 
 ```text
 =NetIncome / 12
 ```
 
-A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. Providers are available in formula cards only, not in rule formulas.
+There are two types of provider:
 
-To add a provider:
+- A library provider is in the formula library. Every card can use it.
+- A card provider is on one card only. Other cards cannot use it.
+
+A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. A provider gives one value. If the formula of a provider gives a table, use `INDEX` to get one cell. Providers are available in formula cards only, not in rule formulas.
+
+To add a library provider:
 
 1. Go to **Settings** > **Formula library**.
 2. Under **Providers**, select **Create new provider**.
@@ -437,22 +442,39 @@ A provider uses the queries of the card that uses it:
 - If the card has its own query with the same name as a library query, the provider uses the card query.
 - If the card has its own time frame for a library query, the provider uses that time frame.
 
-Thus one provider can give a different value on each card. **Result** in the provider editor has no card, so it uses the library queries only.
+Thus one library provider can give a different value on each card. **Result** in the library provider editor has no card, so it uses the library queries only.
+
+#### Add a Card Provider
+
+1. In the card editor, under **Providers**, select **Add Provider**.
+2. Type a name and the formula. Optionally, type a description.
+3. Select **Save**. **Result** shows the value of the formula on this card.
+4. Select **Save widget**. Until you save the widget, the card provider is not stored.
+
+If a card provider has the same name as a library provider, the card uses the card provider. This is also true when a library provider uses the name. For example, the library provider `Yearly` has the formula `=NetIncome * 12`. On a card with a card provider `NetIncome`, `Yearly` uses the card provider. The card shows a warning that the card provider hides the library provider.
 
 #### Use Providers in the Card Editor
 
-The formula autocomplete shows the providers in their own section.
+The formula autocomplete shows the card providers and the library providers in their own section.
 
-To see the providers, turn on **Show providers** under **Query Definitions**. If the card formula uses a provider when you open the editor, this option is already on. Each provider shows its formula and its value on this card, and has these buttons:
+The card providers are under **Providers**. Each card provider shows its formula and its value on this card, and has these buttons:
 
 - **Insert** adds the provider name to the card formula, at the cursor.
-- **Edit** opens the provider. A change applies to every card that uses the provider.
+- **Make shared** moves the provider to the formula library. Then select **Save widget**. **Make shared** is not available when the library already has a provider with the same name. If the provider uses a card query or another card provider, Actual does not move it, and shows the names that it uses. A library provider cannot find these names, so make them shared first.
+- **Edit** opens the provider. When you rename a card provider, Actual also changes the name in the formulas of the card and in its other card providers.
+- The delete button removes the provider from the card.
 
-#### Rename or Delete a Provider
+To see the library providers, turn on **Show library providers**. If the card formula uses a library provider when you open the editor, this option is already on. Each library provider shows its formula and its value on this card, and has these buttons:
 
-When you rename a provider that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the provider name in the formulas of the selected cards. Actual also changes the name in every provider that uses the renamed provider. A card that you clear keeps the old name, and shows an error until you change its formula or add a provider with the old name.
+- **Insert** adds the provider name to the card formula, at the cursor.
+- **Copy into card** adds a copy of the provider to the card as a card provider. The copy has the same name, so the card uses its copy. Use this to change the provider for one card only.
+- **Edit** opens the library provider. A change applies to every card that uses the provider.
 
-Before Actual deletes a provider, it shows the cards and the providers that use it. After the delete, these cards show the error `Provider "name" not found`.
+#### Rename or Delete a Library Provider
+
+When you rename a library provider that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the provider name in the formulas and the card providers of the selected cards. Actual also changes the name in every library provider that uses the renamed provider. A card that you clear keeps the old name, and shows an error until you change its formula or add a provider with the old name. A card with a card provider of the same name does not use the library provider, so it does not change.
+
+Before Actual deletes a library provider, it shows the cards and the providers that use it. After the delete, these cards show the error `Provider "name" not found`.
 
 #### Provider Errors
 
