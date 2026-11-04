@@ -19,6 +19,8 @@ type FormulaTableColumnSettingsProps = {
   onHeaderChange: (header: FormulaTableHeader) => void;
   // The table shows its first row as the header row
   isHeaderRowShown: boolean;
+  // The 'auto' setting finds a header row in the first row
+  isHeaderRowFound: boolean;
   totals: FormulaTableTotals;
   onTotalsChange: (totals: FormulaTableTotals) => void;
   // The names in the first row, for the placeholders
@@ -32,6 +34,7 @@ export function FormulaTableColumnSettings({
   header,
   onHeaderChange,
   isHeaderRowShown,
+  isHeaderRowFound,
   totals,
   onTotalsChange,
   headerRowNames,
@@ -81,7 +84,7 @@ export function FormulaTableColumnSettings({
           options={[
             [
               'auto',
-              isHeaderRowShown
+              isHeaderRowFound
                 ? t('Automatic (first row)')
                 : t('Automatic (column names)'),
             ],

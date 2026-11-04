@@ -151,6 +151,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     table ?? [],
     tableHeader,
   );
+  const isHeaderRowFound = isFormulaTableHeaderRowShown(table ?? [], 'auto');
 
   const colorVariables = useMemo(
     () => ({
@@ -527,6 +528,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 header={tableHeader}
                 onHeaderChange={setTableHeader}
                 isHeaderRowShown={isHeaderRowShown}
+                isHeaderRowFound={isHeaderRowFound}
                 totals={tableTotals}
                 onTotalsChange={setTableTotals}
                 headerRowNames={getFormulaTableColumnNames(
