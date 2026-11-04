@@ -1,4 +1,7 @@
-import { formulaUsesProviderName } from '@actual-app/core/shared/formulas/providerNameUses';
+import {
+  formulaUsesProviderName,
+  isSameProviderName,
+} from '@actual-app/core/shared/formulas/providerNameUses';
 import {
   formulaUsesQueryName,
   isSameQueryName,
@@ -16,7 +19,8 @@ export type FormulaQueryUse = {
   // Empty when the card has no name
   cardName: string;
   dashboardName: string;
-  // The formula text that uses the query: the formula, the color formula or both
+  // The formula text that uses the query: the formula, the color formula and
+  // the card provider formulas
   formulas: string[];
 };
 
@@ -36,8 +40,9 @@ function formulaUsesItemName(
     : formulaUsesQueryName(formula, name);
 }
 
-// The cards that use a library query or provider. A card with a local query of
-// the same name does not use the library query. A query name built at run
+// The cards that use a library query or provider, also in card providers. A
+// card with a card query or card provider of the same name does not use the
+// library item. A query name built at run
 // time, for example QUERY("fo"&"od"), is not found. A card that uses the item
 // only through a provider is not in the list.
 export function findFormulaQueryUses(
@@ -50,15 +55,29 @@ export function findFormulaQueryUses(
   for (const widget of widgets) {
     if (!isFormulaWidget(widget) || !widget.meta) continue;
 
-    const { formula, colorFormula, queries = {} } = widget.meta;
+    const {
+      formula,
+      colorFormula,
+      queries = {},
+      providers: cardProviders = {},
+    } = widget.meta;
     if (
-      type === 'query' &&
-      Object.keys(queries).some(localName => isSameQueryName(localName, name))
+      type === 'query'
+        ? Object.keys(queries).some(localName =>
+            isSameQueryName(localName, name),
+          )
+        : Object.keys(cardProviders).some(cardName =>
+            isSameProviderName(cardName, name),
+          )
     ) {
       continue;
     }
 
-    const formulas = [formula, colorFormula].filter(
+    const formulas = [
+      formula,
+      colorFormula,
+      ...Object.values(cardProviders).map(provider => provider.formula),
+    ].filter(
       (text): text is string =>
         text !== undefined && formulaUsesItemName(type, text, name),
     );

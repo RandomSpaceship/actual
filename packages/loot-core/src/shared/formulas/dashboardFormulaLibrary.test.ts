@@ -278,6 +278,58 @@ describe('providers in a dashboard export and import', () => {
     ).toEqual(['food-id', 'net-id', 'spending-id']);
   });
 
+  it('exports what the card providers use, and not the names that they hide', () => {
+    const library = [
+      libraryQuery('food-id', 'Food', 1),
+      libraryProvider('net-id', 'Net', '=Base * 2'),
+      libraryProvider('base-id', 'Base', '=QUERY("rent")'),
+      libraryProvider('yearly-id', 'Yearly', '=1'),
+    ];
+
+    expect(
+      collectFormulaLibraryForExport(
+        [
+          formulaWidget({
+            formula: '=Yearly',
+            providers: {
+              YEARLY: { formula: '=Net * 12' },
+              base: { formula: '=QUERY("food")' },
+            },
+          }),
+        ],
+        library,
+      ).map(({ id }) => id),
+    ).toEqual(['food-id', 'net-id']);
+  });
+
+  it('renames an imported provider in card providers, but not a name that a card provider hides', () => {
+    const plan = planFormulaLibraryImport(
+      [
+        formulaWidget({
+          formula: '=Yearly + Hidden',
+          providers: {
+            Yearly: { formula: '=Net * 12', description: 'Per year' },
+            HIDDEN: { formula: '=Net' },
+          },
+        }),
+      ],
+      [exportedProvider('Net', '=1'), exportedProvider('Hidden', '=2')],
+      [
+        libraryProvider('net-id', 'Net', '=2'),
+        libraryProvider('hidden-id', 'Hidden', '=3'),
+      ],
+      createIds(),
+    );
+
+    expect(plan.widgets[0].meta).toMatchObject({
+      formula: '=Yearly + Hidden',
+      providers: {
+        Yearly: { formula: '=Net_2 * 12', description: 'Per year' },
+        HIDDEN: { formula: '=Net_2' },
+      },
+    });
+  });
+
   it('reuses an identical provider and creates a new one', () => {
     const plan = planFormulaLibraryImport(
       [formulaWidget({ formula: '=Net + Other' })],

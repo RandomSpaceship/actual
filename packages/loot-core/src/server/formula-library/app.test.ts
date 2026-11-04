@@ -250,6 +250,39 @@ describe('formula library app', () => {
     expect((await getWidget(notCheckedId)).meta?.formula).toBe('=Net');
   });
 
+  it('renames the provider in card providers, but not in a card that hides it', async () => {
+    const id = await app.handlers['formula-library-create']({
+      type: 'provider',
+      name: 'Net',
+      data: { formula: '=1' },
+    });
+    const usesId = await addFormulaWidget({
+      formula: '=Yearly',
+      providers: { Yearly: { formula: '=Net * 12', description: 'Per year' } },
+    });
+    const hidesId = await addFormulaWidget({
+      formula: '=Net + Other',
+      providers: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
+    });
+
+    await app.handlers['formula-library-update']({
+      id,
+      name: 'NetIncome',
+      renameInWidgetIds: [usesId, hidesId],
+    });
+
+    expect((await getWidget(usesId)).meta).toMatchObject({
+      formula: '=Yearly',
+      providers: {
+        Yearly: { formula: '=NetIncome * 12', description: 'Per year' },
+      },
+    });
+    expect((await getWidget(hidesId)).meta).toMatchObject({
+      formula: '=Net + Other',
+      providers: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
+    });
+  });
+
   it('rejects a rename to a name in use', async () => {
     await app.handlers['formula-library-create']({
       type: 'query',

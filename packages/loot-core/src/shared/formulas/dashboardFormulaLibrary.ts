@@ -40,6 +40,36 @@ function getCardFormulas(meta: FormulaMeta) {
   );
 }
 
+function isCardProviderName(meta: FormulaMeta, name: string) {
+  return Object.keys(meta.providers ?? {}).some(cardName =>
+    isSameProviderName(cardName, name),
+  );
+}
+
+// The providers as the card sees them: a card provider wins over a library
+// provider with the same name
+function getCardProviderFormulas(
+  meta: FormulaMeta,
+  providers: ProviderFormulas,
+): ProviderFormulas {
+  const cardProviders: ProviderFormulas = new Map(providers);
+  for (const [name, { formula }] of Object.entries(meta.providers ?? {})) {
+    cardProviders.set(name.toUpperCase(), formula);
+  }
+  return cardProviders;
+}
+
+// The library provider names that a card uses, also through card providers
+function findLibraryProviderNames(
+  meta: FormulaMeta,
+  providers: ProviderFormulas,
+) {
+  return findProviderNames(
+    getCardFormulas(meta),
+    getCardProviderFormulas(meta, providers),
+  ).filter(name => !isCardProviderName(meta, name));
+}
+
 // The names of the providers that the formulas use, also through other
 // providers. A name that is not in providers is not in the list.
 function findProviderNames(formulas: string[], providers: ProviderFormulas) {
@@ -59,13 +89,14 @@ function findProviderNames(formulas: string[], providers: ProviderFormulas) {
   return [...names.values()];
 }
 
-// The library query names that a card uses, also through providers. A
-// provider uses the queries of the card, so a name that a card query hides is
-// not in the list.
+// The library query names that a card uses, also through card and library
+// providers. A provider uses the queries of the card, so a name that a card
+// query hides is not in the list.
 function findLibraryQueryNames(meta: FormulaMeta, providers: ProviderFormulas) {
   const formulas = getCardFormulas(meta);
-  const providerFormulas = findProviderNames(formulas, providers).map(
-    name => providers.get(name.toUpperCase()) ?? '',
+  const cardProviders = getCardProviderFormulas(meta, providers);
+  const providerFormulas = findProviderNames(formulas, cardProviders).map(
+    name => cardProviders.get(name.toUpperCase()) ?? '',
   );
   return [...formulas, ...providerFormulas]
     .flatMap(formula => findQueryNameReferences(formula))
@@ -131,7 +162,7 @@ export function collectFormulaLibraryForExport(
     for (const name of findLibraryQueryNames(meta, providers)) {
       add(findLibraryItem(oldestFirst, 'query', name));
     }
-    for (const name of findProviderNames(getCardFormulas(meta), providers)) {
+    for (const name of findLibraryProviderNames(meta, providers)) {
       add(findLibraryItem(oldestFirst, 'provider', name));
     }
   }
@@ -355,18 +386,33 @@ export function planFormulaLibraryImport<
       ),
     );
 
+    // A name that a card provider hides is not the library provider
+    const cardRenames = new Map(
+      [...providerPlan.renames].filter(
+        ([oldName]) => !isCardProviderName(meta, oldName),
+      ),
+    );
     const rename = (formula: string | undefined) =>
-      formula === undefined
-        ? undefined
-        : renameProviders(formula, providerPlan.renames);
+      formula === undefined ? undefined : renameProviders(formula, cardRenames);
 
     return {
       ...widget,
       meta: {
         ...meta,
-        ...(providerPlan.renames.size > 0 && {
+        ...(cardRenames.size > 0 && {
           formula: rename(meta.formula),
           colorFormula: rename(meta.colorFormula),
+          ...(meta.providers && {
+            providers: Object.fromEntries(
+              Object.entries(meta.providers).map(([name, provider]) => [
+                name,
+                {
+                  ...provider,
+                  formula: renameProviders(provider.formula, cardRenames),
+                },
+              ]),
+            ),
+          }),
         }),
         ...(meta.queries || Object.keys(queries).length > 0 ? { queries } : {}),
         ...(meta.timeFrameOverrides ? { timeFrameOverrides } : {}),

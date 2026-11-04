@@ -81,8 +81,9 @@ async function createItem({
 }
 
 // A rename changes the formula text of the cards in renameInWidgetIds, in the
-// same batch, so that one undo reverts all of it. A card with a local query
-// that has the old name does not use the library query, so it does not change.
+// same batch, so that one undo reverts all of it, also in card providers. A
+// card with a card query or card provider that has the old name does not use
+// the library item, so it does not change.
 // The rename also changes every provider that uses the item. An item that an
 // older item with the same name overrides has no uses, so nothing else changes.
 async function updateItem({
@@ -142,13 +143,12 @@ async function updateItem({
 
     for (const widget of widgets) {
       const meta = widget.meta;
-      const localQueryNames = Object.keys(meta?.queries ?? {});
+      const localNames = Object.keys(
+        (item.type === 'query' ? meta?.queries : meta?.providers) ?? {},
+      );
       if (
         !meta ||
-        (item.type === 'query' &&
-          localQueryNames.some(localName =>
-            isSameQueryName(localName, item.name),
-          ))
+        localNames.some(localName => isSameQueryName(localName, item.name))
       ) {
         continue;
       }
@@ -163,6 +163,14 @@ async function updateItem({
             meta.colorFormula === undefined
               ? undefined
               : rename(meta.colorFormula),
+          ...(meta.providers && {
+            providers: Object.fromEntries(
+              Object.entries(meta.providers).map(([name, provider]) => [
+                name,
+                { ...provider, formula: rename(provider.formula) },
+              ]),
+            ),
+          }),
         },
       });
     }

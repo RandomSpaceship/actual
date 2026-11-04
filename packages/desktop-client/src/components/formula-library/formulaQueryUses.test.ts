@@ -103,6 +103,28 @@ describe('findFormulaQueryUses for a provider', () => {
       ).map(({ widgetId }) => widgetId),
     ).toEqual(['uses']);
   });
+
+  it('finds uses in card providers, and skips a card provider of the same name', () => {
+    const widgets = [
+      formulaWidget('card', 'main', {
+        formula: '=Yearly',
+        providers: { Yearly: { formula: '=Net * 12' } },
+      }),
+      formulaWidget('hidden', 'main', {
+        formula: '=Net',
+        providers: { NET: { formula: '=1' } },
+      }),
+    ];
+
+    expect(
+      findFormulaQueryUses({ type: 'provider', name: 'Net' }, widgets, pages),
+    ).toEqual([
+      expect.objectContaining({
+        widgetId: 'card',
+        formulas: ['=Net * 12'],
+      }),
+    ]);
+  });
 });
 
 describe('findProviderUses', () => {
