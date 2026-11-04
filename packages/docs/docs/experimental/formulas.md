@@ -157,6 +157,7 @@ If a function isn’t listed here, it still might work. Actual uses HyperFormula
 | `QUERY_PIVOT`                   | Query        | Returns a table with one row for each group of one dimension and one column for each group of a second dimension. The first row has the column names. See [Make a Wide Table With `QUERY_PIVOT`](#make-a-wide-table-with-query_pivot). | `=QUERY_PIVOT("expenses", "category", , "month")`                                                                             | Row sort and column sort                                                                                        |
 | `QUERY_PIVOT_COUNT`             | Query        | Returns the same table as `QUERY_PIVOT`, with the number of transactions in place of the amount.                                                                                                                                       | `=QUERY_PIVOT_COUNT("expenses", "payee", , "month")`                                                                          | Row sort and column sort                                                                                        |
 | `QUERY_START_DATE`              | Query        | Returns the first day that a named query includes, as `YYYY-MM-DD` text.                                                                                                                                                               | `=QUERY_START_DATE("expenses")`                                                                                               | —                                                                                                               |
+| `QUERY_TABLE`                   | Query        | Returns the rows of a named AQL query that has `select` or `groupBy`, with one column for each `select` item. See [Get the Rows of a Table Query](#get-the-rows-of-a-table-query).                                                     | `=QUERY_TABLE("spendByPayee", TRUE())`                                                                                        | Header                                                                                                          |
 | `RANK`                          | Query        | Returns the rank of a number in a list.                                                                                                                                                                                                | `=RANK(10, A1:A10, 0)`                                                                                                        | —                                                                                                               |
 | `RATE`                          | Query        | Calculates interest rate per period.                                                                                                                                                                                                   | `=RATE(60, -200, 10000)`                                                                                                      | —                                                                                                               |
 | `REPLACE`                       | Query, Rules | Replaces substring at specified position.                                                                                                                                                                                              | `=REPLACE(notes, 1, 5, "")`                                                                                                   | —                                                                                                               |
@@ -467,11 +468,11 @@ To add an AQL query:
 2. Under **AQL queries**, select **Create new AQL query**.
 3. Type a name. AQL queries and the other library queries share one set of names, so an AQL query cannot have the name of a library query.
 4. Type the query in the **Query** box. The line under the box shows the kind of the query, or the error in the text.
-5. Optionally, set the date field and the time frame.
+5. Optionally, set the date field and the time frame. For a table query, you can also set the money columns and the row limit.
 6. Look at **Result**. It updates when you stop typing.
 7. Select **Save**.
 
-A card uses an AQL query by its name, as for the other library queries, for example `QUERY("groceries")`. In the card editor, AQL queries show with the library queries.
+A card uses an AQL query by its name, as for the other library queries, for example `QUERY("groceries")` or `QUERY_TABLE("spendByPayee")`. In the card editor, AQL queries show with the library queries.
 
 #### Write the Query
 
@@ -496,13 +497,47 @@ The JSON gives one of three kinds of query:
 | ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Filter | `"table": "transactions"`, with only `filter` and `options`                              | `QUERY`, `QUERY_COUNT`, `QUERY_GROUP`, `QUERY_PIVOT`, `QUERY_DAYS` and the other date functions |
 | Value  | `calculate`                                                                              | `QUERY`                                                                                         |
-| Table  | `select`, `groupBy`, `orderBy`, `limit` or `offset`, or a table that is not transactions | No formula function reads a table query yet                                                     |
+| Table  | `select`, `groupBy`, `orderBy`, `limit` or `offset`, or a table that is not transactions | `QUERY_TABLE`                                                                                   |
 
 A filter AQL query works the same as a library query with filters. For example, `QUERY("groceries")` gives the sum of the amounts, and `QUERY_GROUP("groceries", "payee")` gives a row for each payee.
 
 A value query gives the value of its `calculate`. Actual reads the value as an amount, the same as the amounts of transactions, unless the calculation is `$count`. If the value is a count of a different kind, select **The value is a count, not an amount**.
 
 `QUERY_EXTRACT_CATEGORIES`, `QUERY_EXTRACT_TIMEFRAME_START` and `QUERY_EXTRACT_TIMEFRAME_END` do not work with an AQL query.
+
+#### Get the Rows of a Table Query
+
+`QUERY_TABLE` gives the rows of a table query:
+
+```
+=QUERY_TABLE("query", header)
+```
+
+The table has one column for each item of `select`, in the same order. For example, with this query named `spendByPayee`, `=QUERY_TABLE("spendByPayee")` gives one row for each payee, with the payee name, the total and the number of transactions:
+
+```json
+{
+  "table": "transactions",
+  "filter": { "amount": { "$lt": 0 } },
+  "groupBy": ["payee.name"],
+  "select": [
+    "payee.name",
+    { "total": { "$sum": "$amount" } },
+    { "count": { "$count": "$id" } }
+  ],
+  "orderBy": [{ "$sum": "$amount", "$dir": "asc" }]
+}
+```
+
+The table has no header row, so other functions can use its values. For example, `=SUM(CHOOSECOLS(QUERY_TABLE("spendByPayee"), 2))` gives the total of all payees. To add the column names as the first row, set `header` to `TRUE()`: `=QUERY_TABLE("spendByPayee", TRUE())`. The names are the `select` items, for example `payee.name` and `total`.
+
+The query name and `header` must be in the formula, not in a cell or a provider. Actual must know the size of the table before the formula runs.
+
+The database stores an amount in cents. A money column gives the amount, as `QUERY` does. Under **Money columns** in the AQL query editor, select the columns that are money. By default, a column is money when its expression reads a field named `amount`, for example `{"total": {"$sum": "$amount"}}`. If the `select` has a `*`, the fields named `amount` are money.
+
+A table query gives at most 1,000 rows. If the query gives more rows, the table stops at 1,000 rows, and the card shows a warning. To get fewer rows, add a filter or a `limit` to the query. To get more rows, set **Row limit**, up to 10,000. A smaller `limit` in the query is used instead, with no warning.
+
+On a card, the [table view](#show-a-table) shows a column of numbers as money. To show a count as a number, set the type of its column to **Number**.
 
 #### Set the Time Frame of an AQL Query
 
@@ -512,9 +547,8 @@ The time frame starts at **All time**. A card can give the query its own time fr
 
 #### Tips for AQL Queries
 
-- A linked field such as `category` or `payee` gives an id. To get the name, use `category.name` or `payee.name`.
+- A linked field such as `category` or `payee` gives an id. To get the name, use `category.name` or `payee.name`. The result in the editor shows a hint when a column has only ids.
 - ActualQL cannot order rows by a name from `select`. To order by a sum, repeat the sum in `orderBy`, with the direction in `$dir`: `"orderBy": [{"$sum": "$amount", "$dir": "desc"}]`.
-- The result of a table query in the editor shows the values as the database stores them, so amounts are in cents.
 - If the query has an error, for example a field name that does not exist, the card shows the error. The other parts of Actual do not show it.
 
 ### Reuse a Formula With Providers
