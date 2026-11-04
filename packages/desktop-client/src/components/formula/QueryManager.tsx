@@ -15,6 +15,7 @@ import { View } from '@actual-app/components/view';
 import {
   findProviderNameReferences,
   isSameProviderName,
+  renameProviderInFormula,
 } from '@actual-app/core/shared/formulas/providerNameUses';
 import {
   findQueryNameReferences,
@@ -22,6 +23,7 @@ import {
 } from '@actual-app/core/shared/formulas/queryNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
+  FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
   FormulaTimeFrameOverride,
@@ -43,14 +45,16 @@ import { addNotification } from '#notifications/notificationsSlice';
 import { useDispatch } from '#redux';
 import type { AppDispatch } from '#redux/store';
 
-import { LibraryProviderItem } from './LibraryProviderItem';
 import { LibraryQueryItem } from './LibraryQueryItem';
+import { ProviderItem } from './ProviderItem';
 import {
   newQueryTimeFrame,
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from './queryTimeFrame';
 import { QueryTimeFrameControl } from './QueryTimeFrameControl';
+import { findCardProviderName } from './resolveProviders';
+import type { CardProviders } from './resolveProviders';
 
 type QueryConfig = {
   conditions?: RuleConditionEntity[];
@@ -66,6 +70,13 @@ type QueryManagerProps = {
   onTimeFrameOverridesChange: (
     timeFrameOverrides: Record<string, FormulaTimeFrameOverride>,
   ) => void;
+  cardProviders: CardProviders;
+  // Set when a card provider gets a new name, so that the card formulas can
+  // change too. The card providers change here.
+  onCardProvidersChange: (
+    cardProviders: CardProviders,
+    rename?: { oldName: string; newName: string },
+  ) => void;
   // The card formulas. Only the formulas when the editor opens are used
   formulas: string[];
   // For the provider values on this card
@@ -79,6 +90,8 @@ export function QueryManager({
   onQueriesChange,
   timeFrameOverrides,
   onTimeFrameOverridesChange,
+  cardProviders,
+  onCardProvidersChange,
   formulas,
   accounts,
   onInsertProvider,
@@ -122,13 +135,19 @@ export function QueryManager({
           findCardQueryName(name) === undefined,
       );
 
-  // The providers show at the start if the formulas use one of them
+  function findLibraryProvider(name: string) {
+    return libraryProviders.find(item => isSameProviderName(item.name, name));
+  }
+
+  // The library providers show at the start if the formulas use one of them
   const areProvidersShown =
     showProviders ??
     openingFormulas
       .flatMap(formula => findProviderNameReferences(formula))
-      .some(({ name }) =>
-        libraryProviders.some(item => isSameProviderName(item.name, name)),
+      .some(
+        ({ name }) =>
+          findLibraryProvider(name) !== undefined &&
+          findCardProviderName(cardProviders, name) === undefined,
       );
 
   function handleAddQuery() {
@@ -235,6 +254,117 @@ export function QueryManager({
     dispatch(
       pushModal({
         modal: { name: 'edit-formula-library-provider', options: { item } },
+      }),
+    );
+  }
+
+  function handleEditCardProvider(name?: string) {
+    dispatch(
+      pushModal({
+        modal: {
+          name: 'edit-formula-library-provider',
+          options: {
+            card: {
+              name,
+              providers: cardProviders,
+              queries,
+              timeFrameOverrides,
+              onSave: (newName, data) =>
+                handleSaveCardProvider(name, newName, data),
+            },
+          },
+        },
+      }),
+    );
+  }
+
+  // A rename also changes the other card providers that use the name
+  function handleSaveCardProvider(
+    oldName: string | undefined,
+    newName: string,
+    data: FormulaLibraryProviderData,
+  ) {
+    const isRename = oldName !== undefined && oldName !== newName;
+    const rename = (formula: string) =>
+      isRename ? renameProviderInFormula(formula, oldName, newName) : formula;
+    const newProvider = { ...data, formula: rename(data.formula) };
+    // The provider keeps its place in the list
+    const newProviders: CardProviders = Object.fromEntries(
+      Object.entries(cardProviders).map(([providerName, provider]) =>
+        providerName === oldName
+          ? [newName, newProvider]
+          : [providerName, { ...provider, formula: rename(provider.formula) }],
+      ),
+    );
+    if (oldName === undefined) {
+      newProviders[newName] = newProvider;
+    }
+    onCardProvidersChange(
+      newProviders,
+      isRename ? { oldName, newName } : undefined,
+    );
+  }
+
+  function handleRemoveCardProvider(name: string) {
+    const newProviders = { ...cardProviders };
+    delete newProviders[name];
+    onCardProvidersChange(newProviders);
+  }
+
+  function handleCopyProviderIntoCard(item: FormulaLibraryProviderEntity) {
+    onCardProvidersChange({ ...cardProviders, [item.name]: item.data });
+  }
+
+  // The card queries and card providers that a card provider uses. In the
+  // library, the provider cannot find them.
+  function findCardOnlyNames(name: string) {
+    const { formula } = cardProviders[name];
+    const queryNames = findQueryNameReferences(formula)
+      .map(reference => findCardQueryName(reference.name))
+      .filter((queryName): queryName is string => queryName !== undefined)
+      .map(queryName => `QUERY("${queryName}")`);
+    const providerNames = findProviderNameReferences(formula)
+      .map(reference => findCardProviderName(cardProviders, reference.name))
+      .filter(
+        (providerName): providerName is string =>
+          providerName !== undefined && providerName !== name,
+      );
+    return [...new Set([...queryNames, ...providerNames])];
+  }
+
+  async function handleMakeProviderShared(name: string) {
+    const cardOnlyNames = findCardOnlyNames(name);
+    if (cardOnlyNames.length > 0) {
+      dispatch(
+        addNotification({
+          notification: {
+            type: 'error',
+            message: t(
+              'Cannot share "{{name}}", because it uses names that only this card has: {{names}}. Share them first.',
+              { name, names: cardOnlyNames.join(', ') },
+            ),
+          },
+        }),
+      );
+      return;
+    }
+
+    await createLibraryItem.mutateAsync({
+      type: 'provider',
+      name,
+      data: cardProviders[name],
+    });
+    handleRemoveCardProvider(name);
+    setShowProviders(true);
+    dispatch(
+      addNotification({
+        notification: {
+          type: 'message',
+          message: t(
+            '"{{name}}" is now a library provider. Save the widget to remove the card copy.',
+            { name },
+          ),
+        },
       }),
     );
   }
@@ -389,6 +519,62 @@ export function QueryManager({
         </View>
       )}
 
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: 16,
+          marginBottom: 16,
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: 600 }}>
+          <Trans>Providers</Trans>
+        </Text>
+        <Button variant="primary" onPress={() => handleEditCardProvider()}>
+          <Trans>Add Provider</Trans>
+        </Button>
+      </View>
+
+      {Object.keys(cardProviders).length === 0 ? (
+        <Text
+          size="small"
+          style={{ color: theme.pageTextSubdued, marginBottom: 12 }}
+        >
+          <Trans>
+            A provider is a named formula. Other formulas use it by its name,
+            for example =NetIncome / 12. A card provider is only on this card.
+          </Trans>
+        </Text>
+      ) : (
+        Object.entries(cardProviders).map(([name, data]) => (
+          <ProviderItem
+            key={name}
+            name={name}
+            data={data}
+            warning={
+              findLibraryProvider(name)
+                ? t('Hides the library provider with the same name')
+                : undefined
+            }
+            queries={queries}
+            timeFrameOverrides={timeFrameOverrides}
+            cardProviders={cardProviders}
+            accounts={accounts}
+            onEdit={() => handleEditCardProvider(name)}
+            onInsert={
+              onInsertProvider ? () => onInsertProvider(name) : undefined
+            }
+            onMakeShared={
+              findLibraryProvider(name)
+                ? undefined
+                : () => void handleMakeProviderShared(name)
+            }
+            onRemove={() => handleRemoveCardProvider(name)}
+          />
+        ))
+      )}
+
       {libraryProviders.length > 0 && (
         <View style={{ marginTop: 8 }}>
           <View
@@ -406,26 +592,38 @@ export function QueryManager({
             />
             <label htmlFor="query-manager-show-providers">
               <Trans count={libraryProviders.length}>
-                Show providers ({{ count: libraryProviders.length }})
+                Show library providers ({{ count: libraryProviders.length }})
               </Trans>
             </label>
           </View>
           {areProvidersShown &&
-            libraryProviders.map(item => (
-              <LibraryProviderItem
-                key={item.id}
-                item={item}
-                queries={queries}
-                timeFrameOverrides={timeFrameOverrides}
-                accounts={accounts}
-                onEdit={() => handleEditProvider(item)}
-                onInsert={
-                  onInsertProvider
-                    ? () => onInsertProvider(item.name)
-                    : undefined
-                }
-              />
-            ))}
+            libraryProviders.map(item => {
+              const isHidden =
+                findCardProviderName(cardProviders, item.name) !== undefined;
+              return (
+                <ProviderItem
+                  key={item.id}
+                  name={item.name}
+                  data={item.data}
+                  isHidden={isHidden}
+                  queries={queries}
+                  timeFrameOverrides={timeFrameOverrides}
+                  cardProviders={cardProviders}
+                  accounts={accounts}
+                  onEdit={() => handleEditProvider(item)}
+                  onInsert={
+                    onInsertProvider && !isHidden
+                      ? () => onInsertProvider(item.name)
+                      : undefined
+                  }
+                  onCopyIntoCard={
+                    isHidden
+                      ? undefined
+                      : () => handleCopyProviderIntoCard(item)
+                  }
+                />
+              );
+            })}
         </View>
       )}
     </View>

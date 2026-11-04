@@ -15,7 +15,9 @@ import {
 import type {
   AccountEntity,
   FormulaLibraryItemEntity,
+  FormulaLibraryProviderData,
   FormulaLibraryProviderEntity,
+  FormulaTimeFrameOverride,
 } from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
 
@@ -31,7 +33,9 @@ import {
   listProviderNames,
   resolveProviders,
 } from '#components/formula/resolveProviders';
+import type { CardProviders } from '#components/formula/resolveProviders';
 import { listQueryNames } from '#components/formula/resolveQuery';
+import type { FormulaQueryConfig } from '#components/formula/resolveQuery';
 import { FormulaResult } from '#components/reports/FormulaResult';
 import {
   formulaLibraryQueries,
@@ -52,15 +56,30 @@ const FormulaEditor = lazy(() =>
 
 // Stable identities, so the preview does not run again on each render
 const NO_CARD_QUERIES = {};
+const NO_CARD_PROVIDERS: CardProviders = {};
 const NO_ACCOUNTS: AccountEntity[] = [];
+
+// A provider of one card. The card editor keeps it until the card is saved.
+export type CardProviderEditContext = {
+  // Without it, the modal creates a new card provider
+  name?: string;
+  providers: CardProviders;
+  queries: Record<string, FormulaQueryConfig>;
+  // Keyed by library item id
+  timeFrameOverrides: Record<string, FormulaTimeFrameOverride>;
+  onSave: (name: string, data: FormulaLibraryProviderData) => void;
+};
 
 type EditFormulaLibraryProviderModalProps = {
   // Without it, the modal creates a new provider
   item?: FormulaLibraryProviderEntity;
+  // Set to edit a card provider in place of a library provider
+  card?: CardProviderEditContext;
 };
 
 export function EditFormulaLibraryProviderModal({
   item,
+  card,
 }: EditFormulaLibraryProviderModalProps) {
   const { t } = useTranslation();
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
@@ -69,9 +88,15 @@ export function EditFormulaLibraryProviderModal({
   const updateItem = useUpdateFormulaLibraryItemMutation();
   const accounts = useAccounts().data ?? NO_ACCOUNTS;
 
-  const [name, setName] = useState(item?.name ?? '');
-  const [description, setDescription] = useState(item?.data.description ?? '');
-  const [formula, setFormula] = useState(item?.data.formula ?? '=');
+  const cardProvider =
+    card?.name !== undefined ? card.providers[card.name] : undefined;
+  const [name, setName] = useState(item?.name ?? card?.name ?? '');
+  const [description, setDescription] = useState(
+    item?.data.description ?? cardProvider?.description ?? '',
+  );
+  const [formula, setFormula] = useState(
+    item?.data.formula ?? cardProvider?.formula ?? '=',
+  );
   const [nameError, setNameError] = useState<string | null>(null);
   const [formulaError, setFormulaError] = useState<string | null>(null);
   // Set when a rename needs the user to choose the cards to change
@@ -85,17 +110,38 @@ export function EditFormulaLibraryProviderModal({
     : { cards: [], providers: [] };
   const isRename = item !== undefined && trimmedName !== item.name;
 
+  // The other providers of the card
+  const otherCardProviders = Object.fromEntries(
+    Object.entries(card?.providers ?? NO_CARD_PROVIDERS).filter(
+      ([providerName]) => providerName !== card?.name,
+    ),
+  );
+  // The card providers as they are after the save
+  const editedCardProviders: CardProviders = card
+    ? { ...otherCardProviders, [trimmedName]: { formula } }
+    : NO_CARD_PROVIDERS;
+  const isLibraryNameHidden =
+    card !== undefined &&
+    library.some(
+      libraryItem =>
+        libraryItem.type === 'provider' &&
+        isSameProviderName(libraryItem.name, trimmedName),
+    );
+
   const simpleAccounts = accounts
     .filter(account => !account.tombstone)
     .map(account => ({ id: account.id, name: account.name }));
-  // A provider uses the queries of the card that uses it. The preview has no
-  // card, so it uses library queries only.
+  // A provider uses the queries of the card that uses it. A library provider
+  // has no card here, so its preview uses library queries only.
   const preview = useFormulaExecution(
     formula,
-    NO_CARD_QUERIES,
+    card?.queries ?? NO_CARD_QUERIES,
     undefined,
     undefined,
     simpleAccounts,
+    card?.timeFrameOverrides,
+    'value',
+    editedCardProviders,
   );
 
   function validateName() {
@@ -111,12 +157,16 @@ export function EditFormulaLibraryProviderModal({
       );
     }
     if (
-      library.some(
-        libraryItem =>
-          libraryItem.id !== item?.id &&
-          libraryItem.type === 'provider' &&
-          isSameProviderName(libraryItem.name, trimmedName),
-      )
+      card
+        ? Object.keys(otherCardProviders).some(providerName =>
+            isSameProviderName(providerName, trimmedName),
+          )
+        : library.some(
+            libraryItem =>
+              libraryItem.id !== item?.id &&
+              libraryItem.type === 'provider' &&
+              isSameProviderName(libraryItem.name, trimmedName),
+          )
     ) {
       return t('A provider with this name already exists');
     }
@@ -141,9 +191,12 @@ export function EditFormulaLibraryProviderModal({
         libraryItem.id === item?.id ? editedProvider : libraryItem,
       ),
     ];
-    const cycle = resolveProviders([formula], editedLibrary).issues.find(
-      issue => issue.kind === 'provider-cycle',
-    );
+    const cycle = resolveProviders(
+      [formula],
+      card ? library : editedLibrary,
+      [],
+      editedCardProviders,
+    ).issues.find(issue => issue.kind === 'provider-cycle');
     return cycle ? cycle.message : null;
   }
 
@@ -153,7 +206,9 @@ export function EditFormulaLibraryProviderModal({
       ...(description.trim() !== '' && { description: description.trim() }),
     };
 
-    if (item) {
+    if (card) {
+      card.onSave(trimmedName, data);
+    } else if (item) {
       await updateItem.mutateAsync({
         id: item.id,
         name: trimmedName,
@@ -190,7 +245,15 @@ export function EditFormulaLibraryProviderModal({
       {({ state }) => (
         <View style={{ width: 800, maxWidth: '100%' }}>
           <ModalHeader
-            title={item ? t('Edit provider') : t('New provider')}
+            title={
+              card
+                ? card.name !== undefined
+                  ? t('Edit card provider')
+                  : t('New card provider')
+                : item
+                  ? t('Edit provider')
+                  : t('New provider')
+            }
             rightContent={<ModalCloseButton onPress={() => state.close()} />}
           />
           {renameWidgetIds ? (
@@ -257,10 +320,18 @@ export function EditFormulaLibraryProviderModal({
                     style={{ fontFamily: 'monospace' }}
                     autoFocus
                   />
-                  {nameError && (
+                  {nameError ? (
                     <Text style={{ color: theme.errorText, marginTop: 5 }}>
                       {nameError}
                     </Text>
+                  ) : (
+                    isLibraryNameHidden && (
+                      <Text style={{ color: theme.warningText, marginTop: 5 }}>
+                        <Trans>
+                          Hides the library provider with the same name
+                        </Trans>
+                      </Text>
+                    )
                   )}
                 </FormField>
                 <FormField style={{ flex: 2 }}>
@@ -291,11 +362,15 @@ export function EditFormulaLibraryProviderModal({
                       value={formula}
                       onChange={setFormula}
                       mode="query"
-                      queries={listQueryNames({ localQueries: {}, library })}
+                      queries={listQueryNames({
+                        localQueries: card?.queries ?? {},
+                        library,
+                      })}
                       providers={listProviderNames(
                         library.filter(
                           libraryItem => libraryItem.id !== item?.id,
                         ),
+                        otherCardProviders,
                       )}
                       singleLine={false}
                       showLineNumbers
@@ -335,10 +410,14 @@ export function EditFormulaLibraryProviderModal({
                   marginTop: 5,
                 }}
               >
-                <Trans>
-                  The result uses library queries. On a card, a card query with
-                  the same name wins, so the result can be different.
-                </Trans>
+                {card ? (
+                  <Trans>The result uses the queries of this card.</Trans>
+                ) : (
+                  <Trans>
+                    The result uses library queries. On a card, a card query
+                    with the same name wins, so the result can be different.
+                  </Trans>
+                )}
               </Text>
               <ModalButtons>
                 <Button

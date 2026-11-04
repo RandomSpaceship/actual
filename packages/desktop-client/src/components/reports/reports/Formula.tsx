@@ -13,6 +13,7 @@ import { styles } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
+import { renameProviderInFormula } from '@actual-app/core/shared/formulas/providerNameUses';
 import type {
   FormulaLibraryItemEntity,
   FormulaTableColumn,
@@ -38,6 +39,7 @@ import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColu
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
 import { listProviderNames } from '#components/formula/resolveProviders';
+import type { CardProviders } from '#components/formula/resolveProviders';
 import { listQueryNames } from '#components/formula/resolveQuery';
 import type { FormulaIssue } from '#components/formula/resolveQuery';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
@@ -93,6 +95,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [timeFrameOverrides, setTimeFrameOverrides] = useState(
     widget?.meta?.timeFrameOverrides || {},
   );
+  const [cardProviders, setCardProviders] = useState<CardProviders>(
+    widget?.meta?.providers || {},
+  );
   const {
     data: { list: categories, grouped: categoryGroups } = {
       list: [],
@@ -142,16 +147,24 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     colorFormula,
     queries,
     timeFrameOverrides,
+    cardProviders,
   }));
   function runFormula() {
-    setRanInputs({ formula, colorFormula, queries, timeFrameOverrides });
+    setRanInputs({
+      formula,
+      colorFormula,
+      queries,
+      timeFrameOverrides,
+      cardProviders,
+    });
   }
   const isChanged =
     formula !== ranInputs.formula ||
     colorFormula !== ranInputs.colorFormula ||
     JSON.stringify(queries) !== JSON.stringify(ranInputs.queries) ||
     JSON.stringify(timeFrameOverrides) !==
-      JSON.stringify(ranInputs.timeFrameOverrides);
+      JSON.stringify(ranInputs.timeFrameOverrides) ||
+    JSON.stringify(cardProviders) !== JSON.stringify(ranInputs.cardProviders);
 
   const title = widget?.meta?.name || t('Formula');
 
@@ -178,6 +191,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     simpleAccounts,
     ranInputs.timeFrameOverrides,
     view === 'auto' ? 'auto' : view === 'table' ? 'table' : 'value',
+    ranInputs.cardProviders,
   );
   const isManualRun = issues.some(
     issue => issue.kind === 'large-table' || issue.kind === 'table-cut',
@@ -277,6 +291,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     colorVariables,
     simpleAccounts,
     ranInputs.timeFrameOverrides,
+    'value',
+    ranInputs.cardProviders,
   );
 
   // For autocomplete and badges: card queries and library queries
@@ -284,7 +300,10 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     () => listQueryNames({ localQueries: queries, library }),
     [queries, library],
   );
-  const providerNames = useMemo(() => listProviderNames(library), [library]);
+  const providerNames = useMemo(
+    () => listProviderNames(library, cardProviders),
+    [library, cardProviders],
+  );
 
   const formulaEditorViewRef = useRef<EditorView | null>(null);
   // Before the first focus, the cursor is at the start of the formula
@@ -332,6 +351,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           formula,
           queries,
           timeFrameOverrides,
+          providers: cardProviders,
           fontSizeMode,
           staticFontSize,
           showTitle,
@@ -370,6 +390,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             formula,
             queries,
             timeFrameOverrides,
+            providers: cardProviders,
             fontSizeMode,
             staticFontSize,
             showTitle,
@@ -857,7 +878,31 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             onQueriesChange={setQueries}
             timeFrameOverrides={timeFrameOverrides}
             onTimeFrameOverridesChange={setTimeFrameOverrides}
-            formulas={[formula, colorFormula]}
+            cardProviders={cardProviders}
+            onCardProvidersChange={(newCardProviders, rename) => {
+              setCardProviders(newCardProviders);
+              if (rename) {
+                setFormula(
+                  renameProviderInFormula(
+                    formula,
+                    rename.oldName,
+                    rename.newName,
+                  ),
+                );
+                setColorFormula(
+                  renameProviderInFormula(
+                    colorFormula,
+                    rename.oldName,
+                    rename.newName,
+                  ),
+                );
+              }
+            }}
+            formulas={[
+              formula,
+              colorFormula,
+              ...Object.values(cardProviders).map(provider => provider.formula),
+            ]}
             accounts={simpleAccounts}
             onInsertProvider={insertIntoFormula}
           />

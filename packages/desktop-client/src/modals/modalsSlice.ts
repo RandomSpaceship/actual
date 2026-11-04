@@ -27,6 +27,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 import { accountQueries } from '#accounts';
 import { resetApp, setAppState } from '#app/appSlice';
+import type { CardProviderEditContext } from '#components/formula-library/EditFormulaLibraryProviderModal';
 import type { SelectLinkedAccountsModalProps } from '#components/modals/SelectLinkedAccountsModal';
 import type { TransactionTableColumn } from '#components/transactions/table/columns';
 import { createAppAsyncThunk } from '#redux';
@@ -619,6 +620,7 @@ export type Modal =
       name: 'edit-formula-library-provider';
       options: {
         item?: FormulaLibraryProviderEntity;
+        card?: CardProviderEditContext;
       };
     }
   | {
