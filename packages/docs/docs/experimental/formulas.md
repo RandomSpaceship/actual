@@ -537,11 +537,12 @@ Example — compare budgeted vs actual spent for a hard-coded month range:
 
 A formula card can show a table in place of one value. When a formula gives a table, for example with `QUERY_GROUP`, the card shows the table.
 
-The **Display** setting in the card editor has three options:
+The **Display** setting in the card editor has four options:
 
 - **Automatic** (the default): a table for a formula that gives a table, and one value for other formulas.
 - **One value**: always one value. A formula that gives a table shows an error.
 - **Table**: always a table. One value shows as a table with one cell.
+- **Chart**: the table as a chart. Refer to [Show a Chart](#show-a-chart).
 
 Some formulas give one value for some data and a table for other data, for example `FILTER`. For these formulas, set **Display** to **Table**, so that the card does not change its look when the data changes.
 
@@ -584,6 +585,35 @@ The **Totals** setting adds totals to the table:
 The table view has no font size and no conditional color.
 
 If a formula gives a table but **Display** is **One value**, the card shows an error. Set **Display** to **Automatic** or **Table**, or use `INDEX` to get one cell from the table.
+
+### Show a Chart
+
+A formula card can show a table as a chart. To show a chart:
+
+1. Open the card editor.
+2. Set **Display** to **Chart**.
+3. Under **Chart**, select **Bar**, **Line**, **Area** or **Donut**.
+4. Click **Save widget**.
+
+The chart uses the column names, column types and **Header row** setting of the [table view](#show-a-table). Each label is a value from one column, for example a month or a category. Each value column is a series in the chart.
+
+The **Labels** setting selects the label column:
+
+- **Automatic** (the default): the first **Text** or **Date** column. If the table has no such column, the labels are the row numbers.
+- **Row numbers**: the labels are 1, 2, 3 and so on.
+- A column: the values of that column are the labels.
+
+Under **Values**, select the columns that the chart shows. By default, the chart shows each **Money**, **Percent** and **Number** column. Click **Automatic** to go back to the default. A cell that is not a number shows as a gap in the chart.
+
+The tooltip shows each value in the format of its column. Privacy mode hides **Money** values. The axis uses the format of the first value column, so put columns with the same type in one chart.
+
+Spending from `QUERY_GROUP` gives negative amounts. Turn on **Flip signs** to show each value with the opposite sign. This setting changes all of the value columns.
+
+A **Donut** chart shows only the first value column. It shows the size of each value, so a negative value and a positive value of the same size look the same. If a column has both negative and positive values, the editor shows a warning. A row with no value or a value of zero has no slice.
+
+On a dashboard card, the chart has no axes and no legend, as the other report cards. Point to a bar, a point or a slice to see its values. A click on the chart does not open the transactions.
+
+The chart view has no font size, no conditional color and no totals.
 
 ### Format One Value
 
