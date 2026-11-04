@@ -134,16 +134,36 @@ export function EditFormulaLibraryProviderModal({
     .map(account => ({ id: account.id, name: account.name }));
   // A provider uses the queries of the card that uses it. A library provider
   // has no card here, so its preview uses library queries only.
-  const preview = useFormulaExecution(
+  // The inputs of the last run. As in the card editor, they follow your changes
+  // until a run gives a large table. Then only Run and Ctrl+Enter update them.
+  const [ranInputs, setRanInputs] = useState(() => ({
     formula,
+    providers: editedCardProviders,
+  }));
+  function runFormula() {
+    setRanInputs({ formula, providers: editedCardProviders });
+  }
+  const isChanged =
+    formula !== ranInputs.formula ||
+    JSON.stringify(editedCardProviders) !== JSON.stringify(ranInputs.providers);
+  const preview = useFormulaExecution(
+    ranInputs.formula,
     card?.queries ?? NO_CARD_QUERIES,
     undefined,
     undefined,
     simpleAccounts,
     card?.timeFrameOverrides,
     'auto',
-    editedCardProviders,
+    ranInputs.providers,
   );
+  const isManualRun = preview.issues.some(
+    issue => issue.kind === 'large-table' || issue.kind === 'table-cut',
+  );
+  if (!isManualRun && isChanged) {
+    // A state update in render, as React allows for state that follows other
+    // state. React renders again before it shows the page.
+    runFormula();
+  }
 
   function validateName() {
     if (trimmedName === '') {
@@ -375,6 +395,7 @@ export function EditFormulaLibraryProviderModal({
                       )}
                       singleLine={false}
                       showLineNumbers
+                      onRun={runFormula}
                     />
                   </Suspense>
                 </View>
@@ -384,9 +405,43 @@ export function EditFormulaLibraryProviderModal({
                   </Text>
                 )}
               </FormField>
-              <Text style={{ color: theme.pageTextSubdued, marginBottom: 5 }}>
-                <Trans>Result:</Trans>
-              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                  marginBottom: 5,
+                }}
+              >
+                <Text style={{ color: theme.pageTextSubdued }}>
+                  <Trans>Result:</Trans>
+                </Text>
+                <View style={{ flex: 1 }} />
+                {isManualRun && (
+                  <Text style={{ fontSize: 13, color: theme.pageTextSubdued }}>
+                    {isChanged ? (
+                      <Trans>
+                        Changed. The table is large, so it updates only when you
+                        select Run or press Ctrl+Enter.
+                      </Trans>
+                    ) : (
+                      <Trans>
+                        The table is large, so it updates only when you select
+                        Run or press Ctrl+Enter.
+                      </Trans>
+                    )}
+                  </Text>
+                )}
+                {isManualRun && (
+                  <Button
+                    variant={isChanged ? 'primary' : 'normal'}
+                    onPress={runFormula}
+                  >
+                    <Trans>Run</Trans>
+                  </Button>
+                )}
+              </View>
               {/* An error can be long, so it shows as text from its start */}
               {preview.error && !preview.isLoading ? (
                 <Text

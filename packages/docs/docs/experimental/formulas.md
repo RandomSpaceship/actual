@@ -424,7 +424,7 @@ There are two types of provider:
 
 A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. Providers are available in formula cards only, not in rule formulas.
 
-A provider can give one value or a table. A formula uses a provider that gives a table as it uses a table from a function. For example, the provider `Spending` has the formula `=QUERY_GROUP("expenses", "category")`. Then `=INDEX(Spending, 1, 2)` gives the amount in row 1, `=SUM(Spending)` gives the total, and `=SORT(Spending, 2, 1)` gives the table sorted by amount. If the card formula is `=Spending`, the card shows the table.
+A provider can give one value or a table. A formula uses a provider that gives a table as it uses a table from a function. For example, the provider `Spending` has the formula `=QUERY_GROUP("expenses", "category")`. Then `=INDEX(Spending, 1, 2)` gives the amount in row 1, `=SUM(Spending)` gives the total, and `=SORT(Spending, 2, 1)` gives the table sorted by amount. If the card formula is `=Spending`, the card shows the table. Under **Providers** in the card editor, each provider shows the first 10 rows of its table.
 
 To add a library provider:
 
@@ -432,7 +432,7 @@ To add a library provider:
 2. Under **Providers**, select **Create new provider**.
 3. Type a name. Names are not case-sensitive, so `NetIncome` and `netincome` are the same name.
 4. Optionally, type a description.
-5. Type the formula. The formula must start with `=`. **Result** shows the value or the table that the formula gives.
+5. Type the formula. The formula must start with `=`. **Result** shows the value or the table that the formula gives. As in the card editor, a large table stops the result from changing while you type. Then click **Run** or press **Ctrl+Enter** to see the result.
 6. Select **Save**.
 
 A provider name can have letters, digits, `_` and `.`. It must start with a letter or `_`. A name cannot look like a cell reference, for example `AB12`. Formulas use `RESULT`, `TRUE`, `FALSE` and names that start with `theme_` for other things, so a provider cannot have these names.

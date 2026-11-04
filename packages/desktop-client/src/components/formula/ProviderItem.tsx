@@ -22,6 +22,9 @@ import { useFormulaExecution } from '#hooks/useFormulaExecution';
 import { FormulaTable } from './FormulaTable';
 import { FormulaWarnings } from './FormulaWarnings';
 
+// The panel shows many providers, so each one shows only the start of its table
+const shownProviderTableRows = 10;
+
 type ProviderItemProps = {
   name: string;
   data: FormulaLibraryProviderData;
@@ -178,16 +181,27 @@ export function ProviderItem({
             )}
           </View>
           {value.table && !value.error && (
-            <FormulaTable
-              table={value.table}
-              compact
-              style={{ maxHeight: 160 }}
-            />
+            <>
+              <FormulaTable
+                table={value.table.slice(0, shownProviderTableRows)}
+                compact
+              />
+              {value.table.length > shownProviderTableRows && (
+                <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
+                  <Trans>
+                    Shows the first {{ shown: shownProviderTableRows }} rows
+                  </Trans>
+                </Text>
+              )}
+            </>
           )}
-          {/* The warning line above already says that the name is hidden */}
+          {/* The lines above already say that the name is hidden, and that
+              the table shows only its first rows */}
           <FormulaWarnings
             issues={value.issues.filter(
-              issue => !(issue.kind === 'shadowed' && issue.name === name),
+              issue =>
+                !(issue.kind === 'shadowed' && issue.name === name) &&
+                issue.kind !== 'table-cut',
             )}
           />
         </>
