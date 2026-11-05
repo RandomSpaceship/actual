@@ -37,6 +37,7 @@ const report: CustomReportEntity = {
   showUncategorized: true,
   trimIntervals: false,
   showTrendLines: false,
+  unstackBars: false,
   graphType: 'TableGraph',
   conditions: [],
   conditionsOp: 'and',

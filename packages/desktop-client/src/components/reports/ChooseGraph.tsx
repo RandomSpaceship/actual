@@ -31,6 +31,7 @@ type ChooseGraphProps = {
   showHiddenCategories?: boolean;
   showOffBudget?: boolean;
   showTrendLines?: boolean;
+  unstackBars?: boolean;
   showTooltip?: boolean;
   intervalsCount: number;
 };
@@ -50,6 +51,7 @@ export function ChooseGraph({
   showHiddenCategories = false,
   showOffBudget = false,
   showTrendLines = false,
+  unstackBars = false,
   showTooltip = true,
   intervalsCount,
 }: ChooseGraphProps) {
@@ -186,6 +188,7 @@ export function ChooseGraph({
         showOffBudget={showOffBudget}
         showTooltip={showTooltip}
         interval={interval}
+        stacked={!unstackBars}
       />
     );
   }

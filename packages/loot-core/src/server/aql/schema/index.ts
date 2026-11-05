@@ -173,6 +173,7 @@ export const schema = {
     show_uncategorized: f('integer', { default: 0 }),
     trim_intervals: f('integer', { default: 0 }),
     show_trend_lines: f('integer', { default: 0 }),
+    unstack_bars: f('integer', { default: 0 }),
     include_current: f('integer', { default: 0 }),
     graph_type: f('string', { default: 'BarGraph' }),
     conditions: f('json'),

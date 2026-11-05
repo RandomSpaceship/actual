@@ -1,0 +1,5 @@
+BEGIN TRANSACTION;
+
+ALTER TABLE custom_reports ADD COLUMN unstack_bars INTEGER DEFAULT 0;
+
+COMMIT;

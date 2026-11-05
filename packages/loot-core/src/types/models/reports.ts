@@ -30,6 +30,7 @@ export type CustomReportEntity = {
   showUncategorized: boolean;
   trimIntervals: boolean;
   showTrendLines: boolean;
+  unstackBars: boolean;
   graphType: string;
   conditions?: RuleConditionEntity[];
   conditionsOp: 'and' | 'or';
@@ -162,6 +163,7 @@ export type CustomReportData = {
   show_uncategorized: number;
   trim_intervals: number;
   show_trend_lines: number;
+  unstack_bars: number;
   graph_type: string;
   conditions?: RuleConditionEntity[];
   conditions_op: 'and' | 'or';

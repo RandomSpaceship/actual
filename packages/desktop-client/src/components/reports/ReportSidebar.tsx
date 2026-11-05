@@ -65,6 +65,7 @@ type ReportSidebarProps = {
   ) => void;
   setTrimIntervals: (value: CustomReportEntity['trimIntervals']) => void;
   setShowTrendLines: (value: CustomReportEntity['showTrendLines']) => void;
+  setUnstackBars: (value: CustomReportEntity['unstackBars']) => void;
   setIncludeCurrentInterval: (
     value: CustomReportEntity['includeCurrentInterval'],
   ) => void;
@@ -107,6 +108,7 @@ export function ReportSidebar({
   setShowUncategorized,
   setTrimIntervals,
   setShowTrendLines,
+  setUnstackBars,
   setSelectedCategories,
   onChangeDates,
   onReportChange,
@@ -500,6 +502,12 @@ export function ReportSidebar({
                     !customReportItems.showTrendLines,
                   );
                   setShowTrendLines(!customReportItems.showTrendLines);
+                } else if (type === 'unstack-bars') {
+                  setSessionReport(
+                    'unstackBars',
+                    !customReportItems.unstackBars,
+                  );
+                  setUnstackBars(!customReportItems.unstackBars);
                 }
               }}
               items={[
@@ -552,6 +560,15 @@ export function ReportSidebar({
                   tooltip: t('Add a trend line per series (line graphs only)'),
                   toggle: customReportItems.showTrendLines,
                   disabled: customReportItems.graphType !== 'LineGraph',
+                },
+                {
+                  name: 'unstack-bars',
+                  text: t('Unstack bars'),
+                  tooltip: t(
+                    'Show the bars of each interval side by side (stacked bar graphs only)',
+                  ),
+                  toggle: customReportItems.unstackBars,
+                  disabled: customReportItems.graphType !== 'StackedBarGraph',
                 },
               ]}
             />

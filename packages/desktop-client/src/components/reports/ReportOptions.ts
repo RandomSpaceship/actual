@@ -30,6 +30,7 @@ export const defaultReport: CustomReportEntity = {
   showUncategorized: true,
   trimIntervals: false,
   showTrendLines: false,
+  unstackBars: false,
   graphType: 'BarGraph',
   conditions: [],
   conditionsOp: 'and',

@@ -296,6 +296,7 @@ function CustomReportInner({
   const [showTrendLines, setShowTrendLines] = useState(
     loadReport.showTrendLines,
   );
+  const [unstackBars, setUnstackBars] = useState(loadReport.unstackBars);
   const [graphType, setGraphType] = useState(loadReport.graphType);
 
   const [dateRange, setDateRange] = useState(loadReport.dateRange);
@@ -639,6 +640,7 @@ function CustomReportInner({
     showUncategorized,
     trimIntervals,
     showTrendLines,
+    unstackBars,
     graphType,
     conditions,
     conditionsOp,
@@ -788,6 +790,7 @@ function CustomReportInner({
     setShowUncategorized(input.showUncategorized);
     setTrimIntervals(input.trimIntervals);
     setShowTrendLines(input.showTrendLines);
+    setUnstackBars(input.unstackBars);
     setGraphType(input.graphType);
     onApplyFilter(null);
     (input.conditions || []).forEach(condition => {
@@ -935,6 +938,7 @@ function CustomReportInner({
             setShowUncategorized={setShowUncategorized}
             setTrimIntervals={setTrimIntervals}
             setShowTrendLines={setShowTrendLines}
+            setUnstackBars={setUnstackBars}
             setSelectedCategories={setSelectedCategories}
             onChangeDates={onChangeDates}
             onReportChange={onReportChange}
@@ -1080,6 +1084,7 @@ function CustomReportInner({
                     showHiddenCategories={showHiddenCategories}
                     showOffBudget={showOffBudget}
                     showTrendLines={showTrendLines}
+                    unstackBars={unstackBars}
                     intervalsCount={intervals.length}
                   />
                 ) : (
