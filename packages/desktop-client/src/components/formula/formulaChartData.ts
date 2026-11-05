@@ -1,4 +1,5 @@
 import type {
+  FormulaChartColumnRole,
   FormulaChartSettings,
   FormulaChartType,
   FormulaTableColumn,
@@ -57,8 +58,6 @@ export type FormulaChartRowCells = Record<string, FormulaTableCellPosition[]>;
 export type FormulaChartWarning =
   // The chart has no value column
   | { kind: 'no-values' }
-  // The settings use a column that the table does not have
-  | { kind: 'missing-column'; columnIndex: number }
   // A donut shows only its first value column
   | { kind: 'donut-first-column'; columnIndex: number }
   // With a series column, the chart shows only the first value column
@@ -108,7 +107,6 @@ export function getFormulaChartData(
   const type = settings.type ?? 'bar';
   const stacked =
     (settings.stacked ?? false) && (type === 'bar' || type === 'area');
-  const width = Math.max(0, ...table.map(row => row.length));
   const bodyRows = headerRow ? table.slice(1) : table;
   const toTableRowIndex = (bodyRowIndex: number) =>
     headerRow ? bodyRowIndex + 1 : bodyRowIndex;
@@ -116,60 +114,54 @@ export function getFormulaChartData(
   const columnNames = getFormulaTableColumnNames(table, columns, headerRow);
   const warnings: FormulaChartWarning[] = [];
 
-  function isInTable(columnIndex: number) {
-    const isFound = columnIndex >= 0 && columnIndex < width;
-    if (!isFound) {
-      warnings.push({ kind: 'missing-column', columnIndex });
-    }
-    return isFound;
-  }
   function isLabelType(columnType: FormulaTableColumnType) {
     return columnType === 'text' || columnType === 'date';
   }
+  // The role of each column, or undefined for an automatic role
+  const roles = columnTypes.map(
+    (_, columnIndex) => columns[columnIndex]?.chartRole,
+  );
+  function isAutomatic(columnIndex: number) {
+    return roles[columnIndex] === undefined;
+  }
 
-  const defaultLabelColumn = columnTypes.findIndex(isLabelType);
+  // -1 when no column is a label column: the row numbers are the labels
+  const setLabelColumn = roles.indexOf('label');
   const labelColumn =
-    settings.labelColumn === undefined
-      ? defaultLabelColumn
-      : settings.labelColumn === rowNumberLabelColumn ||
-          isInTable(settings.labelColumn)
-        ? settings.labelColumn
-        : defaultLabelColumn;
+    setLabelColumn !== -1
+      ? setLabelColumn
+      : columnTypes.findIndex(
+          (columnType, columnIndex) =>
+            isAutomatic(columnIndex) && isLabelType(columnType),
+        );
 
   // A long table has a label more than one time, once for each series. A
   // wide table with a second text column, for example notes, does not.
   const labels = bodyRows.map((row, rowIndex) => getRowLabel(row, rowIndex));
   const hasRepeatedLabels = new Set(labels).size < labels.length;
-  const defaultSeriesColumn = hasRepeatedLabels
-    ? columnTypes.findIndex(
-        (columnType, columnIndex) =>
-          isLabelType(columnType) && columnIndex !== labelColumn,
-      )
-    : noSeriesColumn;
+  const setSeriesColumn = roles.indexOf('series');
   const seriesColumn =
-    settings.seriesColumn === undefined
-      ? defaultSeriesColumn
-      : settings.seriesColumn === noSeriesColumn ||
-          settings.seriesColumn === labelColumn ||
-          !isInTable(settings.seriesColumn)
-        ? noSeriesColumn
-        : settings.seriesColumn;
+    setSeriesColumn !== -1
+      ? setSeriesColumn
+      : hasRepeatedLabels
+        ? columnTypes.findIndex(
+            (columnType, columnIndex) =>
+              isAutomatic(columnIndex) &&
+              isLabelType(columnType) &&
+              columnIndex !== labelColumn,
+          )
+        : noSeriesColumn;
   const hasSeriesColumn = seriesColumn !== noSeriesColumn;
 
-  let valueColumns = settings.valueColumns
-    ? settings.valueColumns.filter(
-        columnIndex =>
-          isInTable(columnIndex) &&
-          columnIndex !== labelColumn &&
-          columnIndex !== seriesColumn,
-      )
-    : columnTypes.flatMap((columnType, columnIndex) =>
-        isNumericType(columnType) &&
-        columnIndex !== labelColumn &&
-        columnIndex !== seriesColumn
-          ? [columnIndex]
-          : [],
-      );
+  let valueColumns = columnTypes.flatMap((columnType, columnIndex) =>
+    roles[columnIndex] === 'value' ||
+    (isAutomatic(columnIndex) &&
+      isNumericType(columnType) &&
+      columnIndex !== labelColumn &&
+      columnIndex !== seriesColumn)
+      ? [columnIndex]
+      : [],
+  );
   if ((hasSeriesColumn || type === 'donut') && valueColumns.length > 1) {
     warnings.push({
       kind: hasSeriesColumn ? 'series-first-column' : 'donut-first-column',
@@ -426,6 +418,22 @@ function isNumericType(type: FormulaTableColumnType) {
   return type === 'money' || type === 'percent' || type === 'number';
 }
 
+// The role that each column has in the chart, for the automatic choice of
+// the role select. A value column that the chart does not show is hidden.
+export function getFormulaChartColumnRoles(
+  chart: FormulaChartData,
+  columnCount: number,
+): FormulaChartColumnRole[] {
+  const shownValueColumns = new Set(
+    chart.series.map(series => series.columnIndex),
+  );
+  return Array.from({ length: columnCount }, (_, columnIndex) => {
+    if (columnIndex === chart.labelColumn) return 'label';
+    if (columnIndex === chart.seriesColumn) return 'series';
+    return shownValueColumns.has(columnIndex) ? 'value' : 'hidden';
+  });
+}
+
 // The chart warnings as issues. Only 'no-values' is an error, because the
 // chart is then empty.
 export function getFormulaChartIssues(
@@ -440,17 +448,7 @@ export function getFormulaChartIssues(
           kind: 'chart',
           name: '',
           message: t(
-            'The chart has no values. Select a value column, or give a number column a money, percent or number type.',
-          ),
-        };
-      case 'missing-column':
-        return {
-          severity: 'warning',
-          kind: 'chart',
-          name: String(warning.columnIndex + 1),
-          message: t(
-            'The table has no column {{columnNumber}}, so the chart does not use it.',
-            { columnNumber: warning.columnIndex + 1 },
+            'The chart has no values. Set a column to Value, or give a number column a money, percent or number type.',
           ),
         };
       case 'donut-first-column':
@@ -479,7 +477,7 @@ export function getFormulaChartIssues(
           kind: 'chart',
           name: '',
           message: t(
-            'The chart has {{count}} series, so some colors repeat. Group the rows into fewer series, or select a different series column.',
+            'The chart has {{count}} series, so some colors repeat. Group the rows into fewer series, or set a different column to Series.',
             { count: warning.count },
           ),
         };

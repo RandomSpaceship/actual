@@ -24,7 +24,11 @@ const spending: FormulaTable = [
 
 describe('getFormulaGraph', () => {
   it('draws one money series as a bar graph with a color for each bar', () => {
-    const graph = graphOf(spending, { type: 'bar', valueColumns: [1] });
+    const graph = graphOf(spending, { type: 'bar' }, [
+      {},
+      {},
+      { chartRole: 'hidden' },
+    ]);
     expect(graph.graphType).toBe('BarGraph');
     expect(graph.valueType).toBe('money');
     expect(graph.seriesName).toBe('Value');
@@ -88,7 +92,8 @@ describe('getFormulaGraph', () => {
 
   it('draws one area series as an area graph and more as areas of a line graph', () => {
     expect(
-      graphOf(spending, { type: 'area', valueColumns: [1] }).graphType,
+      graphOf(spending, { type: 'area' }, [{}, {}, { chartRole: 'hidden' }])
+        .graphType,
     ).toBe('AreaGraph');
     const graph = graphOf(spending, { type: 'area' }, [
       {},
@@ -106,7 +111,8 @@ describe('getFormulaGraph', () => {
         ['Food', 'Groceries', -100],
         ['Bills', 'Power', -50],
       ],
-      { type: 'donut', seriesColumn: 1 },
+      { type: 'donut' },
+      [{}, { chartRole: 'series' }, {}],
     );
     expect(graph.graphType).toBe('DonutGraph');
     expect(graph.groupBy).toBe('CategoryGroup');

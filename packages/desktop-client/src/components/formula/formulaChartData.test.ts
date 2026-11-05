@@ -72,14 +72,15 @@ describe('getFormulaChartData', () => {
     ]);
   });
 
-  it('uses the columns that the settings give, and flips the signs', () => {
+  it('uses the row numbers when no column can be the label, and flips the signs', () => {
     const chart = getFormulaChartData(
       spending,
-      [],
+      [{ chartRole: 'hidden' }, {}, { chartRole: 'hidden' }],
       false,
-      { labelColumn: rowNumberLabelColumn, valueColumns: [1], flipSign: true },
+      { flipSign: true },
       formatLabel,
     );
+    expect(chart.labelColumn).toBe(rowNumberLabelColumn);
     expect(chart.rows.map(row => [row.label, row.value0])).toEqual([
       ['1', 120.5],
       ['2', 900],
@@ -87,20 +88,36 @@ describe('getFormulaChartData', () => {
     ]);
   });
 
-  it('warns about a column that the table does not have', () => {
+  it('uses the roles that the column settings give', () => {
+    const chart = getFormulaChartData(
+      [
+        ['Food', 'weekly shop', -100],
+        ['Rent', 'monthly', -900],
+      ],
+      [{ chartRole: 'value' }, { chartRole: 'label' }],
+      false,
+      {},
+      formatLabel,
+    );
+    expect(chart.labelColumn).toBe(1);
+    expect(chart.series.map(series => series.columnIndex)).toEqual([0, 2]);
+    expect(chart.rows.map(row => row.label)).toEqual([
+      'weekly shop',
+      'monthly',
+    ]);
+  });
+
+  it('ignores the role of a column that the table does not have', () => {
     const chart = getFormulaChartData(
       spending,
-      [],
+      [{}, {}, {}, { chartRole: 'label' }],
       false,
-      { labelColumn: 7, valueColumns: [1, 9] },
+      {},
       formatLabel,
     );
     expect(chart.labelColumn).toBe(0);
     expect(chart.series.map(series => series.columnIndex)).toEqual([1]);
-    expect(chart.warnings).toEqual([
-      { kind: 'missing-column', columnIndex: 7 },
-      { kind: 'missing-column', columnIndex: 9 },
-    ]);
+    expect(chart.warnings).toEqual([]);
   });
 
   it('warns when there is no value column', () => {
@@ -222,12 +239,12 @@ describe('getFormulaChartData', () => {
       ]).toEqual([true, true, false]);
     });
 
-    it('uses no series column when the settings say so', () => {
+    it('uses no series column when the automatic one is not shown', () => {
       const chart = getFormulaChartData(
         monthsByCategory,
-        [],
+        [{}, { chartRole: 'hidden' }],
         false,
-        { seriesColumn: noSeriesColumn },
+        {},
         formatLabel,
       );
       expect(chart.seriesColumn).toBe(noSeriesColumn);

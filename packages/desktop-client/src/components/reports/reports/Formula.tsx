@@ -36,6 +36,7 @@ import {
 } from '#components/formula/formatFormulaValue';
 import { FormulaChart } from '#components/formula/FormulaChart';
 import {
+  getFormulaChartColumnRoles,
   getFormulaChartData,
   getFormulaChartIssues,
 } from '#components/formula/formulaChartData';
@@ -738,8 +739,6 @@ function FormulaInner({ widget }: FormulaInnerProps) {
               <FormulaChartSettingsForm
                 settings={chartSettings}
                 onChange={setChartSettings}
-                chart={chart}
-                columnNames={columnNames}
               />
               <FormulaTableColumnSettings
                 columnCount={columnNames.length}
@@ -755,6 +754,13 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   true,
                 )}
                 automaticTypes={automaticColumnTypes}
+                chartRoles={{
+                  automaticRoles: getFormulaChartColumnRoles(
+                    chart,
+                    columnNames.length,
+                  ),
+                  isDonut: chart.type === 'donut',
+                }}
               />
             </View>
           ) : isTableView ? (

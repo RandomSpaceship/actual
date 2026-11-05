@@ -526,29 +526,27 @@ export type FormulaTableColumnType =
   | 'date'
   | 'text';
 
-// Without a type, a column of numbers shows as money, and other columns as text
+// Without a type, a column of numbers shows as money, a column of YYYY-MM-DD
+// or YYYY-MM text as a date, and other columns as text
 export type FormulaTableHeader = 'auto' | 'first-row' | 'none';
 export type FormulaTableTotals = 'none' | 'row' | 'column' | 'both';
+// What a column does in the chart view. A series column splits the values of
+// a long table into series (the stacks, or the outer ring of a donut).
+export type FormulaChartColumnRole = 'label' | 'series' | 'value' | 'hidden';
 export type FormulaTableColumn = {
   name?: string;
   type?: FormulaTableColumnType;
+  // Without it, the chart finds the role. The first text or date column is
+  // the label column, or the row numbers when there is none. When a label
+  // shows more than one time, the next text or date column is the series
+  // column. Each money, percent or number column is a value column.
+  chartRole?: FormulaChartColumnRole;
 };
 
 export type FormulaChartType = 'bar' | 'line' | 'area' | 'donut';
 export type FormulaChartSettings = {
   // 'bar' is the default
   type?: FormulaChartType;
-  // The column of the labels, by position. -1 uses the row numbers. Without
-  // it, the first text or date column, or the row numbers.
-  labelColumn?: number;
-  // The columns of the values, by position. Without it, each money, percent
-  // or number column that is not the label column.
-  valueColumns?: number[];
-  // A long table: the column that splits the values into series (the stacks,
-  // or the outer ring of a donut), by position. -1 uses no series column.
-  // Without it, the first text or date column that is not the label column,
-  // but only when a label shows more than one time.
-  seriesColumn?: number;
   // Stacks the series of a bar or area chart
   stacked?: boolean;
   // Shows each value with the opposite sign, for example spending

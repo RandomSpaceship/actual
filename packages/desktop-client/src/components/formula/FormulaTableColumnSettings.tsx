@@ -5,6 +5,7 @@ import { Select } from '@actual-app/components/select';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import type {
+  FormulaChartColumnRole,
   FormulaTableColumn,
   FormulaTableColumnType,
   FormulaTableHeader,
@@ -28,6 +29,13 @@ type FormulaTableColumnSettingsProps = {
   headerRowNames: string[];
   // The type of each column without a set type, for the automatic choice
   automaticTypes: FormulaTableColumnType[];
+  // Chart view only: each row gets a role select
+  chartRoles?: {
+    // The role of each column in the chart now, for the automatic choice
+    automaticRoles: FormulaChartColumnRole[];
+    // A donut calls the series the outer ring
+    isDonut: boolean;
+  };
 };
 
 export function FormulaTableColumnSettings({
@@ -42,8 +50,51 @@ export function FormulaTableColumnSettings({
   onTotalsChange,
   headerRowNames,
   automaticTypes,
+  chartRoles,
 }: FormulaTableColumnSettingsProps) {
   const { t } = useTranslation();
+
+  const roleNames: Record<FormulaChartColumnRole, string> = {
+    label: t('Label'),
+    series: chartRoles?.isDonut ? t('Outer ring') : t('Series'),
+    value: t('Value'),
+    hidden: t('Not shown'),
+  };
+  function getRoleOptions(
+    columnIndex: number,
+  ): Array<[FormulaChartColumnRole | 'auto', string]> {
+    return [
+      [
+        'auto',
+        t('Automatic ({{role}})', {
+          role: roleNames[chartRoles?.automaticRoles[columnIndex] ?? 'hidden'],
+        }),
+      ],
+      ['label', roleNames.label],
+      ['series', roleNames.series],
+      ['value', roleNames.value],
+      ['hidden', roleNames.hidden],
+    ];
+  }
+  // A chart has one label column and one series column, so a column that
+  // gets one of these roles takes it from the other columns
+  function setColumnRole(
+    columnIndex: number,
+    chartRole: FormulaChartColumnRole | undefined,
+  ) {
+    const isSingleRole = chartRole === 'label' || chartRole === 'series';
+    const updated = Array.from(
+      { length: Math.max(columns.length, columnIndex + 1) },
+      (_, index) => {
+        const column = columns[index] ?? {};
+        if (index === columnIndex) return { ...column, chartRole };
+        return isSingleRole && column.chartRole === chartRole
+          ? { ...column, chartRole: undefined }
+          : column;
+      },
+    );
+    onChange(updated);
+  }
 
   const typeNames: Record<FormulaTableColumnType, string> = {
     money: t('Money'),
@@ -170,6 +221,18 @@ export function FormulaTableColumnSettings({
               }
               options={getTypeOptions(columnIndex)}
             />
+            {chartRoles && (
+              <Select
+                value={column.chartRole ?? 'auto'}
+                onChange={(value: FormulaChartColumnRole | 'auto') =>
+                  setColumnRole(
+                    columnIndex,
+                    value === 'auto' ? undefined : value,
+                  )
+                }
+                options={getRoleOptions(columnIndex)}
+              />
+            )}
           </View>
         );
       })}
