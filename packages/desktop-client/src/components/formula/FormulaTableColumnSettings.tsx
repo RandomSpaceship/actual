@@ -26,6 +26,8 @@ type FormulaTableColumnSettingsProps = {
   onTotalsChange?: (totals: FormulaTableTotals) => void;
   // The names in the first row, for the placeholders
   headerRowNames: string[];
+  // The type of each column without a set type, for the automatic choice
+  automaticTypes: FormulaTableColumnType[];
 };
 
 export function FormulaTableColumnSettings({
@@ -39,17 +41,34 @@ export function FormulaTableColumnSettings({
   totals,
   onTotalsChange,
   headerRowNames,
+  automaticTypes,
 }: FormulaTableColumnSettingsProps) {
   const { t } = useTranslation();
 
-  const typeOptions: Array<[FormulaTableColumnType | 'auto', string]> = [
-    ['auto', t('Automatic')],
-    ['money', t('Money')],
-    ['percent', t('Percent')],
-    ['number', t('Number')],
-    ['date', t('Date')],
-    ['text', t('Text')],
-  ];
+  const typeNames: Record<FormulaTableColumnType, string> = {
+    money: t('Money'),
+    percent: t('Percent'),
+    number: t('Number'),
+    date: t('Date'),
+    text: t('Text'),
+  };
+  function getTypeOptions(
+    columnIndex: number,
+  ): Array<[FormulaTableColumnType | 'auto', string]> {
+    return [
+      [
+        'auto',
+        t('Automatic ({{type}})', {
+          type: typeNames[automaticTypes[columnIndex] ?? 'text'],
+        }),
+      ],
+      ['money', typeNames.money],
+      ['percent', typeNames.percent],
+      ['number', typeNames.number],
+      ['date', typeNames.date],
+      ['text', typeNames.text],
+    ];
+  }
 
   function updateColumn(columnIndex: number, change: FormulaTableColumn) {
     const updated = Array.from(
@@ -149,18 +168,11 @@ export function FormulaTableColumnSettings({
                   type: value === 'auto' ? undefined : value,
                 })
               }
-              options={typeOptions}
+              options={getTypeOptions(columnIndex)}
             />
           </View>
         );
       })}
-      <View style={{ ...labelStyle, fontSize: 11 }}>
-        <Trans>
-          Automatic shows a column of numbers as money, and other columns as
-          text. A table without column names has no header row. A name that you
-          type replaces the name in the first row.
-        </Trans>
-      </View>
     </View>
   );
 }

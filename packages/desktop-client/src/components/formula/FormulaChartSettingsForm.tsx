@@ -239,14 +239,6 @@ export function FormulaChartSettingsForm({
           </Button>
         )}
       </View>
-      <View style={{ ...labelStyle, fontSize: 11 }}>
-        <Trans>
-          Automatic uses the first text or date column for the labels, and each
-          money, percent or number column for the values. When a label shows
-          more than one time, Automatic uses the next text or date column for
-          the series. Flip signs shows spending as positive values.
-        </Trans>
-      </View>
     </View>
   );
 }

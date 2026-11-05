@@ -43,6 +43,7 @@ import { FormulaChartSettingsForm } from '#components/formula/FormulaChartSettin
 import {
   FormulaTable,
   getFormulaTableColumnNames,
+  getFormulaTableColumnTypes,
   getFormulaTableUnformattableColumns,
   isFormulaTableHeaderRowShown,
 } from '#components/formula/FormulaTable';
@@ -304,6 +305,11 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     tableColumns,
     isHeaderRowShown,
   ).slice(0, maxShownTableColumns);
+  const automaticColumnTypes = getFormulaTableColumnTypes(
+    table ?? [],
+    [],
+    isHeaderRowShown,
+  );
 
   const colorVariables = useMemo(
     () => ({
@@ -748,6 +754,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   [],
                   true,
                 )}
+                automaticTypes={automaticColumnTypes}
               />
             </View>
           ) : isTableView ? (
@@ -770,6 +777,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                   [],
                   true,
                 )}
+                automaticTypes={automaticColumnTypes}
               />
             </View>
           ) : (
@@ -799,7 +807,15 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                       setValueFormat(value)
                     }
                     options={[
-                      ['auto', t('Automatic')],
+                      [
+                        'auto',
+                        t('Automatic ({{type}})', {
+                          type:
+                            typeof result === 'number'
+                              ? formatNames.money
+                              : formatNames.text,
+                        }),
+                      ],
                       ['money', formatNames.money],
                       ['percent', formatNames.percent],
                       ['number', formatNames.number],
