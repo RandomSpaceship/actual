@@ -10,16 +10,22 @@ import {
 } from './FormulaTable';
 
 describe('getFormulaTableColumnTypes', () => {
-  it('shows a column of numbers as money and other columns as text', () => {
+  it('shows numbers as money, dates as dates and other columns as text', () => {
     expect(
       getFormulaTableColumnTypes(
         [
-          ['Rent', '2024-01', -50, { error: '#DIV/0!' }],
-          ['Power', '2024-02', null, 3],
+          ['Rent', '2024-01', '2024-01-05', -50, { error: '#DIV/0!' }],
+          ['Power', '2024-02', null, null, 3],
         ],
         [],
       ),
-    ).toEqual(['text', 'text', 'money', 'money']);
+    ).toEqual(['text', 'date', 'date', 'money', 'money']);
+  });
+
+  it('shows a column of dates and other text as text', () => {
+    expect(
+      getFormulaTableColumnTypes([['2024-01'], ['Rent'], ['2024-13']], []),
+    ).toEqual(['text']);
   });
 
   it('uses the type that the column settings give', () => {

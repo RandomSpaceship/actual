@@ -4,6 +4,7 @@ import { styles } from '@actual-app/components/styles';
 import type { CSSProperties } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
+import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaTableColumn,
   FormulaTableColumnType,
@@ -224,8 +225,8 @@ export function FormulaTable({
 }
 
 // The type of each column. A column without a type shows as money when all of
-// its cells are numbers, and as text when they are not. A header row does not
-// count.
+// its cells are numbers, as a date when all of its cells are YYYY-MM-DD or
+// YYYY-MM text, and as text when they are not. A header row does not count.
 export function getFormulaTableColumnTypes(
   table: FormulaTableData,
   columns: FormulaTableColumn[],
@@ -239,8 +240,15 @@ export function getFormulaTableColumnTypes(
     const values = bodyRows
       .map(row => row[columnIndex] ?? null)
       .filter(cell => cell !== null && !isErrorCell(cell));
-    return values.length > 0 && values.every(value => typeof value === 'number')
-      ? 'money'
+    if (values.length === 0) return 'text';
+    if (values.every(value => typeof value === 'number')) return 'money';
+    return values.every(
+      value =>
+        typeof value === 'string' &&
+        (monthUtils.isValidYearMonthDay(value) ||
+          monthUtils.isValidYearMonth(value)),
+    )
+      ? 'date'
       : 'text';
   });
 }
@@ -311,7 +319,9 @@ export function getFormulaTableTotals(
     rowTotals,
     columnTotals,
     totalColumnType,
-    labelColumn: columnTypes.findIndex(type => type === 'text'),
+    labelColumn: columnTypes.findIndex(
+      type => type === 'text' || type === 'date',
+    ),
   };
 }
 
