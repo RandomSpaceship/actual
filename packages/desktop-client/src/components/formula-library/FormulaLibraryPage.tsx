@@ -12,7 +12,7 @@ import { getNormalisedString } from '@actual-app/core/shared/normalisation';
 import type {
   FormulaLibraryAqlQueryEntity,
   FormulaLibraryItemEntity,
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaEntity,
   FormulaLibraryQueryEntity,
 } from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +25,7 @@ import { pushModal } from '#modals/modalsSlice';
 import { useDispatch } from '#redux';
 
 import { FormulaLibraryAqlQueryRow } from './FormulaLibraryAqlQueryRow';
-import { FormulaLibraryProviderRow } from './FormulaLibraryProviderRow';
+import { FormulaLibraryNamedFormulaRow } from './FormulaLibraryNamedFormulaRow';
 import { FormulaLibraryRow } from './FormulaLibraryRow';
 import { isOverriddenLibraryItem } from './formulaQueryUses';
 import { useFindFormulaQueryUses } from './useFindFormulaQueryUses';
@@ -60,12 +60,13 @@ export function FormulaLibraryPage() {
   const aqlQueries = library.filter(
     (item): item is FormulaLibraryAqlQueryEntity => item.type === 'aql-query',
   );
-  const providers = library.filter(
-    (item): item is FormulaLibraryProviderEntity => item.type === 'provider',
+  const namedFormulas = library.filter(
+    (item): item is FormulaLibraryNamedFormulaEntity =>
+      item.type === 'named-formula',
   );
   const filteredQueries = filterAndSort(queries, () => []);
   const filteredAqlQueries = filterAndSort(aqlQueries, item => [item.data.aql]);
-  const filteredProviders = filterAndSort(providers, item => [
+  const filteredNamedFormulas = filterAndSort(namedFormulas, item => [
     item.data.formula,
   ]);
 
@@ -85,10 +86,13 @@ export function FormulaLibraryPage() {
     );
   }
 
-  function onEditProvider(item?: FormulaLibraryProviderEntity) {
+  function onEditNamedFormula(item?: FormulaLibraryNamedFormulaEntity) {
     dispatch(
       pushModal({
-        modal: { name: 'edit-formula-library-provider', options: { item } },
+        modal: {
+          name: 'edit-formula-library-named-formula',
+          options: { item },
+        },
       }),
     );
   }
@@ -121,15 +125,15 @@ export function FormulaLibraryPage() {
       >
         <Text style={{ color: theme.pageTextLight, flex: 1 }}>
           <Trans>
-            Queries and providers that every formula card can use. A card uses a
-            query by its name in quotes, for example QUERY("groceries"). A query
-            on a card wins over a library query with the same name. A provider
-            is a named formula. A card uses a provider by its name without
-            quotes, for example =NetIncome / 12.
+            Queries and named formulas that every formula card can use. A card
+            uses a query by its name in quotes, for example QUERY("groceries").
+            A query on a card wins over a library query with the same name. A
+            card uses a named formula by its name without quotes, for example
+            =NetIncome / 12.
           </Trans>
         </Text>
         <Search
-          placeholder={t('Filter queries and providers...')}
+          placeholder={t('Filter queries and named formulas...')}
           value={filter}
           onChange={setFilter}
         />
@@ -197,25 +201,25 @@ export function FormulaLibraryPage() {
       </LibrarySection>
 
       <LibrarySection
-        title={t('Providers')}
+        title={t('Named formulas')}
         header={<Cell value={t('Formula')} width="flex" />}
         emptyText={
-          providers.length === 0 ? (
-            <Trans>No providers</Trans>
+          namedFormulas.length === 0 ? (
+            <Trans>No named formulas</Trans>
           ) : (
-            <Trans>No providers match the filter</Trans>
+            <Trans>No named formulas match the filter</Trans>
           )
         }
-        createText={<Trans>Create new provider</Trans>}
-        onCreate={() => onEditProvider()}
+        createText={<Trans>Create new named formula</Trans>}
+        onCreate={() => onEditNamedFormula()}
       >
-        {filteredProviders.map(item => (
-          <FormulaLibraryProviderRow
+        {filteredNamedFormulas.map(item => (
+          <FormulaLibraryNamedFormulaRow
             key={item.id}
             item={item}
             uses={findUses(item)}
             isOverridden={isOverriddenLibraryItem(item, library)}
-            onEdit={onEditProvider}
+            onEdit={onEditNamedFormula}
             onDelete={onDelete}
           />
         ))}

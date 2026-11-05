@@ -8,13 +8,13 @@ import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import { amountToInteger } from '@actual-app/core/shared/util';
 import type {
-  FormulaLibraryProviderData,
+  FormulaLibraryNamedFormulaData,
   FormulaTimeFrameOverride,
 } from '@actual-app/core/types/models';
 
 import { FinancialText } from '#components/FinancialText';
 import type { SimpleAccount } from '#components/formula/executeFormula';
-import type { CardProviders } from '#components/formula/resolveProviders';
+import type { CardNamedFormulas } from '#components/formula/resolveNamedFormulas';
 import type { FormulaQueryConfig } from '#components/formula/resolveQuery';
 import { useFormat } from '#hooks/useFormat';
 import { useFormulaExecution } from '#hooks/useFormulaExecution';
@@ -22,22 +22,22 @@ import { useFormulaExecution } from '#hooks/useFormulaExecution';
 import { FormulaTable } from './FormulaTable';
 import { FormulaWarnings } from './FormulaWarnings';
 
-// The panel shows many providers, so each one shows only the start of its table
-const shownProviderTableRows = 10;
+// The panel shows many named formulas, so each one shows only the start of its table
+const shownNamedFormulaTableRows = 10;
 
-type ProviderItemProps = {
+type NamedFormulaItemProps = {
   name: string;
-  data: FormulaLibraryProviderData;
-  // Set for a library provider that a card provider with the same name hides.
+  data: FormulaLibraryNamedFormulaData;
+  // Set for a library named formula that a card named formula with the same name hides.
   // It then shows no value.
   isHidden?: boolean;
   // A short line under the name
   warning?: string;
-  // The card queries, overrides and providers, so that the value is the value
+  // The card queries, overrides and named formulas, so that the value is the value
   // on this card
   queries: Record<string, FormulaQueryConfig>;
   timeFrameOverrides: Record<string, FormulaTimeFrameOverride>;
-  cardProviders: CardProviders;
+  cardNamedFormulas: CardNamedFormulas;
   accounts: SimpleAccount[];
   onEdit: () => void;
   // Each button shows only when its handler is set
@@ -47,24 +47,24 @@ type ProviderItemProps = {
   onRemove?: () => void;
 };
 
-// A card provider or a library provider in the card editor. For a library
-// provider, the edit button opens the library editor, which changes the
-// provider for every card.
-export function ProviderItem({
+// A card named formula or a library named formula in the card editor. For a library
+// named formula, the edit button opens the library editor, which changes the
+// named formula for every card.
+export function NamedFormulaItem({
   name,
   data,
   isHidden = false,
   warning,
   queries,
   timeFrameOverrides,
-  cardProviders,
+  cardNamedFormulas,
   accounts,
   onEdit,
   onInsert,
   onCopyIntoCard,
   onMakeShared,
   onRemove,
-}: ProviderItemProps) {
+}: NamedFormulaItemProps) {
   const { t } = useTranslation();
   const format = useFormat();
   const { description, formula } = data;
@@ -76,7 +76,7 @@ export function ProviderItem({
     accounts,
     timeFrameOverrides,
     'auto',
-    cardProviders,
+    cardNamedFormulas,
   );
 
   return (
@@ -123,7 +123,7 @@ export function ProviderItem({
             <Button
               variant="bare"
               onPress={onRemove}
-              aria-label={t('Remove provider')}
+              aria-label={t('Remove named formula')}
             >
               <SvgTrash style={{ width: 13, height: 13 }} />
             </Button>
@@ -132,7 +132,9 @@ export function ProviderItem({
       </View>
       {isHidden && (
         <Text style={{ color: theme.warningText, fontSize: 12 }}>
-          <Trans>A card provider with this name hides this provider</Trans>
+          <Trans>
+            A card named formula with this name hides this named formula
+          </Trans>
         </Text>
       )}
       {warning && (
@@ -183,13 +185,13 @@ export function ProviderItem({
           {value.table && !value.error && (
             <>
               <FormulaTable
-                table={value.table.slice(0, shownProviderTableRows)}
+                table={value.table.slice(0, shownNamedFormulaTableRows)}
                 compact
               />
-              {value.table.length > shownProviderTableRows && (
+              {value.table.length > shownNamedFormulaTableRows && (
                 <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
                   <Trans>
-                    Shows the first {{ shown: shownProviderTableRows }} rows
+                    Shows the first {{ shown: shownNamedFormulaTableRows }} rows
                   </Trans>
                 </Text>
               )}

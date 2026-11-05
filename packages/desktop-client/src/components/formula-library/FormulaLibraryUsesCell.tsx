@@ -7,7 +7,7 @@ import { Popover } from '@actual-app/components/popover';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import type { FormulaLibraryProviderEntity } from '@actual-app/core/types/models';
+import type { FormulaLibraryNamedFormulaEntity } from '@actual-app/core/types/models';
 
 import { Cell } from '#components/table';
 
@@ -16,18 +16,21 @@ import { FormulaQueryUsesList } from './FormulaQueryUsesList';
 
 type FormulaLibraryUsesCellProps = {
   name: string;
-  uses: { cards: FormulaQueryUse[]; providers: FormulaLibraryProviderEntity[] };
+  uses: {
+    cards: FormulaQueryUse[];
+    namedFormulas: FormulaLibraryNamedFormulaEntity[];
+  };
 };
 
 export function FormulaLibraryUsesCell({
   name,
-  uses: { cards, providers },
+  uses: { cards, namedFormulas },
 }: FormulaLibraryUsesCellProps) {
   const { t } = useTranslation();
 
   return (
     <Cell width={100} plain style={{ padding: '10px 5px' }}>
-      {cards.length === 0 && providers.length === 0 ? (
+      {cards.length === 0 && namedFormulas.length === 0 ? (
         <Text style={{ color: theme.pageTextSubdued }}>
           <Trans>Not used</Trans>
         </Text>
@@ -44,10 +47,10 @@ export function FormulaLibraryUsesCell({
                 </Trans>
               </Text>
             )}
-            {providers.length > 0 && (
+            {namedFormulas.length > 0 && (
               <Text>
-                <Trans count={providers.length}>
-                  {{ count: providers.length }} providers
+                <Trans count={namedFormulas.length}>
+                  {{ count: namedFormulas.length }} named formulas
                 </Trans>
               </Text>
             )}
@@ -55,7 +58,10 @@ export function FormulaLibraryUsesCell({
           <Popover placement="bottom end">
             <Dialog aria-label={t('Uses of {{name}}', { name })}>
               <View style={{ padding: 15, width: 400 }}>
-                <FormulaQueryUsesList uses={cards} providers={providers} />
+                <FormulaQueryUsesList
+                  uses={cards}
+                  namedFormulas={namedFormulas}
+                />
               </View>
             </Dialog>
           </Popover>

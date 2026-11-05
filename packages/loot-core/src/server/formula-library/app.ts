@@ -8,9 +8,9 @@ import { mutator } from '#server/mutators';
 import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
 import {
-  isValidProviderName,
-  renameProviderInFormula,
-} from '#shared/formulas/providerNameUses';
+  isValidNamedFormulaName,
+  renameNamedFormulaInFormula,
+} from '#shared/formulas/namedFormulaNameUses';
 import {
   getLibraryNameKind,
   isSameQueryName,
@@ -44,8 +44,8 @@ async function validateName(
   if (name.trim() === '') {
     throw new ValidationError('A formula library item must have a name');
   }
-  if (type === 'provider' && !isValidProviderName(name)) {
-    throw new ValidationError(`"${name}" cannot be a provider name`);
+  if (type === 'named-formula' && !isValidNamedFormulaName(name)) {
+    throw new ValidationError(`"${name}" cannot be a named formula name`);
   }
 
   const items = await getItems();
@@ -82,10 +82,10 @@ async function createItem({
 }
 
 // A rename changes the formula text of the cards in renameInWidgetIds, in the
-// same batch, so that one undo reverts all of it, also in card providers. A
-// card with a card query or card provider that has the old name does not use
+// same batch, so that one undo reverts all of it, also in card named formulas. A
+// card with a card query or card named formula that has the old name does not use
 // the library item, so it does not change.
-// The rename also changes every provider that uses the item. An item that an
+// The rename also changes every named formula that uses the item. An item that an
 // older item with the same name overrides has no uses, so nothing else changes.
 async function updateItem({
   id,
@@ -115,8 +115,8 @@ async function updateItem({
         isSameQueryName(candidate.name, item.name),
     )?.id === id;
   const rename = (formula: string) =>
-    item.type === 'provider'
-      ? renameProviderInFormula(formula, item.name, name ?? item.name)
+    item.type === 'named-formula'
+      ? renameNamedFormulaInFormula(formula, item.name, name ?? item.name)
       : renameQueryInFormula(formula, item.name, name ?? item.name);
 
   const widgets =
@@ -145,7 +145,8 @@ async function updateItem({
     for (const widget of widgets) {
       const meta = widget.meta;
       const localNames = Object.keys(
-        (item.type === 'provider' ? meta?.providers : meta?.queries) ?? {},
+        (item.type === 'named-formula' ? meta?.namedFormulas : meta?.queries) ??
+          {},
       );
       if (
         !meta ||
@@ -164,11 +165,11 @@ async function updateItem({
             meta.colorFormula === undefined
               ? undefined
               : rename(meta.colorFormula),
-          ...(meta.providers && {
-            providers: Object.fromEntries(
-              Object.entries(meta.providers).map(([name, provider]) => [
+          ...(meta.namedFormulas && {
+            namedFormulas: Object.fromEntries(
+              Object.entries(meta.namedFormulas).map(([name, namedFormula]) => [
                 name,
-                { ...provider, formula: rename(provider.formula) },
+                { ...namedFormula, formula: rename(namedFormula.formula) },
               ]),
             ),
           }),
@@ -178,17 +179,18 @@ async function updateItem({
 
     if (!isUsedItem) return;
 
-    for (const provider of items) {
-      if (provider.type !== 'provider') continue;
+    for (const namedFormula of items) {
+      if (namedFormula.type !== 'named-formula') continue;
       // The item itself has the new name and data already
-      const providerData = provider.id === id && data ? data : provider.data;
-      if (!('formula' in providerData)) continue;
+      const namedFormulaData =
+        namedFormula.id === id && data ? data : namedFormula.data;
+      if (!('formula' in namedFormulaData)) continue;
 
-      const formula = rename(providerData.formula);
-      if (formula !== providerData.formula) {
+      const formula = rename(namedFormulaData.formula);
+      if (formula !== namedFormulaData.formula) {
         await db.updateWithSchema('formula_library', {
-          id: provider.id,
-          data: { ...providerData, formula },
+          id: namedFormula.id,
+          data: { ...namedFormulaData, formula },
         });
       }
     }

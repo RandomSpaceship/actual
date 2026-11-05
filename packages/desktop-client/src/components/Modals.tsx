@@ -14,7 +14,7 @@ import { useDispatch } from '#redux';
 import { EditSyncAccount } from './banksync/EditSyncAccount';
 import { ConfirmFormulaLibraryItemDeleteModal } from './formula-library/ConfirmFormulaLibraryItemDeleteModal';
 import { EditFormulaLibraryAqlQueryModal } from './formula-library/EditFormulaLibraryAqlQueryModal';
-import { EditFormulaLibraryProviderModal } from './formula-library/EditFormulaLibraryProviderModal';
+import { EditFormulaLibraryNamedFormulaModal } from './formula-library/EditFormulaLibraryNamedFormulaModal';
 import { EditFormulaLibraryQueryModal } from './formula-library/EditFormulaLibraryQueryModal';
 import { AccountAutocompleteModal } from './modals/AccountAutocompleteModal';
 import { AccountGroupsModal } from './modals/AccountGroupsModal';
@@ -199,9 +199,9 @@ export function Modals() {
             <EditFormulaLibraryAqlQueryModal key={key} {...modal.options} />
           );
 
-        case 'edit-formula-library-provider':
+        case 'edit-formula-library-named-formula':
           return (
-            <EditFormulaLibraryProviderModal key={key} {...modal.options} />
+            <EditFormulaLibraryNamedFormulaModal key={key} {...modal.options} />
           );
 
         case 'confirm-formula-library-item-delete':

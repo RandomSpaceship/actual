@@ -7,7 +7,7 @@ import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import type {
   FormulaLibraryAqlQueryEntity,
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaEntity,
 } from '@actual-app/core/types/models';
 
 import { getAqlDateField } from '#components/formula/aqlSource';
@@ -20,7 +20,10 @@ import { QueryTimeFrameSummary } from './QueryTimeFrameSummary';
 
 type FormulaLibraryAqlQueryRowProps = {
   item: FormulaLibraryAqlQueryEntity;
-  uses: { cards: FormulaQueryUse[]; providers: FormulaLibraryProviderEntity[] };
+  uses: {
+    cards: FormulaQueryUse[];
+    namedFormulas: FormulaLibraryNamedFormulaEntity[];
+  };
   // Set when an older query has the same name
   isOverridden: boolean;
   onEdit: (item: FormulaLibraryAqlQueryEntity) => void;

@@ -81,8 +81,8 @@ function getVariableCompletionSection(): string {
   return `🔢 ${t('Variables')}`;
 }
 
-function getProviderCompletionSection(): string {
-  return `🧩 ${t('Providers')}`;
+function getNamedFormulaCompletionSection(): string {
+  return `🧩 ${t('Named formulas')}`;
 }
 
 export function getFunctionSignatureCompletionSection(): string {
@@ -107,7 +107,7 @@ function getFormulaCompletionSectionOrder(): Record<string, number> {
   return {
     [getFunctionSignatureCompletionSection()]: -2,
     [getVariableCompletionSection()]: -1,
-    [getProviderCompletionSection()]: -0.5,
+    [getNamedFormulaCompletionSection()]: -0.5,
     [categoryConfig.query.section]: categoryConfig.query.order,
     [categoryConfig.math.section]: categoryConfig.math.order,
     [categoryConfig.logical.section]: categoryConfig.logical.order,
@@ -1877,21 +1877,21 @@ export function getNamedVariableCompletions(
   }));
 }
 
-// The library providers, keyed by name. The value is the provider formula
-export function getProviderCompletions(
-  providers?: Record<string, string>,
+// The library named formulas, keyed by name. The value is the named formula formula
+export function getNamedFormulaCompletions(
+  namedFormulas?: Record<string, string>,
 ): Completion[] {
-  if (!providers) {
+  if (!namedFormulas) {
     return [];
   }
 
-  const providerSection = getProviderCompletionSection();
+  const namedFormulaSection = getNamedFormulaCompletionSection();
 
-  return Object.entries(providers).map(([providerName, formula]) => ({
-    label: providerName,
+  return Object.entries(namedFormulas).map(([namedFormulaName, formula]) => ({
+    label: namedFormulaName,
     type: 'variable',
-    section: providerSection,
-    info: t('Provider: {{formula}}', { formula }),
+    section: namedFormulaSection,
+    info: t('Named formula: {{formula}}', { formula }),
     boost: 19,
   }));
 }

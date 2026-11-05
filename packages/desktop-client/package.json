@@ -60,7 +60,7 @@
     "#components/formula/formulaChartData": "./src/components/formula/formulaChartData.ts",
     "#components/formula/formulaGraphData": "./src/components/formula/formulaGraphData.ts",
     "#components/formula/resolveQuery": "./src/components/formula/resolveQuery.ts",
-    "#components/formula/resolveProviders": "./src/components/formula/resolveProviders.ts",
+    "#components/formula/resolveNamedFormulas": "./src/components/formula/resolveNamedFormulas.ts",
     "#components/formula/aqlSource": "./src/components/formula/aqlSource.ts",
     "#components/formula/formulaSourceMap": "./src/components/formula/formulaSourceMap.ts",
     "#components/formula-library/aqlQueryKind": "./src/components/formula-library/aqlQueryKind.ts",

@@ -5,29 +5,32 @@ import { Button } from '@actual-app/components/button';
 import { SvgTrash } from '@actual-app/components/icons/v1';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
-import type { FormulaLibraryProviderEntity } from '@actual-app/core/types/models';
+import type { FormulaLibraryNamedFormulaEntity } from '@actual-app/core/types/models';
 
 import { Cell, Field, Row } from '#components/table';
 
 import { FormulaLibraryUsesCell } from './FormulaLibraryUsesCell';
 import type { FormulaQueryUse } from './formulaQueryUses';
 
-type FormulaLibraryProviderRowProps = {
-  item: FormulaLibraryProviderEntity;
-  uses: { cards: FormulaQueryUse[]; providers: FormulaLibraryProviderEntity[] };
-  // Set when an older provider has the same name
+type FormulaLibraryNamedFormulaRowProps = {
+  item: FormulaLibraryNamedFormulaEntity;
+  uses: {
+    cards: FormulaQueryUse[];
+    namedFormulas: FormulaLibraryNamedFormulaEntity[];
+  };
+  // Set when an older named formula has the same name
   isOverridden: boolean;
-  onEdit: (item: FormulaLibraryProviderEntity) => void;
-  onDelete: (item: FormulaLibraryProviderEntity) => void;
+  onEdit: (item: FormulaLibraryNamedFormulaEntity) => void;
+  onDelete: (item: FormulaLibraryNamedFormulaEntity) => void;
 };
 
-export function FormulaLibraryProviderRow({
+export function FormulaLibraryNamedFormulaRow({
   item,
   uses,
   isOverridden,
   onEdit,
   onDelete,
-}: FormulaLibraryProviderRowProps) {
+}: FormulaLibraryNamedFormulaRowProps) {
   const { t } = useTranslation();
   const { description, formula } = item.data;
 
@@ -40,7 +43,7 @@ export function FormulaLibraryProviderRow({
       <Field width={200} truncate={false} style={{ padding: '10px 0' }}>
         <Button
           variant="bare"
-          aria-label={t('Edit provider {{name}}', { name: item.name })}
+          aria-label={t('Edit named formula {{name}}', { name: item.name })}
           onPress={() => onEdit(item)}
           style={{ justifyContent: 'flex-start', fontFamily: 'monospace' }}
         >
@@ -49,7 +52,7 @@ export function FormulaLibraryProviderRow({
         {isOverridden && (
           <Text style={{ color: theme.warningText, fontSize: 12 }}>
             <Trans>
-              An older provider has this name, so it is used instead
+              An older named formula has this name, so it is used instead
             </Trans>
           </Text>
         )}
@@ -68,7 +71,7 @@ export function FormulaLibraryProviderRow({
       <Cell width={40} plain style={{ padding: '10px 5px' }}>
         <Button
           variant="bare"
-          aria-label={t('Delete provider {{name}}', { name: item.name })}
+          aria-label={t('Delete named formula {{name}}', { name: item.name })}
           onPress={() => onDelete(item)}
         >
           <SvgTrash style={{ width: 13, height: 13 }} />

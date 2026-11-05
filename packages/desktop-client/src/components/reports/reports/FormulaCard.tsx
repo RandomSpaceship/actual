@@ -76,7 +76,7 @@ export function FormulaCard({
       simpleAccounts,
       meta?.timeFrameOverrides,
       view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
-      meta?.providers,
+      meta?.namedFormulas,
     );
   const isTableView = view === 'table' || (view === 'auto' && table !== null);
   const isChartView = view === 'chart';
@@ -128,7 +128,7 @@ export function FormulaCard({
     simpleAccounts,
     meta?.timeFrameOverrides,
     'value',
-    meta?.providers,
+    meta?.namedFormulas,
   );
 
   // Determine the custom color from color formula result

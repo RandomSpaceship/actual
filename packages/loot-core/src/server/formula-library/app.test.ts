@@ -117,35 +117,35 @@ describe('formula library app', () => {
     expect((await getItems()).map(item => item.name)).toEqual(['food']);
   });
 
-  it('keeps provider names apart from query names, and checks the provider name rules', async () => {
+  it('keeps named formula names apart from query names, and checks the named formula name rules', async () => {
     await app.handlers['formula-library-create']({
       type: 'query',
       name: 'NetIncome',
       data: {},
     });
     await app.handlers['formula-library-create']({
-      type: 'provider',
+      type: 'named-formula',
       name: 'NetIncome',
       data: { formula: '=QUERY("NetIncome")' },
     });
 
     await expect(
       app.handlers['formula-library-create']({
-        type: 'provider',
+        type: 'named-formula',
         name: 'Net income',
         data: { formula: '=1' },
       }),
-    ).rejects.toThrow(/cannot be a provider name/);
+    ).rejects.toThrow(/cannot be a named formula name/);
     await expect(
       app.handlers['formula-library-create']({
-        type: 'provider',
+        type: 'named-formula',
         name: 'netincome',
         data: { formula: '=1' },
       }),
     ).rejects.toThrow(/already in use/);
     expect((await getItems()).map(item => item.type)).toEqual([
       'query',
-      'provider',
+      'named-formula',
     ]);
   });
 
@@ -196,42 +196,44 @@ describe('formula library app', () => {
     expect((await getWidget(shadowedId)).meta?.formula).toBe('=QUERY("food")');
   });
 
-  it('renames the query in the providers that use it', async () => {
+  it('renames the query in the named formulas that use it', async () => {
     const id = await app.handlers['formula-library-create']({
       type: 'query',
       name: 'food',
       data: {},
     });
     await app.handlers['formula-library-create']({
-      type: 'provider',
+      type: 'named-formula',
       name: 'Food',
       data: { formula: '=QUERY("food") * 2 + Food2', description: 'Text' },
     });
 
     await app.handlers['formula-library-update']({ id, name: 'groceries' });
 
-    const provider = (await getItems()).find(item => item.type === 'provider');
-    expect(provider?.data).toEqual({
+    const namedFormula = (await getItems()).find(
+      item => item.type === 'named-formula',
+    );
+    expect(namedFormula?.data).toEqual({
       formula: '=QUERY("groceries") * 2 + Food2',
       description: 'Text',
     });
   });
 
-  it('renames the provider in the cards it is given and in other providers', async () => {
+  it('renames the named formula in the cards it is given and in other named formulas', async () => {
     const id = await app.handlers['formula-library-create']({
-      type: 'provider',
+      type: 'named-formula',
       name: 'Net',
       data: { formula: '=1' },
     });
     await app.handlers['formula-library-create']({
-      type: 'provider',
+      type: 'named-formula',
       name: 'Yearly',
       data: { formula: '=net * 12' },
     });
     const renamedId = await addFormulaWidget({
       formula: '=Net + QUERY("Net")',
       colorFormula: '=IF(Net > 0, "red", "")',
-      // A card query does not hide a provider
+      // A card query does not hide a named formula
       queries: { Net: {} },
     });
     const notCheckedId = await addFormulaWidget({ formula: '=Net' });
@@ -258,19 +260,21 @@ describe('formula library app', () => {
     expect((await getWidget(notCheckedId)).meta?.formula).toBe('=Net');
   });
 
-  it('renames the provider in card providers, but not in a card that hides it', async () => {
+  it('renames the named formula in card named formulas, but not in a card that hides it', async () => {
     const id = await app.handlers['formula-library-create']({
-      type: 'provider',
+      type: 'named-formula',
       name: 'Net',
       data: { formula: '=1' },
     });
     const usesId = await addFormulaWidget({
       formula: '=Yearly',
-      providers: { Yearly: { formula: '=Net * 12', description: 'Per year' } },
+      namedFormulas: {
+        Yearly: { formula: '=Net * 12', description: 'Per year' },
+      },
     });
     const hidesId = await addFormulaWidget({
       formula: '=Net + Other',
-      providers: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
+      namedFormulas: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
     });
 
     await app.handlers['formula-library-update']({
@@ -281,13 +285,13 @@ describe('formula library app', () => {
 
     expect((await getWidget(usesId)).meta).toMatchObject({
       formula: '=Yearly',
-      providers: {
+      namedFormulas: {
         Yearly: { formula: '=NetIncome * 12', description: 'Per year' },
       },
     });
     expect((await getWidget(hidesId)).meta).toMatchObject({
       formula: '=Net + Other',
-      providers: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
+      namedFormulas: { NET: { formula: '=5' }, Other: { formula: '=Net' } },
     });
   });
 

@@ -26,24 +26,27 @@ export function ConfirmFormulaLibraryItemDeleteModal({
   item,
 }: ConfirmFormulaLibraryItemDeleteModalProps) {
   const { t } = useTranslation();
-  const { cards, providers } = useFindFormulaQueryUses()(item);
+  const { cards, namedFormulas } = useFindFormulaQueryUses()(item);
   const deleteItem = useDeleteFormulaLibraryItemMutation();
-  const isProvider = item.type === 'provider';
-  const useCount = cards.length + providers.length;
+  const isNamedFormula = item.type === 'named-formula';
+  const useCount = cards.length + namedFormulas.length;
 
   return (
     <Modal name="confirm-formula-library-item-delete">
       {({ state }) => (
         <View style={{ maxWidth: 600, lineHeight: 1.5 }}>
           <ModalHeader
-            title={isProvider ? t('Delete provider') : t('Delete query')}
+            title={
+              isNamedFormula ? t('Delete named formula') : t('Delete query')
+            }
             rightContent={<ModalCloseButton onPress={() => state.close()} />}
           />
           {useCount === 0 ? (
             <Paragraph>
-              {isProvider ? (
+              {isNamedFormula ? (
                 <Trans>
-                  Delete the provider "{{ name: item.name }}"? Nothing uses it.
+                  Delete the named formula "{{ name: item.name }}"? Nothing uses
+                  it.
                 </Trans>
               ) : (
                 <Trans>
@@ -54,23 +57,26 @@ export function ConfirmFormulaLibraryItemDeleteModal({
           ) : (
             <>
               <Paragraph>
-                {isProvider ? (
+                {isNamedFormula ? (
                   <Trans count={useCount}>
-                    Delete the provider "{{ name: item.name }}"?{' '}
-                    {{ count: useCount }} cards and providers use it. They will
-                    show an error until you change them or add a provider with
-                    this name.
+                    Delete the named formula "{{ name: item.name }}"?{' '}
+                    {{ count: useCount }} cards and named formulas use it. They
+                    will show an error until you change them or add a named
+                    formula with this name.
                   </Trans>
                 ) : (
                   <Trans count={useCount}>
                     Delete the query "{{ name: item.name }}"?{' '}
-                    {{ count: useCount }} cards and providers use it. They will
-                    show an error until you change them or add a query with this
-                    name.
+                    {{ count: useCount }} cards and named formulas use it. They
+                    will show an error until you change them or add a query with
+                    this name.
                   </Trans>
                 )}
               </Paragraph>
-              <FormulaQueryUsesList uses={cards} providers={providers} />
+              <FormulaQueryUsesList
+                uses={cards}
+                namedFormulas={namedFormulas}
+              />
             </>
           )}
           <ModalButtons style={{ marginTop: 20 }}>

@@ -517,12 +517,14 @@ describe('source map', () => {
     });
   });
 
-  it('works through a provider that is one call', async () => {
+  it('works through a named formula that is one call', async () => {
     const result = await executeFormula({
       formula: '=Spending',
       resolveQuery: name => resolveQuery(name, { localQueries, library: [] }),
       accounts: [],
-      cardProviders: { Spending: { formula: '=QUERY_GROUP("all", "payee")' } },
+      cardNamedFormulas: {
+        Spending: { formula: '=QUERY_GROUP("all", "payee")' },
+      },
       language: 'en-US',
       output: 'table',
     });

@@ -9,7 +9,7 @@ import type {
   QueryGroupRequest,
   QueryGroupRow,
 } from '@actual-app/core/shared/formulas/customFunctions';
-import { findProviderNameReferences } from '@actual-app/core/shared/formulas/providerNameUses';
+import { findNamedFormulaNameReferences } from '@actual-app/core/shared/formulas/namedFormulaNameUses';
 import * as monthUtils from '@actual-app/core/shared/months';
 import { q } from '@actual-app/core/shared/query';
 import type { Query } from '@actual-app/core/shared/query';
@@ -26,11 +26,11 @@ import {
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from '#components/formula/queryTimeFrame';
-import { resolveProviders } from '#components/formula/resolveProviders';
+import { resolveNamedFormulas } from '#components/formula/resolveNamedFormulas';
 import type {
-  CardProviders,
-  ResolvedProvider,
-} from '#components/formula/resolveProviders';
+  CardNamedFormulas,
+  ResolvedNamedFormula,
+} from '#components/formula/resolveNamedFormulas';
 import type {
   FormulaIssue,
   FormulaQueryConfig,
@@ -141,8 +141,8 @@ type FormulaEvaluation = {
   // Only for a formula that spills into more than one cell
   table: FormulaTable | null;
   cellError: { type: string; message?: string } | null;
-  // The error type of each provider whose value is an error
-  providerErrors: Map<string, string>;
+  // The error type of each named formula whose value is an error
+  namedFormulaErrors: Map<string, string>;
 };
 
 // The column letters of a 1-based column number, for example 28 gives AB
@@ -168,45 +168,48 @@ function getUsedSize(
   };
 }
 
-// Puts each provider after the providers that it uses. The resolver already
-// stops a cycle, so a provider never uses itself.
-function sortProvidersByUse(providers: ResolvedProvider[]) {
-  const providersByKey = new Map(
-    providers.map(provider => [provider.name.toUpperCase(), provider]),
+// Puts each named formula after the named formulas that it uses. The resolver already
+// stops a cycle, so a named formula never uses itself.
+function sortNamedFormulasByUse(namedFormulas: ResolvedNamedFormula[]) {
+  const namedFormulasByKey = new Map(
+    namedFormulas.map(namedFormula => [
+      namedFormula.name.toUpperCase(),
+      namedFormula,
+    ]),
   );
-  const sorted: ResolvedProvider[] = [];
+  const sorted: ResolvedNamedFormula[] = [];
   const visited = new Set<string>();
-  function visit(provider: ResolvedProvider) {
-    const key = provider.name.toUpperCase();
+  function visit(namedFormula: ResolvedNamedFormula) {
+    const key = namedFormula.name.toUpperCase();
     if (visited.has(key)) return;
     visited.add(key);
-    for (const usedName of provider.uses) {
-      const usedProvider = providersByKey.get(usedName.toUpperCase());
-      if (usedProvider) visit(usedProvider);
+    for (const usedName of namedFormula.uses) {
+      const usedNamedFormula = namedFormulasByKey.get(usedName.toUpperCase());
+      if (usedNamedFormula) visit(usedNamedFormula);
     }
-    sorted.push(provider);
+    sorted.push(namedFormula);
   }
-  providers.forEach(visit);
+  namedFormulas.forEach(visit);
   return sorted;
 }
 
-// The range of a provider that gives a table, for each upper-case name
-type ProviderTableRanges = Map<
+// The range of a named formula that gives a table, for each upper-case name
+type NamedFormulaTableRanges = Map<
   string,
   { range: string; rows: number; columns: number }
 >;
 
 // A formula in a cell can use a range, but not a named range, as a table:
 // HyperFormula must know the size of a table when it parses the formula. Thus
-// each name of a provider that gives a table changes to its range. When the
+// each name of a named formula that gives a table changes to its range. When the
 // name is all of the formula, the range alone gives #VALUE!, so
 // ARRAY_CONSTRAIN makes it a table. Lookup functions such as VLOOKUP need a
 // range, so other names stay a plain range.
-function replaceTableProviderNames(
+function replaceTableNamedFormulaNames(
   formula: string,
-  tableRanges: ProviderTableRanges,
+  tableRanges: NamedFormulaTableRanges,
 ) {
-  const tableReferences = findProviderNameReferences(formula).flatMap(
+  const tableReferences = findNamedFormulaNameReferences(formula).flatMap(
     reference => {
       const tableRange = tableRanges.get(reference.name.toUpperCase());
       return tableRange ? [{ ...reference, ...tableRange }] : [];
@@ -233,33 +236,35 @@ function replaceTableProviderNames(
   return changed;
 }
 
-// A named expression cannot hold a table. Thus each provider goes in cell A1
-// of its own sheet. A provider that gives one value gets a named range to its
-// cell. Formulas get the range of a provider that gives a table in place of
-// its name. A provider must come after the providers that it uses, because
+// A named expression cannot hold a table. Thus each named formula goes in cell A1
+// of its own sheet. A named formula that gives one value gets a named range to its
+// cell. Formulas get the range of a named formula that gives a table in place of
+// its name. A named formula must come after the named formulas that it uses, because
 // their formulas change first.
-function addProviders(
+function addNamedFormulas(
   hfInstance: ReturnType<typeof HyperFormula.buildEmpty>,
-  providers: ResolvedProvider[],
+  namedFormulas: ResolvedNamedFormula[],
 ) {
-  // The error type of each provider whose value is one error
-  const providerErrors = new Map<string, string>();
-  const tableRanges: ProviderTableRanges = new Map();
-  sortProvidersByUse(providers).forEach((provider, index) => {
-    const providerSheetName = hfInstance.addSheet(`__provider_${index + 1}`);
-    const providerSheetId = hfInstance.getSheetId(providerSheetName);
-    if (providerSheetId === undefined) {
-      throw new Error('Failed to create provider sheet');
+  // The error type of each named formula whose value is one error
+  const namedFormulaErrors = new Map<string, string>();
+  const tableRanges: NamedFormulaTableRanges = new Map();
+  sortNamedFormulasByUse(namedFormulas).forEach((namedFormula, index) => {
+    const namedFormulaSheetName = hfInstance.addSheet(
+      `__namedFormula_${index + 1}`,
+    );
+    const namedFormulaSheetId = hfInstance.getSheetId(namedFormulaSheetName);
+    if (namedFormulaSheetId === undefined) {
+      throw new Error('Failed to create named formula sheet');
     }
-    const firstCell = { sheet: providerSheetId, col: 0, row: 0 };
+    const firstCell = { sheet: namedFormulaSheetId, col: 0, row: 0 };
     hfInstance.setCellContents(firstCell, [
-      [replaceTableProviderNames(provider.formula, tableRanges)],
+      [replaceTableNamedFormulaNames(namedFormula.formula, tableRanges)],
     ]);
 
-    const firstCellReference = `'${providerSheetName}'!$A$1`;
-    const { width, height } = getUsedSize(hfInstance, providerSheetId);
+    const firstCellReference = `'${namedFormulaSheetName}'!$A$1`;
+    const { width, height } = getUsedSize(hfInstance, namedFormulaSheetId);
     if (width > 1 || height > 1) {
-      tableRanges.set(provider.name.toUpperCase(), {
+      tableRanges.set(namedFormula.name.toUpperCase(), {
         range: `${firstCellReference}:$${toColumnLetters(width)}$${height}`,
         rows: height,
         columns: width,
@@ -267,16 +272,16 @@ function addProviders(
       return;
     }
 
-    hfInstance.addNamedExpression(provider.name, `=${firstCellReference}`);
-    const providerValue = hfInstance.getCellValue(firstCell);
-    if (isHyperFormulaError(providerValue)) {
-      providerErrors.set(
-        provider.name.toUpperCase(),
-        providerValue.value ?? providerValue.type,
+    hfInstance.addNamedExpression(namedFormula.name, `=${firstCellReference}`);
+    const namedFormulaValue = hfInstance.getCellValue(firstCell);
+    if (isHyperFormulaError(namedFormulaValue)) {
+      namedFormulaErrors.set(
+        namedFormula.name.toUpperCase(),
+        namedFormulaValue.value ?? namedFormulaValue.type,
       );
     }
   });
-  return { providerErrors, tableRanges };
+  return { namedFormulaErrors, tableRanges };
 }
 
 function evaluateFormulaWithContext({
@@ -284,13 +289,13 @@ function evaluateFormulaWithContext({
   formulaQueryContext,
   locale,
   namedExpressions,
-  providers,
+  namedFormulas,
 }: {
   formula: string;
   formulaQueryContext: FormulaQueryContext;
   locale: string;
   namedExpressions?: Record<string, number | string>;
-  providers: ResolvedProvider[];
+  namedFormulas: ResolvedNamedFormula[];
 }): FormulaEvaluation {
   let hfInstance: ReturnType<typeof HyperFormula.buildEmpty> | null = null;
 
@@ -321,10 +326,13 @@ function evaluateFormulaWithContext({
       }
     }
 
-    const { providerErrors, tableRanges } = addProviders(hfInstance, providers);
+    const { namedFormulaErrors, tableRanges } = addNamedFormulas(
+      hfInstance,
+      namedFormulas,
+    );
 
     hfInstance.setCellContents({ sheet: sheetId, col: 0, row: 0 }, [
-      [replaceTableProviderNames(formula, tableRanges)],
+      [replaceTableNamedFormulaNames(formula, tableRanges)],
     ]);
 
     const cellValue = hfInstance.getCellValue({
@@ -338,7 +346,7 @@ function evaluateFormulaWithContext({
         value: null,
         table: null,
         cellError: cellValue,
-        providerErrors,
+        namedFormulaErrors,
       };
     }
 
@@ -354,23 +362,25 @@ function evaluateFormulaWithContext({
       value: table ? null : (cellValue as FormulaCellValue),
       table,
       cellError: null,
-      providerErrors,
+      namedFormulaErrors,
     };
   } finally {
     hfInstance?.destroy();
   }
 }
 
-// The provider that gives an error of its own, and does not only pass on an
-// error from a provider that it uses
-function findProviderWithError(
-  providers: ResolvedProvider[],
-  providerErrors: Map<string, string>,
+// The named formula that gives an error of its own, and does not only pass on an
+// error from a named formula that it uses
+function findNamedFormulaWithError(
+  namedFormulas: ResolvedNamedFormula[],
+  namedFormulaErrors: Map<string, string>,
 ) {
-  return providers.find(
-    provider =>
-      providerErrors.has(provider.name.toUpperCase()) &&
-      !provider.uses.some(name => providerErrors.has(name.toUpperCase())),
+  return namedFormulas.find(
+    namedFormula =>
+      namedFormulaErrors.has(namedFormula.name.toUpperCase()) &&
+      !namedFormula.uses.some(name =>
+        namedFormulaErrors.has(name.toUpperCase()),
+      ),
   );
 }
 
@@ -382,12 +392,12 @@ const MAX_EVALUATION_PASSES = 20;
 // the formula asks for, then their data is fetched for the next pass. Query
 // and account data comes first, because BUDGET_QUERY requests can depend on
 // it. The pass that asks for nothing new gives the value. A normal formula
-// takes three passes. A provider can ask for data too, so it can add passes.
+// takes three passes. A named formula can ask for data too, so it can add passes.
 //
-// Problems with names (an unknown query, account or provider, or providers
+// Problems with names (an unknown query, account or named formula, or named formulas
 // that use each other) and failed fetches are returned as issues. An error
-// issue replaces the value. A provider whose value is an error also gives an
-// error issue. A provider can give a table, as a formula can. Other formula
+// issue replaces the value. A named formula whose value is an error also gives an
+// error issue. A named formula can give a table, as a formula can. Other formula
 // errors, and a formula that does not start with "=", throw.
 //
 // A formula that spills into more than one cell gives a table. For the
@@ -398,7 +408,7 @@ export async function executeFormula({
   accounts,
   namedExpressions,
   library = [],
-  cardProviders = {},
+  cardNamedFormulas = {},
   language,
   output = 'value',
 }: {
@@ -406,10 +416,10 @@ export async function executeFormula({
   resolveQuery: QueryResolver;
   accounts: SimpleAccount[];
   namedExpressions?: Record<string, number | string>;
-  // Oldest first. The formula can use its providers
+  // Oldest first. The formula can use its named formulas
   library?: FormulaLibraryItemEntity[];
-  // They win over library providers with the same name
-  cardProviders?: CardProviders;
+  // They win over library named formulas with the same name
+  cardNamedFormulas?: CardNamedFormulas;
   // The language global preference
   language?: string;
   output?: FormulaOutput;
@@ -457,13 +467,13 @@ export async function executeFormula({
     }
   };
 
-  const resolvedProviders = resolveProviders(
+  const resolvedNamedFormulas = resolveNamedFormulas(
     [formula],
     library,
     Object.keys(namedExpressions ?? {}),
-    cardProviders,
+    cardNamedFormulas,
   );
-  resolvedProviders.issues.forEach(addIssue);
+  resolvedNamedFormulas.issues.forEach(addIssue);
   if (issues.some(issue => issue.severity === 'error')) {
     return { value: null, issues };
   }
@@ -479,7 +489,7 @@ export async function executeFormula({
       formulaQueryContext,
       locale: formulaLocale,
       namedExpressions,
-      providers: resolvedProviders.providers,
+      namedFormulas: resolvedNamedFormulas.namedFormulas,
     });
 
   let evaluation = evaluate();
@@ -519,11 +529,11 @@ export async function executeFormula({
   }
 
   if (evaluation.cellError) {
-    const provider = findProviderWithError(
-      resolvedProviders.providers,
-      evaluation.providerErrors,
+    const namedFormula = findNamedFormulaWithError(
+      resolvedNamedFormulas.namedFormulas,
+      evaluation.namedFormulaErrors,
     );
-    if (!provider) {
+    if (!namedFormula) {
       const { type, message } = evaluation.cellError;
       throw new Error(
         message
@@ -533,11 +543,13 @@ export async function executeFormula({
     }
     addIssue({
       severity: 'error',
-      kind: 'provider-error',
-      name: provider.name,
-      message: t('Provider "{{name}}" gives the error {{error}}', {
-        name: provider.name,
-        error: evaluation.providerErrors.get(provider.name.toUpperCase()),
+      kind: 'named-formula-error',
+      name: namedFormula.name,
+      message: t('Named formula "{{name}}" gives the error {{error}}', {
+        name: namedFormula.name,
+        error: evaluation.namedFormulaErrors.get(
+          namedFormula.name.toUpperCase(),
+        ),
       }),
     });
     return { value: null, issues };
@@ -554,7 +566,7 @@ export async function executeFormula({
       sourceMap = await getFormulaSourceMap({
         formula,
         table: evaluation.table,
-        providers: resolvedProviders.providers,
+        namedFormulas: resolvedNamedFormulas.namedFormulas,
         formulaQueryContext,
         sourceRows,
         resolveQuery,
@@ -897,25 +909,25 @@ export async function fetchQueryTable(
 }
 
 // The source map of a formula that is one call of QUERY_GROUP, QUERY_PIVOT,
-// QUERY_TABLE or a _COUNT form, or a provider that is one call. Other
+// QUERY_TABLE or a _COUNT form, or a named formula that is one call. Other
 // functions, such as FILTER and SORT, can change the rows, so other formulas
 // get no source map.
 async function getFormulaSourceMap({
   formula,
   table,
-  providers,
+  namedFormulas,
   formulaQueryContext,
   sourceRows,
   resolveQuery,
 }: {
   formula: string;
   table: FormulaTable;
-  providers: ResolvedProvider[];
+  namedFormulas: ResolvedNamedFormula[];
   formulaQueryContext: Required<FormulaQueryContext>;
   sourceRows: SourceRowsByCall;
   resolveQuery: QueryResolver;
 }): Promise<FormulaSourceMap | undefined> {
-  const functionName = getSourceFunctionName(formula, providers);
+  const functionName = getSourceFunctionName(formula, namedFormulas);
   if (!functionName) return undefined;
 
   // The call is all of the formula, so it is the only request

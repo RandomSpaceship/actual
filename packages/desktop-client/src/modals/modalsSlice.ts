@@ -8,7 +8,7 @@ import type {
   CategoryGroupEntity,
   FormulaLibraryAqlQueryEntity,
   FormulaLibraryItemEntity,
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaEntity,
   FormulaLibraryQueryEntity,
   GoCardlessToken,
   NewRuleEntity,
@@ -28,7 +28,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 import { accountQueries } from '#accounts';
 import { resetApp, setAppState } from '#app/appSlice';
-import type { CardProviderEditContext } from '#components/formula-library/EditFormulaLibraryProviderModal';
+import type { CardNamedFormulaEditContext } from '#components/formula-library/EditFormulaLibraryNamedFormulaModal';
 import type { SelectLinkedAccountsModalProps } from '#components/modals/SelectLinkedAccountsModal';
 import type { TransactionTableColumn } from '#components/transactions/table/columns';
 import { createAppAsyncThunk } from '#redux';
@@ -624,10 +624,10 @@ export type Modal =
       };
     }
   | {
-      name: 'edit-formula-library-provider';
+      name: 'edit-formula-library-named-formula';
       options: {
-        item?: FormulaLibraryProviderEntity;
-        card?: CardProviderEditContext;
+        item?: FormulaLibraryNamedFormulaEntity;
+        card?: CardNamedFormulaEditContext;
       };
     }
   | {

@@ -3,4 +3,4 @@ category: Enhancements
 authors: [RandomSpaceship]
 ---
 
-Let formula providers give a table
+Let named formulas give a table

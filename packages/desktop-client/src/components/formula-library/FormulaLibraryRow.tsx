@@ -6,7 +6,7 @@ import { SvgTrash } from '@actual-app/components/icons/v1';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import type {
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaEntity,
   FormulaLibraryQueryEntity,
 } from '@actual-app/core/types/models';
 
@@ -19,7 +19,10 @@ import { QueryTimeFrameSummary } from './QueryTimeFrameSummary';
 
 type FormulaLibraryRowProps = {
   item: FormulaLibraryQueryEntity;
-  uses: { cards: FormulaQueryUse[]; providers: FormulaLibraryProviderEntity[] };
+  uses: {
+    cards: FormulaQueryUse[];
+    namedFormulas: FormulaLibraryNamedFormulaEntity[];
+  };
   // Set when an older item has the same name
   isOverridden: boolean;
   onEdit: (item: FormulaLibraryQueryEntity) => void;

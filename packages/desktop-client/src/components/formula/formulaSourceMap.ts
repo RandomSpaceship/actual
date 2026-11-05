@@ -10,7 +10,7 @@ import { isEqual } from 'es-toolkit/compat';
 import { t } from 'i18next';
 
 import { getAqlDateField, parseAqlConfig } from './aqlSource';
-import type { ResolvedProvider } from './resolveProviders';
+import type { ResolvedNamedFormula } from './resolveNamedFormulas';
 import type { FormulaQueryConfig } from './resolveQuery';
 
 // A filter on the transactions page. A filter with customName and queryFilter
@@ -307,23 +307,24 @@ export async function getQueryTransactionsFilter(
 
 // The source function of a formula that is one call of it, for example
 // =QUERY_GROUP("spending", "category"). A formula that is only the name of a
-// provider gives the call of that provider. null: the formula does more than
+// named formula gives the call of that named formula. null: the formula does more than
 // one call, so its cells can come from more than one place.
 export function getSourceFunctionName(
   formula: string,
-  providers: ResolvedProvider[],
+  namedFormulas: ResolvedNamedFormula[],
 ): string | null {
   const body = formula.replace(/^\s*=/, '').trim();
 
-  const providerName = body.match(/^[A-Za-z_][\w.]*$/)?.[0];
-  if (providerName !== undefined) {
-    const provider = providers.find(
-      candidate => candidate.name.toUpperCase() === providerName.toUpperCase(),
+  const namedFormulaName = body.match(/^[A-Za-z_][\w.]*$/)?.[0];
+  if (namedFormulaName !== undefined) {
+    const namedFormula = namedFormulas.find(
+      candidate =>
+        candidate.name.toUpperCase() === namedFormulaName.toUpperCase(),
     );
-    // A provider cannot use itself, but a formula can name one that is not
+    // A named formula cannot use itself, but a formula can name one that is not
     // there
-    if (!provider || provider.formula === formula) return null;
-    return getSourceFunctionName(provider.formula, providers);
+    if (!namedFormula || namedFormula.formula === formula) return null;
+    return getSourceFunctionName(namedFormula.formula, namedFormulas);
   }
 
   const call = body.match(/^([A-Za-z_][\w.]*)\s*\(/);

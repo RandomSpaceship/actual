@@ -38,8 +38,8 @@ describe('getSourceFunctionName', () => {
     }
   });
 
-  it('follows a provider that is all of the formula', () => {
-    const providers = [
+  it('follows a named formula that is all of the formula', () => {
+    const namedFormulas = [
       {
         name: 'Spending',
         formula: '=QUERY_PIVOT("a", "category", , "month")',
@@ -47,9 +47,11 @@ describe('getSourceFunctionName', () => {
       },
       { name: 'Sorted', formula: '=SORT(Spending)', uses: ['Spending'] },
     ];
-    expect(getSourceFunctionName('=spending', providers)).toBe('QUERY_PIVOT');
-    expect(getSourceFunctionName('=Sorted', providers)).toBeNull();
-    expect(getSourceFunctionName('=Unknown', providers)).toBeNull();
+    expect(getSourceFunctionName('=spending', namedFormulas)).toBe(
+      'QUERY_PIVOT',
+    );
+    expect(getSourceFunctionName('=Sorted', namedFormulas)).toBeNull();
+    expect(getSourceFunctionName('=Unknown', namedFormulas)).toBeNull();
   });
 });
 

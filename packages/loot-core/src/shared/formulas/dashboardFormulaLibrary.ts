@@ -4,7 +4,7 @@ import * as monthUtils from '#shared/months';
 import type {
   ExportImportFormulaLibraryAqlQuery,
   ExportImportFormulaLibraryItem,
-  ExportImportFormulaLibraryProvider,
+  ExportImportFormulaLibraryNamedFormula,
   ExportImportFormulaLibraryQuery,
   FormulaLibraryAqlQueryData,
   FormulaLibraryItemEntity,
@@ -14,11 +14,11 @@ import type {
 } from '#types/models';
 
 import {
-  findProviderNameReferences,
-  isSameProviderName,
-  isValidProviderName,
-  renameProviderInFormula,
-} from './providerNameUses';
+  findNamedFormulaNameReferences,
+  isSameNamedFormulaName,
+  isValidNamedFormulaName,
+  renameNamedFormulaInFormula,
+} from './namedFormulaNameUses';
 import {
   findQueryNameReferences,
   isSameQueryName,
@@ -27,8 +27,8 @@ import {
 
 type FormulaMeta = NonNullable<FormulaWidget['meta']>;
 
-// Provider formulas, keyed by the provider name in upper case
-type ProviderFormulas = Map<string, string>;
+// Named formula formulas, keyed by the named formula name in upper case
+type NamedFormulaFormulas = Map<string, string>;
 
 function isFormulaMeta(type: string, meta: unknown): meta is FormulaMeta {
   return type === 'formula-card' && meta != null && typeof meta === 'object';
@@ -46,48 +46,51 @@ function getCardFormulas(meta: FormulaMeta) {
   );
 }
 
-function isCardProviderName(meta: FormulaMeta, name: string) {
-  return Object.keys(meta.providers ?? {}).some(cardName =>
-    isSameProviderName(cardName, name),
+function isCardNamedFormulaName(meta: FormulaMeta, name: string) {
+  return Object.keys(meta.namedFormulas ?? {}).some(cardName =>
+    isSameNamedFormulaName(cardName, name),
   );
 }
 
-// The providers as the card sees them: a card provider wins over a library
-// provider with the same name
-function getCardProviderFormulas(
+// The named formulas as the card sees them: a card named formula wins over a library
+// named formula with the same name
+function getCardNamedFormulaFormulas(
   meta: FormulaMeta,
-  providers: ProviderFormulas,
-): ProviderFormulas {
-  const cardProviders: ProviderFormulas = new Map(providers);
-  for (const [name, { formula }] of Object.entries(meta.providers ?? {})) {
-    cardProviders.set(name.toUpperCase(), formula);
+  namedFormulas: NamedFormulaFormulas,
+): NamedFormulaFormulas {
+  const cardNamedFormulas: NamedFormulaFormulas = new Map(namedFormulas);
+  for (const [name, { formula }] of Object.entries(meta.namedFormulas ?? {})) {
+    cardNamedFormulas.set(name.toUpperCase(), formula);
   }
-  return cardProviders;
+  return cardNamedFormulas;
 }
 
-// The library provider names that a card uses, also through card providers
-function findLibraryProviderNames(
+// The library named formula names that a card uses, also through card named formulas
+function findLibraryNamedFormulaNames(
   meta: FormulaMeta,
-  providers: ProviderFormulas,
+  namedFormulas: NamedFormulaFormulas,
 ) {
-  return findProviderNames(
+  return findNamedFormulaNames(
     getCardFormulas(meta),
-    getCardProviderFormulas(meta, providers),
-  ).filter(name => !isCardProviderName(meta, name));
+    getCardNamedFormulaFormulas(meta, namedFormulas),
+  ).filter(name => !isCardNamedFormulaName(meta, name));
 }
 
-// The names of the providers that the formulas use, also through other
-// providers. A name that is not in providers is not in the list.
-function findProviderNames(formulas: string[], providers: ProviderFormulas) {
+// The names of the named formulas that the formulas use, also through other
+// named formulas. A name that is not in named formulas is not in the list.
+function findNamedFormulaNames(
+  formulas: string[],
+  namedFormulas: NamedFormulaFormulas,
+) {
   const names = new Map<string, string>();
 
   function visit(formula: string) {
-    for (const { name } of findProviderNameReferences(formula)) {
+    for (const { name } of findNamedFormulaNameReferences(formula)) {
       const key = name.toUpperCase();
-      const providerFormula = providers.get(key);
-      if (providerFormula === undefined || names.has(key)) continue;
+      const namedFormulaFormula = namedFormulas.get(key);
+      if (namedFormulaFormula === undefined || names.has(key)) continue;
       names.set(key, name);
-      visit(providerFormula);
+      visit(namedFormulaFormula);
     }
   }
 
@@ -96,15 +99,19 @@ function findProviderNames(formulas: string[], providers: ProviderFormulas) {
 }
 
 // The library query names that a card uses, also through card and library
-// providers. A provider uses the queries of the card, so a name that a card
+// named formulas. A named formula uses the queries of the card, so a name that a card
 // query hides is not in the list.
-function findLibraryQueryNames(meta: FormulaMeta, providers: ProviderFormulas) {
+function findLibraryQueryNames(
+  meta: FormulaMeta,
+  namedFormulas: NamedFormulaFormulas,
+) {
   const formulas = getCardFormulas(meta);
-  const cardProviders = getCardProviderFormulas(meta, providers);
-  const providerFormulas = findProviderNames(formulas, cardProviders).map(
-    name => cardProviders.get(name.toUpperCase()) ?? '',
-  );
-  return [...formulas, ...providerFormulas]
+  const cardNamedFormulas = getCardNamedFormulaFormulas(meta, namedFormulas);
+  const namedFormulaFormulas = findNamedFormulaNames(
+    formulas,
+    cardNamedFormulas,
+  ).map(name => cardNamedFormulas.get(name.toUpperCase()) ?? '');
+  return [...formulas, ...namedFormulaFormulas]
     .flatMap(formula => findQueryNameReferences(formula))
     .map(({ name }) => name)
     .filter(name => findLocalQueryName(meta, name) === undefined);
@@ -149,25 +156,25 @@ function findLibraryNamedQuery<
   );
 }
 
-// The winning provider of each name, as formulas use them
-function getProviderFormulas(
+// The winning named formula of each name, as formulas use them
+function getNamedFormulaFormulas(
   library: ExportImportFormulaLibraryItem[],
-): ProviderFormulas {
-  const providers: ProviderFormulas = new Map();
+): NamedFormulaFormulas {
+  const namedFormulas: NamedFormulaFormulas = new Map();
   for (const item of library) {
     const key = item.name.toUpperCase();
-    if (item.type === 'provider' && !providers.has(key)) {
-      providers.set(key, item.data.formula);
+    if (item.type === 'named-formula' && !namedFormulas.has(key)) {
+      namedFormulas.set(key, item.data.formula);
     }
   }
-  return providers;
+  return namedFormulas;
 }
 
 function toExportItem(
   item: FormulaLibraryItemEntity,
 ): ExportImportFormulaLibraryItem {
   switch (item.type) {
-    case 'provider':
+    case 'named-formula':
       return { id: item.id, type: item.type, name: item.name, data: item.data };
     case 'aql-query':
       return { id: item.id, type: item.type, name: item.name, data: item.data };
@@ -176,14 +183,14 @@ function toExportItem(
   }
 }
 
-// The library queries and providers that the formula cards use, for a
+// The library queries and named formulas that the formula cards use, for a
 // dashboard export
 export function collectFormulaLibraryForExport(
   widgets: { type: string; meta: unknown }[],
   library: FormulaLibraryItemEntity[],
 ): ExportImportFormulaLibraryItem[] {
   const oldestFirst = sortOldestFirst(library);
-  const providers = getProviderFormulas(oldestFirst);
+  const namedFormulas = getNamedFormulaFormulas(oldestFirst);
   const items = new Map<string, ExportImportFormulaLibraryItem>();
 
   function add(item: FormulaLibraryItemEntity | undefined) {
@@ -195,11 +202,11 @@ export function collectFormulaLibraryForExport(
   for (const { type, meta } of widgets) {
     if (!isFormulaMeta(type, meta)) continue;
 
-    for (const name of findLibraryQueryNames(meta, providers)) {
+    for (const name of findLibraryQueryNames(meta, namedFormulas)) {
       add(findLibraryNamedQuery(oldestFirst, name));
     }
-    for (const name of findLibraryProviderNames(meta, providers)) {
-      add(findLibraryItem(oldestFirst, 'provider', name));
+    for (const name of findLibraryNamedFormulaNames(meta, namedFormulas)) {
+      add(findLibraryItem(oldestFirst, 'named-formula', name));
     }
   }
 
@@ -285,100 +292,102 @@ function completeTimeFrame(timeFrame: Partial<TimeFrame> | undefined) {
   } satisfies TimeFrame;
 }
 
-function renameProviders(formula: string, renames: Map<string, string>) {
+function renameNamedFormulas(formula: string, renames: Map<string, string>) {
   let renamed = formula;
   for (const [oldName, newName] of renames) {
-    renamed = renameProviderInFormula(renamed, oldName, newName);
+    renamed = renameNamedFormulaInFormula(renamed, oldName, newName);
   }
   return renamed;
 }
 
 // The first name of the form Name_2, Name_3 ... that no item in names has
-function findFreeProviderName(name: string, names: string[]) {
+function findFreeNamedFormulaName(name: string, names: string[]) {
   for (let suffix = 2; ; suffix++) {
     const candidate = `${name}_${suffix}`;
     if (
-      isValidProviderName(candidate) &&
-      !names.some(usedName => isSameProviderName(usedName, candidate))
+      isValidNamedFormulaName(candidate) &&
+      !names.some(usedName => isSameNamedFormulaName(usedName, candidate))
     ) {
       return candidate;
     }
   }
 }
 
-type ProviderImportPlan = {
-  itemsToCreate: ExportImportFormulaLibraryProvider[];
-  // Exported provider names that the import changes, keyed by the old name
+type NamedFormulaImportPlan = {
+  itemsToCreate: ExportImportFormulaLibraryNamedFormula[];
+  // Exported named formula names that the import changes, keyed by the old name
   renames: Map<string, string>;
 };
 
-// For each exported provider, after the renames of the providers that it
+// For each exported named formula, after the renames of the named formulas that it
 // uses:
-// - The library has a provider with the same name and formula: use it.
-// - The library has a provider with the same name and a different formula:
+// - The library has a named formula with the same name and formula: use it.
+// - The library has a named formula with the same name and a different formula:
 //   import it with a new name, and rename it in the imported formulas.
-// - The library has no provider with the name: it gets a new item.
-function planProviderImport(
-  exportedProviders: ExportImportFormulaLibraryProvider[],
+// - The library has no named formula with the name: it gets a new item.
+function planNamedFormulaImport(
+  exportedNamedFormulas: ExportImportFormulaLibraryNamedFormula[],
   library: FormulaLibraryItemEntity[],
   createId: () => string,
-): ProviderImportPlan {
-  const localProviders = getProviderFormulas(library.map(toExportItem));
-  const exportedFormulas = getProviderFormulas(exportedProviders);
+): NamedFormulaImportPlan {
+  const localNamedFormulas = getNamedFormulaFormulas(library.map(toExportItem));
+  const exportedFormulas = getNamedFormulaFormulas(exportedNamedFormulas);
   const usedNames = [
-    ...library.filter(item => item.type === 'provider').map(item => item.name),
-    ...exportedProviders.map(item => item.name),
+    ...library
+      .filter(item => item.type === 'named-formula')
+      .map(item => item.name),
+    ...exportedNamedFormulas.map(item => item.name),
   ];
-  const itemsToCreate: ExportImportFormulaLibraryProvider[] = [];
+  const itemsToCreate: ExportImportFormulaLibraryNamedFormula[] = [];
   const renames = new Map<string, string>();
   const planned = new Set<string>();
 
-  // The providers that a provider uses come first, so that their renames are
+  // The named formulas that a named formula uses come first, so that their renames are
   // known. A cycle stops the walk.
-  function plan(provider: ExportImportFormulaLibraryProvider) {
-    const key = provider.name.toUpperCase();
+  function plan(namedFormula: ExportImportFormulaLibraryNamedFormula) {
+    const key = namedFormula.name.toUpperCase();
     if (planned.has(key)) return;
     planned.add(key);
 
-    for (const name of findProviderNames(
-      [provider.data.formula],
+    for (const name of findNamedFormulaNames(
+      [namedFormula.data.formula],
       exportedFormulas,
     )) {
-      const usedProvider = exportedProviders.find(item =>
-        isSameProviderName(item.name, name),
+      const usedNamedFormula = exportedNamedFormulas.find(item =>
+        isSameNamedFormulaName(item.name, name),
       );
-      if (usedProvider) plan(usedProvider);
+      if (usedNamedFormula) plan(usedNamedFormula);
     }
 
-    const formula = renameProviders(provider.data.formula, renames);
-    const localFormula = localProviders.get(key);
+    const formula = renameNamedFormulas(namedFormula.data.formula, renames);
+    const localFormula = localNamedFormulas.get(key);
     if (localFormula === formula) return;
 
     const name =
       localFormula === undefined
-        ? provider.name
-        : findFreeProviderName(provider.name, usedNames);
-    if (name !== provider.name) {
-      renames.set(provider.name, name);
+        ? namedFormula.name
+        : findFreeNamedFormulaName(namedFormula.name, usedNames);
+    if (name !== namedFormula.name) {
+      renames.set(namedFormula.name, name);
       usedNames.push(name);
     }
     itemsToCreate.push({
-      ...provider,
+      ...namedFormula,
       id: createId(),
       name,
-      data: { ...provider.data, formula },
+      data: { ...namedFormula.data, formula },
     });
   }
 
-  exportedProviders.forEach(plan);
+  exportedNamedFormulas.forEach(plan);
 
-  // In a cycle, a provider can use a provider that got its new name later
+  // In a cycle, a named formula can use a named formula that got its new name later
   return {
     itemsToCreate: itemsToCreate.map(item => ({
       ...item,
       data: {
         ...item.data,
-        formula: renameProviders(item.data.formula, renames),
+        formula: renameNamedFormulas(item.data.formula, renames),
       },
     })),
     renames,
@@ -390,12 +399,12 @@ export type FormulaLibraryImportPlan<Widget> = {
   itemsToCreate: ExportImportFormulaLibraryItem[];
 };
 
-// Providers: see planProviderImport.
+// Named formulas: see planNamedFormulaImport.
 //
 // For each exported library query:
 // - The library has an identical query with the same name: the cards use it.
 // - The library has a different query with the same name: each card that
-//   uses the name, also through a provider, gets a copy of the exported query
+//   uses the name, also through a named formula, gets a copy of the exported query
 //   as a card query. A card query wins over a library query, so the card
 //   result does not change.
 // - The library has no query with the name: it gets a new item.
@@ -410,13 +419,15 @@ export function planFormulaLibraryImport<
   createId: () => string,
 ): FormulaLibraryImportPlan<Widget> {
   const oldestFirst = sortOldestFirst(library);
-  const exportedProviders = exportedItems.filter(
-    (item): item is ExportImportFormulaLibraryProvider =>
-      item.type === 'provider',
+  const exportedNamedFormulas = exportedItems.filter(
+    (item): item is ExportImportFormulaLibraryNamedFormula =>
+      item.type === 'named-formula',
   );
-  const exportedProviderFormulas = getProviderFormulas(exportedProviders);
-  const providerPlan = planProviderImport(
-    exportedProviders,
+  const exportedNamedFormulaFormulas = getNamedFormulaFormulas(
+    exportedNamedFormulas,
+  );
+  const namedFormulaPlan = planNamedFormulaImport(
+    exportedNamedFormulas,
     oldestFirst,
     createId,
   );
@@ -468,7 +479,7 @@ export function planFormulaLibraryImport<
     const { type, meta } = widget;
     if (!isFormulaMeta(type, meta)) return widget;
 
-    const usedNames = findLibraryQueryNames(meta, exportedProviderFormulas);
+    const usedNames = findLibraryQueryNames(meta, exportedNamedFormulaFormulas);
     const queries = { ...meta.queries };
     for (const [exportedId, item] of cardQueryItems) {
       if (!usedNames.some(name => isSameQueryName(name, item.name))) continue;
@@ -495,11 +506,11 @@ export function planFormulaLibraryImport<
       ),
     );
 
-    // A name that a card provider hides is not the library provider, and a
+    // A name that a card named formula hides is not the library named formula, and a
     // name that a card query hides is not the library query
     const cardRenames = new Map(
-      [...providerPlan.renames].filter(
-        ([oldName]) => !isCardProviderName(meta, oldName),
+      [...namedFormulaPlan.renames].filter(
+        ([oldName]) => !isCardNamedFormulaName(meta, oldName),
       ),
     );
     const cardQueryRenames = new Map(
@@ -508,7 +519,10 @@ export function planFormulaLibraryImport<
       ),
     );
     const renameFormula = (formula: string) =>
-      renameQueries(renameProviders(formula, cardRenames), cardQueryRenames);
+      renameQueries(
+        renameNamedFormulas(formula, cardRenames),
+        cardQueryRenames,
+      );
     const rename = (formula: string | undefined) =>
       formula === undefined ? undefined : renameFormula(formula);
 
@@ -519,13 +533,13 @@ export function planFormulaLibraryImport<
         ...((cardRenames.size > 0 || cardQueryRenames.size > 0) && {
           formula: rename(meta.formula),
           colorFormula: rename(meta.colorFormula),
-          ...(meta.providers && {
-            providers: Object.fromEntries(
-              Object.entries(meta.providers).map(([name, provider]) => [
+          ...(meta.namedFormulas && {
+            namedFormulas: Object.fromEntries(
+              Object.entries(meta.namedFormulas).map(([name, namedFormula]) => [
                 name,
                 {
-                  ...provider,
-                  formula: renameFormula(provider.formula),
+                  ...namedFormula,
+                  formula: renameFormula(namedFormula.formula),
                 },
               ]),
             ),
@@ -541,8 +555,8 @@ export function planFormulaLibraryImport<
     widgets: newWidgets,
     itemsToCreate: [
       ...queriesToCreate,
-      // An imported provider uses the new names of the AQL queries
-      ...providerPlan.itemsToCreate.map(item => ({
+      // An imported named formula uses the new names of the AQL queries
+      ...namedFormulaPlan.itemsToCreate.map(item => ({
         ...item,
         data: {
           ...item.data,

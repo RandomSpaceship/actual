@@ -125,7 +125,7 @@ export function isNamedQueryItem(
 
 // Items of the same kind cannot have the same name
 export function getLibraryNameKind(type: FormulaLibraryItemEntity['type']) {
-  return type === 'provider' ? 'provider' : 'query';
+  return type === 'named-formula' ? 'named-formula' : 'query';
 }
 
 export function formulaUsesQueryName(formula: string, name: string) {

@@ -20,19 +20,19 @@ export type FormulaLibraryQueryEntity = {
   tombstone?: boolean;
 };
 
-export type FormulaLibraryProviderData = {
+export type FormulaLibraryNamedFormulaData = {
   description?: string;
   // Starts with "="
   formula: string;
 };
 
 // A named formula. Other formulas use its name without quotes
-export type FormulaLibraryProviderEntity = Omit<
+export type FormulaLibraryNamedFormulaEntity = Omit<
   FormulaLibraryQueryEntity,
   'type' | 'data'
 > & {
-  type: 'provider';
-  data: FormulaLibraryProviderData;
+  type: 'named-formula';
+  data: FormulaLibraryNamedFormulaData;
 };
 
 export type FormulaLibraryAqlQueryData = {
@@ -70,4 +70,4 @@ export type FormulaLibraryNamedQueryEntity =
 export type FormulaLibraryItemEntity =
   | FormulaLibraryQueryEntity
   | FormulaLibraryAqlQueryEntity
-  | FormulaLibraryProviderEntity;
+  | FormulaLibraryNamedFormulaEntity;

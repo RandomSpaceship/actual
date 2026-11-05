@@ -14,7 +14,7 @@ import { batchMessages } from '#server/sync';
 import { undoable } from '#server/undo';
 import { DEFAULT_DASHBOARD_STATE } from '#shared/dashboard';
 import { planFormulaLibraryImport } from '#shared/formulas/dashboardFormulaLibrary';
-import { isValidProviderName } from '#shared/formulas/providerNameUses';
+import { isValidNamedFormulaName } from '#shared/formulas/namedFormulaNameUses';
 import { q } from '#shared/query';
 import type {
   DashboardWidgetEntity,
@@ -125,7 +125,11 @@ const exportModel = {
 
       // The file can hold any value here
       const type: unknown = item.type;
-      if (type !== 'query' && type !== 'aql-query' && type !== 'provider') {
+      if (
+        type !== 'query' &&
+        type !== 'aql-query' &&
+        type !== 'named-formula'
+      ) {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.type value ${String(type)}.`,
         );
@@ -134,7 +138,7 @@ const exportModel = {
       if (
         typeof item.name !== 'string' ||
         item.name.trim() === '' ||
-        (item.type === 'provider' && !isValidProviderName(item.name))
+        (item.type === 'named-formula' && !isValidNamedFormulaName(item.name))
       ) {
         throw new ValidationError(
           `Invalid formulaLibrary.${idx}.name value ${String(item.name)}.`,
@@ -148,7 +152,7 @@ const exportModel = {
       }
 
       if (
-        item.type === 'provider' &&
+        item.type === 'named-formula' &&
         (typeof item.data.formula !== 'string' ||
           !item.data.formula.startsWith('='))
       ) {

@@ -13,10 +13,10 @@ import { Toggle } from '@actual-app/components/toggle';
 import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
 import {
-  findProviderNameReferences,
-  isSameProviderName,
-  renameProviderInFormula,
-} from '@actual-app/core/shared/formulas/providerNameUses';
+  findNamedFormulaNameReferences,
+  isSameNamedFormulaName,
+  renameNamedFormulaInFormula,
+} from '@actual-app/core/shared/formulas/namedFormulaNameUses';
 import {
   findQueryNameReferences,
   isNamedQueryItem,
@@ -25,9 +25,9 @@ import {
 import * as monthUtils from '@actual-app/core/shared/months';
 import type {
   FormulaLibraryAqlQueryEntity,
+  FormulaLibraryNamedFormulaData,
+  FormulaLibraryNamedFormulaEntity,
   FormulaLibraryNamedQueryEntity,
-  FormulaLibraryProviderData,
-  FormulaLibraryProviderEntity,
   FormulaLibraryQueryEntity,
   FormulaTimeFrameOverride,
   RuleConditionEntity,
@@ -50,15 +50,15 @@ import type { AppDispatch } from '#redux/store';
 
 import { LibraryAqlQueryItem } from './LibraryAqlQueryItem';
 import { LibraryQueryItem } from './LibraryQueryItem';
-import { ProviderItem } from './ProviderItem';
+import { NamedFormulaItem } from './NamedFormulaItem';
 import {
   newQueryTimeFrame,
   normalizeQueryTimeFrameEnd,
   normalizeQueryTimeFrameStart,
 } from './queryTimeFrame';
 import { QueryTimeFrameControl } from './QueryTimeFrameControl';
-import { findCardProviderName } from './resolveProviders';
-import type { CardProviders } from './resolveProviders';
+import { findCardNamedFormulaName } from './resolveNamedFormulas';
+import type { CardNamedFormulas } from './resolveNamedFormulas';
 
 type QueryConfig = {
   conditions?: RuleConditionEntity[];
@@ -74,19 +74,19 @@ type QueryManagerProps = {
   onTimeFrameOverridesChange: (
     timeFrameOverrides: Record<string, FormulaTimeFrameOverride>,
   ) => void;
-  cardProviders: CardProviders;
-  // Set when a card provider gets a new name, so that the card formulas can
-  // change too. The card providers change here.
-  onCardProvidersChange: (
-    cardProviders: CardProviders,
+  cardNamedFormulas: CardNamedFormulas;
+  // Set when a card named formula gets a new name, so that the card formulas can
+  // change too. The card named formulas change here.
+  onCardNamedFormulasChange: (
+    cardNamedFormulas: CardNamedFormulas,
     rename?: { oldName: string; newName: string },
   ) => void;
   // The card formulas. Only the formulas when the editor opens are used
   formulas: string[];
-  // For the provider values on this card
+  // For the named formula values on this card
   accounts: SimpleAccount[];
-  // Without it, providers have no insert button
-  onInsertProvider?: (name: string) => void;
+  // Without it, named formulas have no insert button
+  onInsertNamedFormula?: (name: string) => void;
 };
 
 export function QueryManager({
@@ -94,18 +94,20 @@ export function QueryManager({
   onQueriesChange,
   timeFrameOverrides,
   onTimeFrameOverridesChange,
-  cardProviders,
-  onCardProvidersChange,
+  cardNamedFormulas,
+  onCardNamedFormulasChange,
   formulas,
   accounts,
-  onInsertProvider,
+  onInsertNamedFormula,
 }: QueryManagerProps) {
   const { t } = useTranslation();
   const [newQueryName, setNewQueryName] = useState('');
   const [isAddingQuery, setIsAddingQuery] = useState(false);
   // Null until the user changes the toggle
   const [showLibrary, setShowLibrary] = useState<boolean | null>(null);
-  const [showProviders, setShowProviders] = useState<boolean | null>(null);
+  const [showNamedFormulas, setShowNamedFormulas] = useState<boolean | null>(
+    null,
+  );
   const [openingFormulas] = useState(formulas);
   const dispatch = useDispatch();
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
@@ -115,8 +117,8 @@ export function QueryManager({
   const libraryQueries = library
     .filter(isNamedQueryItem)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const libraryProviders = library
-    .filter(item => item.type === 'provider')
+  const libraryNamedFormulas = library
+    .filter(item => item.type === 'named-formula')
     .sort((a, b) => a.name.localeCompare(b.name));
 
   function findLibraryQuery(name: string) {
@@ -140,19 +142,21 @@ export function QueryManager({
           findCardQueryName(name) === undefined,
       );
 
-  function findLibraryProvider(name: string) {
-    return libraryProviders.find(item => isSameProviderName(item.name, name));
+  function findLibraryNamedFormula(name: string) {
+    return libraryNamedFormulas.find(item =>
+      isSameNamedFormulaName(item.name, name),
+    );
   }
 
-  // The library providers show at the start if the formulas use one of them
-  const areProvidersShown =
-    showProviders ??
+  // The library named formulas show at the start if the formulas use one of them
+  const areNamedFormulasShown =
+    showNamedFormulas ??
     openingFormulas
-      .flatMap(formula => findProviderNameReferences(formula))
+      .flatMap(formula => findNamedFormulaNameReferences(formula))
       .some(
         ({ name }) =>
-          findLibraryProvider(name) !== undefined &&
-          findCardProviderName(cardProviders, name) === undefined,
+          findLibraryNamedFormula(name) !== undefined &&
+          findCardNamedFormulaName(cardNamedFormulas, name) === undefined,
       );
 
   function handleAddQuery() {
@@ -263,27 +267,30 @@ export function QueryManager({
     );
   }
 
-  function handleEditProvider(item: FormulaLibraryProviderEntity) {
+  function handleEditNamedFormula(item: FormulaLibraryNamedFormulaEntity) {
     dispatch(
       pushModal({
-        modal: { name: 'edit-formula-library-provider', options: { item } },
+        modal: {
+          name: 'edit-formula-library-named-formula',
+          options: { item },
+        },
       }),
     );
   }
 
-  function handleEditCardProvider(name?: string) {
+  function handleEditCardNamedFormula(name?: string) {
     dispatch(
       pushModal({
         modal: {
-          name: 'edit-formula-library-provider',
+          name: 'edit-formula-library-named-formula',
           options: {
             card: {
               name,
-              providers: cardProviders,
+              namedFormulas: cardNamedFormulas,
               queries,
               timeFrameOverrides,
               onSave: (newName, data) =>
-                handleSaveCardProvider(name, newName, data),
+                handleSaveCardNamedFormula(name, newName, data),
             },
           },
         },
@@ -291,61 +298,71 @@ export function QueryManager({
     );
   }
 
-  // A rename also changes the other card providers that use the name
-  function handleSaveCardProvider(
+  // A rename also changes the other card named formulas that use the name
+  function handleSaveCardNamedFormula(
     oldName: string | undefined,
     newName: string,
-    data: FormulaLibraryProviderData,
+    data: FormulaLibraryNamedFormulaData,
   ) {
     const isRename = oldName !== undefined && oldName !== newName;
     const rename = (formula: string) =>
-      isRename ? renameProviderInFormula(formula, oldName, newName) : formula;
-    const newProvider = { ...data, formula: rename(data.formula) };
-    // The provider keeps its place in the list
-    const newProviders: CardProviders = Object.fromEntries(
-      Object.entries(cardProviders).map(([providerName, provider]) =>
-        providerName === oldName
-          ? [newName, newProvider]
-          : [providerName, { ...provider, formula: rename(provider.formula) }],
+      isRename
+        ? renameNamedFormulaInFormula(formula, oldName, newName)
+        : formula;
+    const newNamedFormula = { ...data, formula: rename(data.formula) };
+    // The named formula keeps its place in the list
+    const newNamedFormulas: CardNamedFormulas = Object.fromEntries(
+      Object.entries(cardNamedFormulas).map(
+        ([namedFormulaName, namedFormula]) =>
+          namedFormulaName === oldName
+            ? [newName, newNamedFormula]
+            : [
+                namedFormulaName,
+                { ...namedFormula, formula: rename(namedFormula.formula) },
+              ],
       ),
     );
     if (oldName === undefined) {
-      newProviders[newName] = newProvider;
+      newNamedFormulas[newName] = newNamedFormula;
     }
-    onCardProvidersChange(
-      newProviders,
+    onCardNamedFormulasChange(
+      newNamedFormulas,
       isRename ? { oldName, newName } : undefined,
     );
   }
 
-  function handleRemoveCardProvider(name: string) {
-    const newProviders = { ...cardProviders };
-    delete newProviders[name];
-    onCardProvidersChange(newProviders);
+  function handleRemoveCardNamedFormula(name: string) {
+    const newNamedFormulas = { ...cardNamedFormulas };
+    delete newNamedFormulas[name];
+    onCardNamedFormulasChange(newNamedFormulas);
   }
 
-  function handleCopyProviderIntoCard(item: FormulaLibraryProviderEntity) {
-    onCardProvidersChange({ ...cardProviders, [item.name]: item.data });
+  function handleCopyNamedFormulaIntoCard(
+    item: FormulaLibraryNamedFormulaEntity,
+  ) {
+    onCardNamedFormulasChange({ ...cardNamedFormulas, [item.name]: item.data });
   }
 
-  // The card queries and card providers that a card provider uses. In the
-  // library, the provider cannot find them.
+  // The card queries and card named formulas that a card named formula uses. In the
+  // library, the named formula cannot find them.
   function findCardOnlyNames(name: string) {
-    const { formula } = cardProviders[name];
+    const { formula } = cardNamedFormulas[name];
     const queryNames = findQueryNameReferences(formula)
       .map(reference => findCardQueryName(reference.name))
       .filter((queryName): queryName is string => queryName !== undefined)
       .map(queryName => `QUERY("${queryName}")`);
-    const providerNames = findProviderNameReferences(formula)
-      .map(reference => findCardProviderName(cardProviders, reference.name))
+    const namedFormulaNames = findNamedFormulaNameReferences(formula)
+      .map(reference =>
+        findCardNamedFormulaName(cardNamedFormulas, reference.name),
+      )
       .filter(
-        (providerName): providerName is string =>
-          providerName !== undefined && providerName !== name,
+        (namedFormulaName): namedFormulaName is string =>
+          namedFormulaName !== undefined && namedFormulaName !== name,
       );
-    return [...new Set([...queryNames, ...providerNames])];
+    return [...new Set([...queryNames, ...namedFormulaNames])];
   }
 
-  async function handleMakeProviderShared(name: string) {
+  async function handleMakeNamedFormulaShared(name: string) {
     const cardOnlyNames = findCardOnlyNames(name);
     if (cardOnlyNames.length > 0) {
       dispatch(
@@ -363,18 +380,18 @@ export function QueryManager({
     }
 
     await createLibraryItem.mutateAsync({
-      type: 'provider',
+      type: 'named-formula',
       name,
-      data: cardProviders[name],
+      data: cardNamedFormulas[name],
     });
-    handleRemoveCardProvider(name);
-    setShowProviders(true);
+    handleRemoveCardNamedFormula(name);
+    setShowNamedFormulas(true);
     dispatch(
       addNotification({
         notification: {
           type: 'message',
           message: t(
-            '"{{name}}" is now a library provider. Save the widget to remove the card copy.',
+            '"{{name}}" is now a library named formula. Save the widget to remove the card copy.',
             { name },
           ),
         },
@@ -560,53 +577,56 @@ export function QueryManager({
         }}
       >
         <Text style={{ fontSize: 18, fontWeight: 600 }}>
-          <Trans>Providers</Trans>
+          <Trans>Named formulas</Trans>
         </Text>
-        <Button variant="primary" onPress={() => handleEditCardProvider()}>
-          <Trans>Add Provider</Trans>
+        <Button variant="primary" onPress={() => handleEditCardNamedFormula()}>
+          <Trans>Add Named Formula</Trans>
         </Button>
       </View>
 
-      {Object.keys(cardProviders).length === 0 ? (
+      {Object.keys(cardNamedFormulas).length === 0 ? (
         <Text
           size="small"
           style={{ color: theme.pageTextSubdued, marginBottom: 12 }}
         >
           <Trans>
-            A provider is a named formula. Other formulas use it by its name,
-            for example =NetIncome / 12. A card provider is only on this card.
+            A named formula is a formula with a name. Other formulas use it by
+            its name, for example =NetIncome / 12. A card named formula is only
+            on this card.
           </Trans>
         </Text>
       ) : (
-        Object.entries(cardProviders).map(([name, data]) => (
-          <ProviderItem
+        Object.entries(cardNamedFormulas).map(([name, data]) => (
+          <NamedFormulaItem
             key={name}
             name={name}
             data={data}
             warning={
-              findLibraryProvider(name)
-                ? t('Hides the library provider with the same name')
+              findLibraryNamedFormula(name)
+                ? t('Hides the library named formula with the same name')
                 : undefined
             }
             queries={queries}
             timeFrameOverrides={timeFrameOverrides}
-            cardProviders={cardProviders}
+            cardNamedFormulas={cardNamedFormulas}
             accounts={accounts}
-            onEdit={() => handleEditCardProvider(name)}
+            onEdit={() => handleEditCardNamedFormula(name)}
             onInsert={
-              onInsertProvider ? () => onInsertProvider(name) : undefined
+              onInsertNamedFormula
+                ? () => onInsertNamedFormula(name)
+                : undefined
             }
             onMakeShared={
-              findLibraryProvider(name)
+              findLibraryNamedFormula(name)
                 ? undefined
-                : () => void handleMakeProviderShared(name)
+                : () => void handleMakeNamedFormulaShared(name)
             }
-            onRemove={() => handleRemoveCardProvider(name)}
+            onRemove={() => handleRemoveCardNamedFormula(name)}
           />
         ))
       )}
 
-      {libraryProviders.length > 0 && (
+      {libraryNamedFormulas.length > 0 && (
         <View style={{ marginTop: 8 }}>
           <View
             style={{
@@ -617,40 +637,42 @@ export function QueryManager({
             }}
           >
             <Toggle
-              id="query-manager-show-providers"
-              isOn={areProvidersShown}
-              onToggle={setShowProviders}
+              id="query-manager-show-named-formulas"
+              isOn={areNamedFormulasShown}
+              onToggle={setShowNamedFormulas}
             />
-            <label htmlFor="query-manager-show-providers">
-              <Trans count={libraryProviders.length}>
-                Show library providers ({{ count: libraryProviders.length }})
+            <label htmlFor="query-manager-show-named-formulas">
+              <Trans count={libraryNamedFormulas.length}>
+                Show library named formulas (
+                {{ count: libraryNamedFormulas.length }})
               </Trans>
             </label>
           </View>
-          {areProvidersShown &&
-            libraryProviders.map(item => {
+          {areNamedFormulasShown &&
+            libraryNamedFormulas.map(item => {
               const isHidden =
-                findCardProviderName(cardProviders, item.name) !== undefined;
+                findCardNamedFormulaName(cardNamedFormulas, item.name) !==
+                undefined;
               return (
-                <ProviderItem
+                <NamedFormulaItem
                   key={item.id}
                   name={item.name}
                   data={item.data}
                   isHidden={isHidden}
                   queries={queries}
                   timeFrameOverrides={timeFrameOverrides}
-                  cardProviders={cardProviders}
+                  cardNamedFormulas={cardNamedFormulas}
                   accounts={accounts}
-                  onEdit={() => handleEditProvider(item)}
+                  onEdit={() => handleEditNamedFormula(item)}
                   onInsert={
-                    onInsertProvider && !isHidden
-                      ? () => onInsertProvider(item.name)
+                    onInsertNamedFormula && !isHidden
+                      ? () => onInsertNamedFormula(item.name)
                       : undefined
                   }
                   onCopyIntoCard={
                     isHidden
                       ? undefined
-                      : () => handleCopyProviderIntoCard(item)
+                      : () => handleCopyNamedFormulaIntoCard(item)
                   }
                 />
               );

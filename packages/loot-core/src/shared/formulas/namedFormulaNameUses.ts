@@ -1,4 +1,4 @@
-// A formula refers to a provider by its name without quotes, for example
+// A formula refers to a named formula by its name without quotes, for example
 // =NetIncome / 12. HyperFormula reads such a name as a named expression.
 
 // The letters that HyperFormula allows in a named expression
@@ -13,28 +13,28 @@ const NAME_PART = new RegExp(`[${LETTERS}0-9_.$]`);
 const RESERVED_NAMES = new Set(['RESULT', 'TRUE', 'FALSE']);
 const RESERVED_PREFIX = 'THEME_';
 
-export type ProviderNameReference = {
+export type NamedFormulaNameReference = {
   name: string;
   start: number;
   end: number;
 };
 
-export function isSameProviderName(a: string, b: string) {
+export function isSameNamedFormulaName(a: string, b: string) {
   return a.toUpperCase() === b.toUpperCase();
 }
 
-export function isReservedProviderName(name: string) {
+export function isReservedNamedFormulaName(name: string) {
   const upperName = name.toUpperCase();
   return RESERVED_NAMES.has(upperName) || upperName.startsWith(RESERVED_PREFIX);
 }
 
 // The HyperFormula named-expression rules, and no reserved name
-export function isValidProviderName(name: string) {
+export function isValidNamedFormulaName(name: string) {
   return (
     NAME_PATTERN.test(name) &&
     !A1_REFERENCE_PATTERN.test(name) &&
     !R1C1_REFERENCE_PATTERN.test(name) &&
-    !isReservedProviderName(name)
+    !isReservedNamedFormulaName(name)
   );
 }
 
@@ -64,11 +64,11 @@ function skipQuoted(formula: string, index: number) {
 }
 
 // Finds the names in a formula that are not functions, cell references, sheet
-// names, or text. Each one is a provider name or an unknown name.
-export function findProviderNameReferences(
+// names, or text. Each one is a named formula name or an unknown name.
+export function findNamedFormulaNameReferences(
   formula: string,
-): ProviderNameReference[] {
-  const references: ProviderNameReference[] = [];
+): NamedFormulaNameReference[] {
+  const references: NamedFormulaNameReference[] = [];
   let index = 0;
 
   while (index < formula.length) {
@@ -103,7 +103,12 @@ export function findProviderNameReferences(
     const isSheetName = next === '!';
     const isRange = next === ':' || formula[start - 1] === ':';
 
-    if (!isFunction && !isSheetName && !isRange && isValidProviderName(name)) {
+    if (
+      !isFunction &&
+      !isSheetName &&
+      !isRange &&
+      isValidNamedFormulaName(name)
+    ) {
       references.push({ name, start, end: index });
     }
   }
@@ -111,13 +116,13 @@ export function findProviderNameReferences(
   return references;
 }
 
-export function formulaUsesProviderName(formula: string, name: string) {
-  return findProviderNameReferences(formula).some(reference =>
-    isSameProviderName(reference.name, name),
+export function formulaUsesNamedFormulaName(formula: string, name: string) {
+  return findNamedFormulaNameReferences(formula).some(reference =>
+    isSameNamedFormulaName(reference.name, name),
   );
 }
 
-export function renameProviderInFormula(
+export function renameNamedFormulaInFormula(
   formula: string,
   oldName: string,
   newName: string,
@@ -125,8 +130,8 @@ export function renameProviderInFormula(
   let renamed = formula;
 
   // Replace from the end, so that the earlier positions stay correct
-  for (const reference of findProviderNameReferences(formula).reverse()) {
-    if (isSameProviderName(reference.name, oldName)) {
+  for (const reference of findNamedFormulaNameReferences(formula).reverse()) {
+    if (isSameNamedFormulaName(reference.name, oldName)) {
       renamed =
         renamed.slice(0, reference.start) +
         newName +

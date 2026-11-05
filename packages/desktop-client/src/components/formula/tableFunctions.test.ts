@@ -12,8 +12,14 @@ vi.mock('@actual-app/core/platform/client/connection', () => ({
 const spending =
   '{"Bills","Rent",-20;"Bills","Power",-50;"Food","Groceries",-120}';
 
-function provider(name: string, formula: string): FormulaLibraryItemEntity {
-  return { id: name, type: 'provider', name, data: { formula }, created_at: 0 };
+function namedFormula(name: string, formula: string): FormulaLibraryItemEntity {
+  return {
+    id: name,
+    type: 'named-formula',
+    name,
+    data: { formula },
+    created_at: 0,
+  };
 }
 
 async function run(formula: string, library: FormulaLibraryItemEntity[] = []) {
@@ -151,10 +157,10 @@ describe('FILTER', () => {
     );
   });
 
-  it('filters a table provider by its amount column', async () => {
+  it('filters a table named formula by its amount column', async () => {
     expect(
       await run('=FILTER(Spending, CHOOSECOLS(Spending, 3) < -30)', [
-        provider('Spending', `=${spending}`),
+        namedFormula('Spending', `=${spending}`),
       ]),
     ).toEqual([
       ['Bills', 'Power', -50],
@@ -162,11 +168,11 @@ describe('FILTER', () => {
     ]);
   });
 
-  it('gives a provider only the rows that match', async () => {
+  it('gives a named formula only the rows that match', async () => {
     // FILTER gets space for 3 rows before it runs, but 2 rows match
     expect(
       await run('=ROWS(Matches)', [
-        provider(
+        namedFormula(
           'Matches',
           `=FILTER(${spending}, CHOOSECOLS(${spending}, 3) < -30)`,
         ),

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findFormulaQueryUses,
-  findProviderUses,
+  findNamedFormulaUses,
   isOverriddenLibraryItem,
 } from './formulaQueryUses';
 
@@ -95,7 +95,7 @@ describe('findFormulaQueryUses', () => {
         formula: '=QUERY("food")',
         queries: { food: {} },
       }),
-      formulaWidget('provider', 'main', { formula: '=food' }),
+      formulaWidget('named-formula', 'main', { formula: '=food' }),
     ];
 
     expect(
@@ -116,8 +116,8 @@ describe('isOverriddenLibraryItem', () => {
         created_at: 2,
       },
       {
-        id: 'provider',
-        type: 'provider',
+        id: 'named-formula',
+        type: 'named-formula',
         name: 'food',
         data: { formula: '=1' },
         created_at: 3,
@@ -130,12 +130,12 @@ describe('isOverriddenLibraryItem', () => {
   });
 });
 
-describe('findFormulaQueryUses for a provider', () => {
+describe('findFormulaQueryUses for a named formula', () => {
   it('lists the cards that use the name without quotes', () => {
     const widgets = [
       formulaWidget('uses', 'main', {
         formula: '=Net * 2',
-        // A card query does not hide a provider
+        // A card query does not hide a named formula
         queries: { Net: {} },
       }),
       formulaWidget('text', 'main', { formula: '="Net" & QUERY("Net")' }),
@@ -143,27 +143,31 @@ describe('findFormulaQueryUses for a provider', () => {
 
     expect(
       findFormulaQueryUses(
-        { type: 'provider', name: 'net' },
+        { type: 'named-formula', name: 'net' },
         widgets,
         pages,
       ).map(({ widgetId }) => widgetId),
     ).toEqual(['uses']);
   });
 
-  it('finds uses in card providers, and skips a card provider of the same name', () => {
+  it('finds uses in card named formulas, and skips a card named formula of the same name', () => {
     const widgets = [
       formulaWidget('card', 'main', {
         formula: '=Yearly',
-        providers: { Yearly: { formula: '=Net * 12' } },
+        namedFormulas: { Yearly: { formula: '=Net * 12' } },
       }),
       formulaWidget('hidden', 'main', {
         formula: '=Net',
-        providers: { NET: { formula: '=1' } },
+        namedFormulas: { NET: { formula: '=1' } },
       }),
     ];
 
     expect(
-      findFormulaQueryUses({ type: 'provider', name: 'Net' }, widgets, pages),
+      findFormulaQueryUses(
+        { type: 'named-formula', name: 'Net' },
+        widgets,
+        pages,
+      ),
     ).toEqual([
       expect.objectContaining({
         widgetId: 'card',
@@ -173,32 +177,37 @@ describe('findFormulaQueryUses for a provider', () => {
   });
 });
 
-describe('findProviderUses', () => {
-  function provider(name: string, formula: string): FormulaLibraryItemEntity {
+describe('findNamedFormulaUses', () => {
+  function namedFormula(
+    name: string,
+    formula: string,
+  ): FormulaLibraryItemEntity {
     return {
       id: name,
-      type: 'provider',
+      type: 'named-formula',
       name,
       data: { formula },
       created_at: 0,
     };
   }
 
-  it('lists the other providers that use a query or provider', () => {
+  it('lists the other named formulas that use a query or named formula', () => {
     const library = [
-      provider('Yearly', '=Net * 12'),
-      provider('Net', '=QUERY("food") - Net'),
-      provider('Other', '=QUERY("rent")'),
+      namedFormula('Yearly', '=Net * 12'),
+      namedFormula('Net', '=QUERY("food") - Net'),
+      namedFormula('Other', '=QUERY("rent")'),
     ];
 
     expect(
-      findProviderUses(
-        { id: 'Net', type: 'provider', name: 'net' },
+      findNamedFormulaUses(
+        { id: 'Net', type: 'named-formula', name: 'net' },
         library,
       ).map(({ name }) => name),
     ).toEqual(['Yearly']);
     expect(
-      findProviderUses({ id: 'q', ...food }, library).map(({ name }) => name),
+      findNamedFormulaUses({ id: 'q', ...food }, library).map(
+        ({ name }) => name,
+      ),
     ).toEqual(['Net']);
   });
 });

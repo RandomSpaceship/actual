@@ -97,9 +97,9 @@ export function EditFormulaLibraryAqlQueryModal({
   );
 
   const trimmedName = name.trim();
-  const { cards: uses, providers: providerUses } = item
+  const { cards: uses, namedFormulas: namedFormulaUses } = item
     ? findUses(item)
-    : { cards: [], providers: [] };
+    : { cards: [], namedFormulas: [] };
   const isRename = item !== undefined && trimmedName !== item.name;
   const aqlDescription = describeAqlQuery(aql);
   const { query: parsedQuery } = parseAqlQuery(aql);
@@ -193,7 +193,7 @@ export function EditFormulaLibraryAqlQueryModal({
     setIsRowLimitErrorShown(true);
     if (error || aqlDescription.error !== undefined || rowLimitError) return;
 
-    if (isRename && uses.length + providerUses.length > 0) {
+    if (isRename && uses.length + namedFormulaUses.length > 0) {
       setRenameWidgetIds(new Set(uses.map(use => use.widgetId)));
       return;
     }
@@ -219,17 +219,17 @@ export function EditFormulaLibraryAqlQueryModal({
                   name.
                 </Trans>
               </Paragraph>
-              {providerUses.length > 0 && (
+              {namedFormulaUses.length > 0 && (
                 <Paragraph>
-                  <Trans count={providerUses.length}>
-                    {{ count: providerUses.length }} providers use the query.
-                    They change too.
+                  <Trans count={namedFormulaUses.length}>
+                    {{ count: namedFormulaUses.length }} named formulas use the
+                    query. They change too.
                   </Trans>
                 </Paragraph>
               )}
               <FormulaQueryUsesList
                 uses={uses}
-                providers={providerUses}
+                namedFormulas={namedFormulaUses}
                 checkedWidgetIds={renameWidgetIds}
                 onCheckedChange={(widgetId, checked) => {
                   const next = new Set(renameWidgetIds);

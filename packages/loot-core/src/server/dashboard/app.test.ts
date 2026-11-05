@@ -295,7 +295,7 @@ describe('dashboard-import', () => {
     ).rejects.toThrow('formulaLibrary.0.name');
   });
 
-  it('rejects a provider with a bad name or formula', async () => {
+  it('rejects a named formula with a bad name or formula', async () => {
     await expect(
       importFile({
         version: 1,
@@ -303,7 +303,7 @@ describe('dashboard-import', () => {
         formulaLibrary: [
           {
             id: 'item-id',
-            type: 'provider',
+            type: 'named-formula',
             name: 'A1',
             data: { formula: '=1' },
           },
@@ -317,7 +317,7 @@ describe('dashboard-import', () => {
         formulaLibrary: [
           {
             id: 'item-id',
-            type: 'provider',
+            type: 'named-formula',
             name: 'Net',
             data: { formula: '1' },
           },
@@ -326,10 +326,10 @@ describe('dashboard-import', () => {
     ).rejects.toThrow('formulaLibrary.0.data.formula');
   });
 
-  it('imports a provider with a new name when the library has a different one', async () => {
+  it('imports a named formula with a new name when the library has a different one', async () => {
     await db.insertWithSchema('formula_library', {
       id: 'local-net-id',
-      type: 'provider',
+      type: 'named-formula',
       name: 'Net',
       data: { formula: '=2' },
       created_at: 1,
@@ -341,7 +341,7 @@ describe('dashboard-import', () => {
       formulaLibrary: [
         {
           id: 'net-id',
-          type: 'provider',
+          type: 'named-formula',
           name: 'Net',
           data: { formula: '=1' },
         },

@@ -1,8 +1,8 @@
 import type { ForecastSeries, ForecastSource } from './forecast';
 import type {
   FormulaLibraryAqlQueryEntity,
-  FormulaLibraryProviderData,
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaData,
+  FormulaLibraryNamedFormulaEntity,
   FormulaLibraryQueryEntity,
 } from './formula-library';
 import type { CustomReportEntity } from './reports';
@@ -408,7 +408,7 @@ export type ExportImportDashboard = {
   // future versions
   version: 1;
   widgets: ExportImportDashboardWidget[];
-  // The library queries and providers that the formula cards use
+  // The library queries and named formulas that the formula cards use
   formulaLibrary?: ExportImportFormulaLibraryItem[];
 };
 
@@ -417,8 +417,8 @@ export type ExportImportFormulaLibraryQuery = Pick<
   'id' | 'type' | 'name' | 'data'
 >;
 
-export type ExportImportFormulaLibraryProvider = Pick<
-  FormulaLibraryProviderEntity,
+export type ExportImportFormulaLibraryNamedFormula = Pick<
+  FormulaLibraryNamedFormulaEntity,
   'id' | 'type' | 'name' | 'data'
 >;
 
@@ -430,7 +430,7 @@ export type ExportImportFormulaLibraryAqlQuery = Pick<
 export type ExportImportFormulaLibraryItem =
   | ExportImportFormulaLibraryQuery
   | ExportImportFormulaLibraryAqlQuery
-  | ExportImportFormulaLibraryProvider;
+  | ExportImportFormulaLibraryNamedFormula;
 
 export type SummaryWidget = AbstractWidget<
   'summary-card',
@@ -505,9 +505,9 @@ export type FormulaWidget = AbstractWidget<
     >;
     // Keyed by library item id
     timeFrameOverrides?: Record<string, FormulaTimeFrameOverride>;
-    // The card's own providers, keyed by name. A card provider wins over a
-    // library provider with the same name, also in library providers.
-    providers?: Record<string, FormulaLibraryProviderData>;
+    // The card's own named formulas, keyed by name. A card named formula wins over a
+    // library named formula with the same name, also in library named formulas.
+    namedFormulas?: Record<string, FormulaLibraryNamedFormulaData>;
   } | null
 >;
 

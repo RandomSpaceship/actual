@@ -53,8 +53,8 @@ import {
   getFormulaFunctionCategoryConfig,
   getFunctionCompletions,
   getFunctionSignatureCompletionSection,
+  getNamedFormulaCompletions,
   getNamedVariableCompletions,
-  getProviderCompletions,
   getRuleFieldCompletions,
   sortFormulaCompletions,
 } from './formulaCatalog';
@@ -602,12 +602,12 @@ export function excelFormulaAutocomplete(
   queries?: Record<string, unknown>,
   variables?: Record<string, number | string>,
   categoryBadges?: Record<string, string>,
-  // Keyed by name. The value is the provider formula
-  providers?: Record<string, string>,
+  // Keyed by name. The value is the named formula formula
+  namedFormulas?: Record<string, string>,
 ): Extension {
   const functionCompletions = getFunctionCompletions(mode);
-  const providerCompletions =
-    mode === 'query' ? getProviderCompletions(providers) : [];
+  const namedFormulaCompletions =
+    mode === 'query' ? getNamedFormulaCompletions(namedFormulas) : [];
   const queryCompletions =
     mode === 'query' ? getDynamicReportQueryCompletions(queries) : [];
   const variableCompletions = getNamedVariableCompletions(variables);
@@ -661,7 +661,7 @@ export function excelFormulaAutocomplete(
 
         const baseSuggestions: Completion[] = [
           ...variableCompletions,
-          ...providerCompletions,
+          ...namedFormulaCompletions,
           ...budgetDimensionCompletions,
           ...budgetCategoryCompletions,
           ...queryCompletions,
@@ -1182,7 +1182,7 @@ export function excelFormulaExtension(
   variables?: Record<string, number | string>,
   onBadgeClick?: (details: FormulaBadgeClick) => void,
   categoryBadges?: Record<string, string>,
-  providers?: Record<string, string>,
+  namedFormulas?: Record<string, string>,
 ): Extension[] {
   return [
     excelFormulaLanguage,
@@ -1191,7 +1191,7 @@ export function excelFormulaExtension(
       queries,
       variables,
       categoryBadges,
-      providers,
+      namedFormulas,
     ),
     excelFormulaHover(mode),
     formulaBadgeExtension(

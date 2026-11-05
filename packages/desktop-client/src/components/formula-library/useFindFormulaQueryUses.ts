@@ -6,11 +6,11 @@ import { dashboardQueries } from '#reports';
 
 import {
   findFormulaQueryUses,
-  findProviderUses,
+  findNamedFormulaUses,
   isOverriddenLibraryItem,
 } from './formulaQueryUses';
 
-// The cards and the providers that use a library item
+// The cards and the named formulas that use a library item
 export function useFindFormulaQueryUses() {
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
   const { data: widgets = [] } = useQuery(
@@ -22,9 +22,9 @@ export function useFindFormulaQueryUses() {
 
   return (item: FormulaLibraryItemEntity) =>
     isOverriddenLibraryItem(item, library)
-      ? { cards: [], providers: [] }
+      ? { cards: [], namedFormulas: [] }
       : {
           cards: findFormulaQueryUses(item, widgets, dashboardPages),
-          providers: findProviderUses(item, library),
+          namedFormulas: findNamedFormulaUses(item, library),
         };
 }

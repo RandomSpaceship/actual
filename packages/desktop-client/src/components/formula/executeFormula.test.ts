@@ -10,8 +10,14 @@ vi.mock('@actual-app/core/platform/client/connection', () => ({
   send: vi.fn(),
 }));
 
-function provider(name: string, formula: string): FormulaLibraryItemEntity {
-  return { id: name, type: 'provider', name, data: { formula }, created_at: 0 };
+function namedFormula(name: string, formula: string): FormulaLibraryItemEntity {
+  return {
+    id: name,
+    type: 'named-formula',
+    name,
+    data: { formula },
+    created_at: 0,
+  };
 }
 
 const localQueries = {
@@ -60,10 +66,10 @@ beforeEach(() => {
 });
 
 describe('executeFormula', () => {
-  it('evaluates the providers that the formula uses', async () => {
+  it('evaluates the named formulas that the formula uses', async () => {
     const library = [
-      provider('Doubled', '=QUERY("a") * 2'),
-      provider('Total', '=Doubled + QUERY_COUNT("b")'),
+      namedFormula('Doubled', '=QUERY("a") * 2'),
+      namedFormula('Total', '=Doubled + QUERY_COUNT("b")'),
     ];
 
     expect(await run('=total / 2', library)).toEqual({
@@ -72,10 +78,10 @@ describe('executeFormula', () => {
     });
   });
 
-  it('evaluates card providers, also in library providers', async () => {
+  it('evaluates card named formulas, also in library named formulas', async () => {
     const library = [
-      provider('Total', '=Doubled + 1'),
-      provider('Doubled', '=1000'),
+      namedFormula('Total', '=Doubled + 1'),
+      namedFormula('Doubled', '=1000'),
     ];
 
     const result = await executeFormula({
@@ -83,7 +89,7 @@ describe('executeFormula', () => {
       resolveQuery: name => resolveQuery(name, { localQueries, library }),
       accounts: [],
       library,
-      cardProviders: { Doubled: { formula: '=QUERY("a") * 2' } },
+      cardNamedFormulas: { Doubled: { formula: '=QUERY("a") * 2' } },
       language: 'en-US',
     });
 
@@ -99,47 +105,47 @@ describe('executeFormula', () => {
     expect(result).toEqual({ value: 9.99, issues: [] });
   });
 
-  it('gives an error for an unknown provider', async () => {
+  it('gives an error for an unknown named formula', async () => {
     expect(await run('=Missing + 1')).toEqual({
       value: null,
       issues: [
         expect.objectContaining({
-          kind: 'missing-provider',
-          message: 'Provider "Missing" not found',
+          kind: 'missing-named-formula',
+          message: 'Named formula "Missing" not found',
         }),
       ],
     });
   });
 
-  it('gives an error for providers that use each other', async () => {
-    const result = await run('=Loop', [provider('Loop', '=Loop + 1')]);
+  it('gives an error for named formulas that use each other', async () => {
+    const result = await run('=Loop', [namedFormula('Loop', '=Loop + 1')]);
 
     expect(result.value).toBeNull();
     expect(result.issues).toEqual([
-      expect.objectContaining({ kind: 'provider-cycle' }),
+      expect.objectContaining({ kind: 'named-formula-cycle' }),
     ]);
   });
 
-  it('names the provider that gives an error', async () => {
+  it('names the named formula that gives an error', async () => {
     const result = await run('=Outer', [
-      provider('Outer', '=Inner + 1'),
-      provider('Inner', '=1 / 0'),
+      namedFormula('Outer', '=Inner + 1'),
+      namedFormula('Inner', '=1 / 0'),
     ]);
 
     expect(result).toEqual({
       value: null,
       issues: [
         expect.objectContaining({
-          kind: 'provider-error',
-          message: 'Provider "Inner" gives the error #DIV/0!',
+          kind: 'named-formula-error',
+          message: 'Named formula "Inner" gives the error #DIV/0!',
         }),
       ],
     });
   });
 
-  it('does not give a provider error when the formula handles the error', async () => {
+  it('does not give a named formula error when the formula handles the error', async () => {
     expect(
-      await run('=IFERROR(Inner, 7)', [provider('Inner', '=1 / 0')]),
+      await run('=IFERROR(Inner, 7)', [namedFormula('Inner', '=1 / 0')]),
     ).toEqual({ value: 7, issues: [] });
   });
 
@@ -217,9 +223,13 @@ describe('executeFormula', () => {
     ]);
   });
 
-  it('uses a provider that gives one value in a table formula', async () => {
+  it('uses a named formula that gives one value in a table formula', async () => {
     expect(
-      await run('={Base, Base + 1}', [provider('Base', '=QUERY("a")')], 'auto'),
+      await run(
+        '={Base, Base + 1}',
+        [namedFormula('Base', '=QUERY("a")')],
+        'auto',
+      ),
     ).toEqual({
       value: null,
       table: [[123.45, 124.45]],
@@ -228,8 +238,8 @@ describe('executeFormula', () => {
     });
   });
 
-  it('uses a provider that gives a table', async () => {
-    const grid = provider('Grid', '=SEQUENCE(3, 2)');
+  it('uses a named formula that gives a table', async () => {
+    const grid = namedFormula('Grid', '=SEQUENCE(3, 2)');
 
     expect(await run('=INDEX(Grid, 3, 2) + SUM(Grid)', [grid])).toEqual({
       value: 6 + 21,
@@ -254,12 +264,12 @@ describe('executeFormula', () => {
     ).toBe(4 + 3);
   });
 
-  it('uses a provider that gives a table in another provider', async () => {
+  it('uses a named formula that gives a table in another named formula', async () => {
     const result = await run(
       '=Sorted',
       [
-        provider('Sorted', '=SORT(Grid, 1, -1)'),
-        provider('Grid', '={1, "a"; 3, "b"; 2, "c"}'),
+        namedFormula('Sorted', '=SORT(Grid, 1, -1)'),
+        namedFormula('Grid', '={1, "a"; 3, "b"; 2, "c"}'),
       ],
       'auto',
     );
@@ -271,24 +281,24 @@ describe('executeFormula', () => {
     ]);
   });
 
-  it('gives a table with more than 26 columns from a provider', async () => {
+  it('gives a table with more than 26 columns from a named formula', async () => {
     const result = await run('=INDEX(Wide, 1, 30)', [
-      provider('Wide', '=TRANSPOSE(SEQUENCE(30))'),
+      namedFormula('Wide', '=TRANSPOSE(SEQUENCE(30))'),
     ]);
 
     expect(result.value).toBe(30);
   });
 
-  it('names the provider that gives an error, also next to a table provider', async () => {
+  it('names the named formula that gives an error, also next to a table named formula', async () => {
     const result = await run('=SUM(Grid) + Other', [
-      provider('Grid', '=SEQUENCE(2, 2)'),
-      provider('Other', '=1 / 0'),
+      namedFormula('Grid', '=SEQUENCE(2, 2)'),
+      namedFormula('Other', '=1 / 0'),
     ]);
 
     expect(result).toEqual({
       value: null,
       issues: [
-        expect.objectContaining({ kind: 'provider-error', name: 'Other' }),
+        expect.objectContaining({ kind: 'named-formula-error', name: 'Other' }),
       ],
     });
   });

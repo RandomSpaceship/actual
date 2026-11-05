@@ -228,8 +228,8 @@ describe('planFormulaLibraryImport', () => {
   });
 });
 
-describe('providers in a dashboard export and import', () => {
-  function libraryProvider(
+describe('named formulas in a dashboard export and import', () => {
+  function libraryNamedFormula(
     id: string,
     name: string,
     formula: string,
@@ -237,17 +237,17 @@ describe('providers in a dashboard export and import', () => {
   ): FormulaLibraryItemEntity {
     return {
       id,
-      type: 'provider',
+      type: 'named-formula',
       name,
       data: { formula },
       created_at: createdAt,
     };
   }
 
-  function exportedProvider(name: string, formula: string) {
+  function exportedNamedFormula(name: string, formula: string) {
     return {
       id: `exported-${name}`,
-      type: 'provider' as const,
+      type: 'named-formula' as const,
       name,
       data: { formula },
     };
@@ -258,17 +258,17 @@ describe('providers in a dashboard export and import', () => {
     return () => `new-id-${++count}`;
   }
 
-  it('exports the providers that a card uses, and the queries that they use', () => {
+  it('exports the named formulas that a card uses, and the queries that they use', () => {
     const library = [
       libraryQuery('food-id', 'Food', 1),
       libraryQuery('rent-id', 'Rent', 2),
-      libraryProvider('net-id', 'Net', '=Spending * 2'),
-      libraryProvider(
+      libraryNamedFormula('net-id', 'Net', '=Spending * 2'),
+      libraryNamedFormula(
         'spending-id',
         'Spending',
         '=QUERY("food") + QUERY("rent")',
       ),
-      libraryProvider('unused-id', 'Unused', '=1'),
+      libraryNamedFormula('unused-id', 'Unused', '=1'),
     ];
 
     expect(
@@ -279,12 +279,12 @@ describe('providers in a dashboard export and import', () => {
     ).toEqual(['food-id', 'net-id', 'spending-id']);
   });
 
-  it('exports what the card providers use, and not the names that they hide', () => {
+  it('exports what the card named formulas use, and not the names that they hide', () => {
     const library = [
       libraryQuery('food-id', 'Food', 1),
-      libraryProvider('net-id', 'Net', '=Base * 2'),
-      libraryProvider('base-id', 'Base', '=QUERY("rent")'),
-      libraryProvider('yearly-id', 'Yearly', '=1'),
+      libraryNamedFormula('net-id', 'Net', '=Base * 2'),
+      libraryNamedFormula('base-id', 'Base', '=QUERY("rent")'),
+      libraryNamedFormula('yearly-id', 'Yearly', '=1'),
     ];
 
     expect(
@@ -292,7 +292,7 @@ describe('providers in a dashboard export and import', () => {
         [
           formulaWidget({
             formula: '=Yearly',
-            providers: {
+            namedFormulas: {
               YEARLY: { formula: '=Net * 12' },
               base: { formula: '=QUERY("food")' },
             },
@@ -303,49 +303,49 @@ describe('providers in a dashboard export and import', () => {
     ).toEqual(['food-id', 'net-id']);
   });
 
-  it('renames an imported provider in card providers, but not a name that a card provider hides', () => {
+  it('renames an imported named formula in card named formulas, but not a name that a card named formula hides', () => {
     const plan = planFormulaLibraryImport(
       [
         formulaWidget({
           formula: '=Yearly + Hidden',
-          providers: {
+          namedFormulas: {
             Yearly: { formula: '=Net * 12', description: 'Per year' },
             HIDDEN: { formula: '=Net' },
           },
         }),
       ],
-      [exportedProvider('Net', '=1'), exportedProvider('Hidden', '=2')],
+      [exportedNamedFormula('Net', '=1'), exportedNamedFormula('Hidden', '=2')],
       [
-        libraryProvider('net-id', 'Net', '=2'),
-        libraryProvider('hidden-id', 'Hidden', '=3'),
+        libraryNamedFormula('net-id', 'Net', '=2'),
+        libraryNamedFormula('hidden-id', 'Hidden', '=3'),
       ],
       createIds(),
     );
 
     expect(plan.widgets[0].meta).toMatchObject({
       formula: '=Yearly + Hidden',
-      providers: {
+      namedFormulas: {
         Yearly: { formula: '=Net_2 * 12', description: 'Per year' },
         HIDDEN: { formula: '=Net_2' },
       },
     });
   });
 
-  it('reuses an identical provider and creates a new one', () => {
+  it('reuses an identical named formula and creates a new one', () => {
     const plan = planFormulaLibraryImport(
       [formulaWidget({ formula: '=Net + Other' })],
-      [exportedProvider('Net', '=1'), exportedProvider('Other', '=2')],
-      [libraryProvider('net-id', 'NET', '=1')],
+      [exportedNamedFormula('Net', '=1'), exportedNamedFormula('Other', '=2')],
+      [libraryNamedFormula('net-id', 'NET', '=1')],
       createIds(),
     );
 
     expect(plan.itemsToCreate).toEqual([
-      { ...exportedProvider('Other', '=2'), id: 'new-id-1' },
+      { ...exportedNamedFormula('Other', '=2'), id: 'new-id-1' },
     ]);
     expect(plan.widgets[0].meta?.formula).toBe('=Net + Other');
   });
 
-  it('gives a different provider with the same name a new name in the imported formulas', () => {
+  it('gives a different named formula with the same name a new name in the imported formulas', () => {
     const plan = planFormulaLibraryImport(
       [
         formulaWidget({
@@ -353,20 +353,23 @@ describe('providers in a dashboard export and import', () => {
           colorFormula: '=IF(Net > 0, "red", "")',
         }),
       ],
-      [exportedProvider('Yearly', '=Net * 12'), exportedProvider('Net', '=1')],
       [
-        libraryProvider('net-id', 'Net', '=2'),
-        libraryProvider('net-2-id', 'Net_2', '=3'),
-        // The same text as the export, but its Net is a different provider
-        libraryProvider('yearly-id', 'Yearly', '=Net * 12'),
+        exportedNamedFormula('Yearly', '=Net * 12'),
+        exportedNamedFormula('Net', '=1'),
+      ],
+      [
+        libraryNamedFormula('net-id', 'Net', '=2'),
+        libraryNamedFormula('net-2-id', 'Net_2', '=3'),
+        // The same text as the export, but its Net is a different named formula
+        libraryNamedFormula('yearly-id', 'Yearly', '=Net * 12'),
       ],
       createIds(),
     );
 
     expect(plan.itemsToCreate).toEqual([
-      { ...exportedProvider('Net', '=1'), id: 'new-id-1', name: 'Net_3' },
+      { ...exportedNamedFormula('Net', '=1'), id: 'new-id-1', name: 'Net_3' },
       {
-        ...exportedProvider('Yearly', '=Net_3 * 12'),
+        ...exportedNamedFormula('Yearly', '=Net_3 * 12'),
         id: 'new-id-2',
         name: 'Yearly_2',
       },
@@ -377,11 +380,11 @@ describe('providers in a dashboard export and import', () => {
     });
   });
 
-  it('copies a query into the card when only a provider of the card uses it', () => {
+  it('copies a query into the card when only a named formula of the card uses it', () => {
     const plan = planFormulaLibraryImport(
       [formulaWidget({ formula: '=Doubled' })],
       [
-        exportedProvider('Doubled', '=QUERY("food") * 2'),
+        exportedNamedFormula('Doubled', '=QUERY("food") * 2'),
         {
           id: 'exported-food-id',
           type: 'query',
@@ -527,7 +530,7 @@ describe('AQL queries in a dashboard export and import', () => {
       [
         formulaWidget({
           formula: '=QUERY("coffee") + Spend',
-          providers: { Card: { formula: '=QUERY_COUNT("Coffee")' } },
+          namedFormulas: { Card: { formula: '=QUERY_COUNT("Coffee")' } },
           timeFrameOverrides: {
             'exported-coffee-id': { name: 'coffee', timeFrame: february },
           },
@@ -542,7 +545,7 @@ describe('AQL queries in a dashboard export and import', () => {
         exportedCoffee,
         {
           id: 'exported-spend-id',
-          type: 'provider',
+          type: 'named-formula',
           name: 'Spend',
           data: { formula: '=QUERY("coffee") * 2' },
         },
@@ -555,11 +558,11 @@ describe('AQL queries in a dashboard export and import', () => {
     );
 
     expect(plan.itemsToCreate).toEqual([
-      // The providers get their ids first
+      // The named formulas get their ids first
       { ...exportedCoffee, id: 'new-id-2', name: 'coffee_3' },
       {
         id: 'new-id-1',
-        type: 'provider',
+        type: 'named-formula',
         name: 'Spend',
         data: { formula: '=QUERY("coffee_3") * 2' },
       },
@@ -568,7 +571,7 @@ describe('AQL queries in a dashboard export and import', () => {
       {
         formula: '=QUERY("coffee_3") + Spend',
         colorFormula: undefined,
-        providers: { Card: { formula: '=QUERY_COUNT("coffee_3")' } },
+        namedFormulas: { Card: { formula: '=QUERY_COUNT("coffee_3")' } },
         timeFrameOverrides: {
           'new-id-2': { name: 'coffee_3', timeFrame: february },
         },

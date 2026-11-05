@@ -41,9 +41,9 @@ export type FormulaIssue = {
     | 'missing-query'
     | 'missing-account'
     | 'query-failed'
-    | 'missing-provider'
-    | 'provider-cycle'
-    | 'provider-error'
+    | 'missing-named-formula'
+    | 'named-formula-cycle'
+    | 'named-formula-error'
     | 'table-result'
     // Only the editor shows it
     | 'large-table'
@@ -58,7 +58,7 @@ export type FormulaIssue = {
     | 'shadowed'
     | 'duplicate-name'
     | 'stale-override';
-  // The query, account or provider name as written in the formula
+  // The query, account or named formula name as written in the formula
   name: string;
   message: string;
 };

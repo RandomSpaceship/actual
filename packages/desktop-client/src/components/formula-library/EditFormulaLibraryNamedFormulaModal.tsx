@@ -8,15 +8,15 @@ import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import {
-  isReservedProviderName,
-  isSameProviderName,
-  isValidProviderName,
-} from '@actual-app/core/shared/formulas/providerNameUses';
+  isReservedNamedFormulaName,
+  isSameNamedFormulaName,
+  isValidNamedFormulaName,
+} from '@actual-app/core/shared/formulas/namedFormulaNameUses';
 import type {
   AccountEntity,
   FormulaLibraryItemEntity,
-  FormulaLibraryProviderData,
-  FormulaLibraryProviderEntity,
+  FormulaLibraryNamedFormulaData,
+  FormulaLibraryNamedFormulaEntity,
   FormulaTimeFrameOverride,
 } from '@actual-app/core/types/models';
 import { useQuery } from '@tanstack/react-query';
@@ -31,10 +31,10 @@ import { FormField, FormLabel } from '#components/forms';
 import { FormulaTable } from '#components/formula/FormulaTable';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import {
-  listProviderNames,
-  resolveProviders,
-} from '#components/formula/resolveProviders';
-import type { CardProviders } from '#components/formula/resolveProviders';
+  listNamedFormulaNames,
+  resolveNamedFormulas,
+} from '#components/formula/resolveNamedFormulas';
+import type { CardNamedFormulas } from '#components/formula/resolveNamedFormulas';
 import { listQueryNames } from '#components/formula/resolveQuery';
 import type { FormulaQueryConfig } from '#components/formula/resolveQuery';
 import { FormulaResult } from '#components/reports/FormulaResult';
@@ -57,31 +57,31 @@ const FormulaEditor = lazy(() =>
 
 // Stable identities, so the preview does not run again on each render
 const NO_CARD_QUERIES = {};
-const NO_CARD_PROVIDERS: CardProviders = {};
+const NO_CARD_NAMED_FORMULAS: CardNamedFormulas = {};
 const NO_ACCOUNTS: AccountEntity[] = [];
 
-// A provider of one card. The card editor keeps it until the card is saved.
-export type CardProviderEditContext = {
-  // Without it, the modal creates a new card provider
+// A named formula of one card. The card editor keeps it until the card is saved.
+export type CardNamedFormulaEditContext = {
+  // Without it, the modal creates a new card named formula
   name?: string;
-  providers: CardProviders;
+  namedFormulas: CardNamedFormulas;
   queries: Record<string, FormulaQueryConfig>;
   // Keyed by library item id
   timeFrameOverrides: Record<string, FormulaTimeFrameOverride>;
-  onSave: (name: string, data: FormulaLibraryProviderData) => void;
+  onSave: (name: string, data: FormulaLibraryNamedFormulaData) => void;
 };
 
-type EditFormulaLibraryProviderModalProps = {
-  // Without it, the modal creates a new provider
-  item?: FormulaLibraryProviderEntity;
-  // Set to edit a card provider in place of a library provider
-  card?: CardProviderEditContext;
+type EditFormulaLibraryNamedFormulaModalProps = {
+  // Without it, the modal creates a new named formula
+  item?: FormulaLibraryNamedFormulaEntity;
+  // Set to edit a card named formula in place of a library named formula
+  card?: CardNamedFormulaEditContext;
 };
 
-export function EditFormulaLibraryProviderModal({
+export function EditFormulaLibraryNamedFormulaModal({
   item,
   card,
-}: EditFormulaLibraryProviderModalProps) {
+}: EditFormulaLibraryNamedFormulaModalProps) {
   const { t } = useTranslation();
   const { data: library = [] } = useQuery(formulaLibraryQueries.list());
   const findUses = useFindFormulaQueryUses();
@@ -89,14 +89,14 @@ export function EditFormulaLibraryProviderModal({
   const updateItem = useUpdateFormulaLibraryItemMutation();
   const accounts = useAccounts().data ?? NO_ACCOUNTS;
 
-  const cardProvider =
-    card?.name !== undefined ? card.providers[card.name] : undefined;
+  const cardNamedFormula =
+    card?.name !== undefined ? card.namedFormulas[card.name] : undefined;
   const [name, setName] = useState(item?.name ?? card?.name ?? '');
   const [description, setDescription] = useState(
-    item?.data.description ?? cardProvider?.description ?? '',
+    item?.data.description ?? cardNamedFormula?.description ?? '',
   );
   const [formula, setFormula] = useState(
-    item?.data.formula ?? cardProvider?.formula ?? '=',
+    item?.data.formula ?? cardNamedFormula?.formula ?? '=',
   );
   const [nameError, setNameError] = useState<string | null>(null);
   const [formulaError, setFormulaError] = useState<string | null>(null);
@@ -106,46 +106,47 @@ export function EditFormulaLibraryProviderModal({
   );
 
   const trimmedName = name.trim();
-  const { cards: uses, providers: providerUses } = item
+  const { cards: uses, namedFormulas: namedFormulaUses } = item
     ? findUses(item)
-    : { cards: [], providers: [] };
+    : { cards: [], namedFormulas: [] };
   const isRename = item !== undefined && trimmedName !== item.name;
 
-  // The other providers of the card
-  const otherCardProviders = Object.fromEntries(
-    Object.entries(card?.providers ?? NO_CARD_PROVIDERS).filter(
-      ([providerName]) => providerName !== card?.name,
+  // The other named formulas of the card
+  const otherCardNamedFormulas = Object.fromEntries(
+    Object.entries(card?.namedFormulas ?? NO_CARD_NAMED_FORMULAS).filter(
+      ([namedFormulaName]) => namedFormulaName !== card?.name,
     ),
   );
-  // The card providers as they are after the save
-  const editedCardProviders: CardProviders = card
-    ? { ...otherCardProviders, [trimmedName]: { formula } }
-    : NO_CARD_PROVIDERS;
+  // The card named formulas as they are after the save
+  const editedCardNamedFormulas: CardNamedFormulas = card
+    ? { ...otherCardNamedFormulas, [trimmedName]: { formula } }
+    : NO_CARD_NAMED_FORMULAS;
   const isLibraryNameHidden =
     card !== undefined &&
     library.some(
       libraryItem =>
-        libraryItem.type === 'provider' &&
-        isSameProviderName(libraryItem.name, trimmedName),
+        libraryItem.type === 'named-formula' &&
+        isSameNamedFormulaName(libraryItem.name, trimmedName),
     );
 
   const simpleAccounts = accounts
     .filter(account => !account.tombstone)
     .map(account => ({ id: account.id, name: account.name }));
-  // A provider uses the queries of the card that uses it. A library provider
+  // A named formula uses the queries of the card that uses it. A library named formula
   // has no card here, so its preview uses library queries only.
   // The inputs of the last run. As in the card editor, they follow your changes
   // until a run gives a large table. Then only Run and Ctrl+Enter update them.
   const [ranInputs, setRanInputs] = useState(() => ({
     formula,
-    providers: editedCardProviders,
+    namedFormulas: editedCardNamedFormulas,
   }));
   function runFormula() {
-    setRanInputs({ formula, providers: editedCardProviders });
+    setRanInputs({ formula, namedFormulas: editedCardNamedFormulas });
   }
   const isChanged =
     formula !== ranInputs.formula ||
-    JSON.stringify(editedCardProviders) !== JSON.stringify(ranInputs.providers);
+    JSON.stringify(editedCardNamedFormulas) !==
+      JSON.stringify(ranInputs.namedFormulas);
   const preview = useFormulaExecution(
     ranInputs.formula,
     card?.queries ?? NO_CARD_QUERIES,
@@ -154,7 +155,7 @@ export function EditFormulaLibraryProviderModal({
     simpleAccounts,
     card?.timeFrameOverrides,
     'auto',
-    ranInputs.providers,
+    ranInputs.namedFormulas,
   );
   const isManualRun = preview.issues.some(
     issue => issue.kind === 'large-table' || issue.kind === 'table-cut',
@@ -169,27 +170,27 @@ export function EditFormulaLibraryProviderModal({
     if (trimmedName === '') {
       return t('Enter a name');
     }
-    if (isReservedProviderName(trimmedName)) {
+    if (isReservedNamedFormulaName(trimmedName)) {
       return t('Formulas use this name for something else');
     }
-    if (!isValidProviderName(trimmedName)) {
+    if (!isValidNamedFormulaName(trimmedName)) {
       return t(
         'Use only letters, digits, _ and . in the name, with a letter or _ at the start. The name cannot look like a cell reference, for example AB12',
       );
     }
     if (
       card
-        ? Object.keys(otherCardProviders).some(providerName =>
-            isSameProviderName(providerName, trimmedName),
+        ? Object.keys(otherCardNamedFormulas).some(namedFormulaName =>
+            isSameNamedFormulaName(namedFormulaName, trimmedName),
           )
         : library.some(
             libraryItem =>
               libraryItem.id !== item?.id &&
-              libraryItem.type === 'provider' &&
-              isSameProviderName(libraryItem.name, trimmedName),
+              libraryItem.type === 'named-formula' &&
+              isSameNamedFormulaName(libraryItem.name, trimmedName),
           )
     ) {
-      return t('A provider with this name already exists');
+      return t('A named formula with this name already exists');
     }
     return null;
   }
@@ -199,25 +200,25 @@ export function EditFormulaLibraryProviderModal({
     if (!formula.trim().startsWith('=')) {
       return t('The formula must start with =');
     }
-    const editedProvider: FormulaLibraryItemEntity = {
+    const editedNamedFormula: FormulaLibraryItemEntity = {
       id: item?.id ?? '',
-      type: 'provider',
+      type: 'named-formula',
       name: trimmedName,
       data: { formula },
       created_at: item?.created_at ?? 0,
     };
     const editedLibrary = [
-      ...(item ? [] : [editedProvider]),
+      ...(item ? [] : [editedNamedFormula]),
       ...library.map(libraryItem =>
-        libraryItem.id === item?.id ? editedProvider : libraryItem,
+        libraryItem.id === item?.id ? editedNamedFormula : libraryItem,
       ),
     ];
-    const cycle = resolveProviders(
+    const cycle = resolveNamedFormulas(
       [formula],
       card ? library : editedLibrary,
       [],
-      editedCardProviders,
-    ).issues.find(issue => issue.kind === 'provider-cycle');
+      editedCardNamedFormulas,
+    ).issues.find(issue => issue.kind === 'named-formula-cycle');
     return cycle ? cycle.message : null;
   }
 
@@ -238,7 +239,7 @@ export function EditFormulaLibraryProviderModal({
       });
     } else {
       await createItem.mutateAsync({
-        type: 'provider',
+        type: 'named-formula',
         name: trimmedName,
         data,
       });
@@ -253,7 +254,7 @@ export function EditFormulaLibraryProviderModal({
     setFormulaError(newFormulaError);
     if (newNameError || newFormulaError) return;
 
-    if (isRename && uses.length + providerUses.length > 0) {
+    if (isRename && uses.length + namedFormulaUses.length > 0) {
       setRenameWidgetIds(new Set(uses.map(use => use.widgetId)));
       return;
     }
@@ -262,18 +263,18 @@ export function EditFormulaLibraryProviderModal({
   }
 
   return (
-    <Modal name="edit-formula-library-provider">
+    <Modal name="edit-formula-library-named-formula">
       {({ state }) => (
         <View style={{ width: 800, maxWidth: '100%' }}>
           <ModalHeader
             title={
               card
                 ? card.name !== undefined
-                  ? t('Edit card provider')
-                  : t('New card provider')
+                  ? t('Edit card named formula')
+                  : t('New card named formula')
                 : item
-                  ? t('Edit provider')
-                  : t('New provider')
+                  ? t('Edit named formula')
+                  : t('New named formula')
             }
             rightContent={<ModalCloseButton onPress={() => state.close()} />}
           />
@@ -283,21 +284,21 @@ export function EditFormulaLibraryProviderModal({
                 <Trans>
                   Choose the cards to change from "{{ oldName: item?.name }}" to
                   "{{ newName: trimmedName }}". A card that you do not choose
-                  shows an error until you change it or add a provider with the
-                  old name.
+                  shows an error until you change it or add a named formula with
+                  the old name.
                 </Trans>
               </Paragraph>
-              {providerUses.length > 0 && (
+              {namedFormulaUses.length > 0 && (
                 <Paragraph>
-                  <Trans count={providerUses.length}>
-                    {{ count: providerUses.length }} providers use this
-                    provider. They change too.
+                  <Trans count={namedFormulaUses.length}>
+                    {{ count: namedFormulaUses.length }} named formulas use this
+                    named formula. They change too.
                   </Trans>
                 </Paragraph>
               )}
               <FormulaQueryUsesList
                 uses={uses}
-                providers={providerUses}
+                namedFormulas={namedFormulaUses}
                 checkedWidgetIds={renameWidgetIds}
                 onCheckedChange={(widgetId, checked) => {
                   const next = new Set(renameWidgetIds);
@@ -332,10 +333,10 @@ export function EditFormulaLibraryProviderModal({
                 <FormField style={{ flex: 1 }}>
                   <FormLabel
                     title={t('Name')}
-                    htmlFor="formula-provider-name"
+                    htmlFor="formula-named-formula-name"
                   />
                   <Input
-                    id="formula-provider-name"
+                    id="formula-named-formula-name"
                     value={name}
                     onChangeValue={setName}
                     style={{ fontFamily: 'monospace' }}
@@ -349,7 +350,7 @@ export function EditFormulaLibraryProviderModal({
                     isLibraryNameHidden && (
                       <Text style={{ color: theme.warningText, marginTop: 5 }}>
                         <Trans>
-                          Hides the library provider with the same name
+                          Hides the library named formula with the same name
                         </Trans>
                       </Text>
                     )
@@ -358,10 +359,10 @@ export function EditFormulaLibraryProviderModal({
                 <FormField style={{ flex: 2 }}>
                   <FormLabel
                     title={t('Description')}
-                    htmlFor="formula-provider-description"
+                    htmlFor="formula-named-formula-description"
                   />
                   <Input
-                    id="formula-provider-description"
+                    id="formula-named-formula-description"
                     value={description}
                     onChangeValue={setDescription}
                   />
@@ -387,11 +388,11 @@ export function EditFormulaLibraryProviderModal({
                         localQueries: card?.queries ?? {},
                         library,
                       })}
-                      providers={listProviderNames(
+                      namedFormulas={listNamedFormulaNames(
                         library.filter(
                           libraryItem => libraryItem.id !== item?.id,
                         ),
-                        otherCardProviders,
+                        otherCardNamedFormulas,
                       )}
                       singleLine={false}
                       showLineNumbers

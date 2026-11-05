@@ -322,7 +322,7 @@ With the header row in the table, `INDEX` counts it as row 1. For example, `=IND
 
 ### Pick Rows and Columns of a Table
 
-These functions take a table, for example from `QUERY_GROUP` or from a [provider](#reuse-a-formula-with-providers), and give a part of it:
+These functions take a table, for example from `QUERY_GROUP` or from a [named formula](#reuse-a-formula-with-named-formulas), and give a part of it:
 
 - `CHOOSECOLS(table, 3)` gives column 3. `CHOOSECOLS(table, 1, 3)` gives columns 1 and 3. A negative number counts from the end, so `-1` is the last column.
 - `CHOOSEROWS(table, 1, 2)` gives rows 1 and 2, in the same way.
@@ -336,7 +336,7 @@ This example gives the categories with spending of more than 100. The amount is 
 =FILTER(QUERY_GROUP("expenses", "category group", , "category"), CHOOSECOLS(QUERY_GROUP("expenses", "category group", , "category"), 3) < -100)
 ```
 
-With a provider named `Spending` that has the `QUERY_GROUP` formula, the same formula is shorter:
+With a named formula `Spending` that has the `QUERY_GROUP` formula, the same formula is shorter:
 
 ```text
 =FILTER(Spending, CHOOSECOLS(Spending, 3) < -100)
@@ -418,7 +418,7 @@ When you rename a query that cards use, Actual shows a list of these cards, and 
 
 To reverse a rename and the formula changes that it made, use undo once.
 
-Actual also changes the query name in every provider that uses the query. The list shows these providers too.
+Actual also changes the query name in every named formula that uses the query. The list shows these named formulas too.
 
 Actual cannot change a name that a formula builds from parts, for example `QUERY("fo" & "od")`. The list of cards does not show these formulas.
 
@@ -437,21 +437,21 @@ A card time frame stays with its library query, also after a rename. If a differ
 
 #### Export and Import a Dashboard
 
-When you export a dashboard, the file also holds the library queries and the library providers that its formula cards use. The card providers are part of their cards. When you import the file, Actual does one of these for each library query in the file:
+When you export a dashboard, the file also holds the library queries and the library named formulas that its formula cards use. The card named formulas are part of their cards. When you import the file, Actual does one of these for each library query in the file:
 
 - If your formula library has a query with the same name, filters, and time frame, the cards use your query.
 - If your formula library has a different query with the same name, each card that uses the name gets a copy of the query from the file. The card query has priority over the library query, so the card shows the same result as before the export.
 - If your formula library has no query with the name, Actual adds the query to your formula library.
 
-An [AQL query](#write-queries-in-actualql) in the file works the same, with one difference. If your formula library has a different query with the same name, Actual adds the AQL query from the file with a new name, for example `coffee_2`. Actual changes the name in the imported cards and providers, so the cards show the same result as before the export.
+An [AQL query](#write-queries-in-actualql) in the file works the same, with one difference. If your formula library has a different query with the same name, Actual adds the AQL query from the file with a new name, for example `coffee_2`. Actual changes the name in the imported cards and named formulas, so the cards show the same result as before the export.
 
-For each provider in the file, Actual does one of these:
+For each named formula in the file, Actual does one of these:
 
-- If your formula library has a provider with the same name and formula, the cards use your provider.
-- If your formula library has a different provider with the same name, Actual adds the provider from the file with a new name, for example `NetIncome_2`. Actual changes the name in the imported cards and providers, so the cards show the same result as before the export.
-- If your formula library has no provider with the name, Actual adds the provider to your formula library.
+- If your formula library has a named formula with the same name and formula, the cards use your named formula.
+- If your formula library has a different named formula with the same name, Actual adds the named formula from the file with a new name, for example `NetIncome_2`. Actual changes the name in the imported cards and named formulas, so the cards show the same result as before the export.
+- If your formula library has no named formula with the name, Actual adds the named formula to your formula library.
 
-The import does not change or delete the queries and providers that are already in your formula library. A card time frame for a library query stays with its query.
+The import does not change or delete the queries and named formulas that are already in your formula library. A card time frame for a library query stays with its query.
 
 ### Write Queries in ActualQL
 
@@ -531,7 +531,7 @@ The table has one column for each item of `select`, in the same order. For examp
 
 The table has no header row, so other functions can use its values. For example, `=SUM(CHOOSECOLS(QUERY_TABLE("spendByPayee"), 2))` gives the total of all payees. To add the column names as the first row, set `header` to `TRUE()`: `=QUERY_TABLE("spendByPayee", TRUE())`. The names are the `select` items, for example `payee.name` and `total`.
 
-The query name and `header` must be in the formula, not in a cell or a provider. Actual must know the size of the table before the formula runs.
+The query name and `header` must be in the formula, not in a cell or a named formula. Actual must know the size of the table before the formula runs.
 
 The database stores an amount in cents. A money column gives the amount, as `QUERY` does. Under **Money columns** in the AQL query editor, select the columns that are money. By default, a column is money when its expression reads a field named `amount`, for example `{"total": {"$sum": "$amount"}}`. If the `select` has a `*`, the fields named `amount` are money.
 
@@ -551,79 +551,79 @@ The time frame starts at **All time**. A card can give the query its own time fr
 - ActualQL cannot order rows by a name from `select`. To order by a sum, repeat the sum in `orderBy`, with the direction in `$dir`: `"orderBy": [{"$sum": "$amount", "$dir": "desc"}]`.
 - If the query has an error, for example a field name that does not exist, the card shows the error. The other parts of Actual do not show it.
 
-### Reuse a Formula With Providers
+### Reuse a Formula With Named Formulas
 
-A provider is a named formula. A card formula uses a provider by its name, with no quotes. For example, the provider `NetIncome` has the formula `=QUERY("income") + QUERY("expenses")`. This card formula then gives the average for each month of a year:
+A named formula is a formula with a name. A card formula uses a named formula by its name, with no quotes. For example, the named formula `NetIncome` has the formula `=QUERY("income") + QUERY("expenses")`. This card formula then gives the average for each month of a year:
 
 ```text
 =NetIncome / 12
 ```
 
-There are two types of provider:
+There are two types of named formula:
 
-- A library provider is in the formula library. Every card can use it.
-- A card provider is on one card only. Other cards cannot use it.
+- A library named formula is in the formula library. Every card can use it.
+- A card named formula is on one card only. Other cards cannot use it.
 
-A provider can use queries, functions, and other providers. A provider cannot use itself, also not through other providers. Providers are available in formula cards only, not in rule formulas.
+A named formula can use queries, functions, and other named formulas. A named formula cannot use itself, also not through other named formulas. Named formulas are available in formula cards only, not in rule formulas.
 
-A provider can give one value or a table. A formula uses a provider that gives a table as it uses a table from a function. For example, the provider `Spending` has the formula `=QUERY_GROUP("expenses", "category")`. Then `=INDEX(Spending, 1, 2)` gives the amount in row 1, `=SUM(Spending)` gives the total, and `=SORT(Spending, 2, 1)` gives the table sorted by amount. If the card formula is `=Spending`, the card shows the table. Under **Providers** in the card editor, each provider shows the first 10 rows of its table.
+A named formula can give one value or a table. A formula uses a named formula that gives a table as it uses a table from a function. For example, the named formula `Spending` has the formula `=QUERY_GROUP("expenses", "category")`. Then `=INDEX(Spending, 1, 2)` gives the amount in row 1, `=SUM(Spending)` gives the total, and `=SORT(Spending, 2, 1)` gives the table sorted by amount. If the card formula is `=Spending`, the card shows the table. Under **Named formulas** in the card editor, each named formula shows the first 10 rows of its table.
 
-To add a library provider:
+To add a library named formula:
 
 1. Go to **Settings** > **Formula library**.
-2. Under **Providers**, select **Create new provider**.
+2. Under **Named formulas**, select **Create new named formula**.
 3. Type a name. Names are not case-sensitive, so `NetIncome` and `netincome` are the same name.
 4. Optionally, type a description.
 5. Type the formula. The formula must start with `=`. **Result** shows the value or the table that the formula gives. As in the card editor, a large table stops the result from changing while you type. Then click **Run** or press **Ctrl+Enter** to see the result.
 6. Select **Save**.
 
-A provider name can have letters, digits, `_` and `.`. It must start with a letter or `_`. A name cannot look like a cell reference, for example `AB12`. Formulas use `RESULT`, `TRUE`, `FALSE` and names that start with `theme_` for other things, so a provider cannot have these names.
+A named formula name can have letters, digits, `_` and `.`. It must start with a letter or `_`. A name cannot look like a cell reference, for example `AB12`. Formulas use `RESULT`, `TRUE`, `FALSE` and names that start with `theme_` for other things, so a named formula cannot have these names.
 
-#### How a Provider Uses Queries
+#### How a Named Formula Uses Queries
 
-A provider uses the queries of the card that uses it:
+A named formula uses the queries of the card that uses it:
 
-- If the card has its own query with the same name as a library query, the provider uses the card query.
-- If the card has its own time frame for a library query, the provider uses that time frame.
+- If the card has its own query with the same name as a library query, the named formula uses the card query.
+- If the card has its own time frame for a library query, the named formula uses that time frame.
 
-Thus one library provider can give a different value on each card. **Result** in the library provider editor has no card, so it uses the library queries only.
+Thus one library named formula can give a different value on each card. **Result** in the library named formula editor has no card, so it uses the library queries only.
 
-#### Add a Card Provider
+#### Add a Card Named Formula
 
-1. In the card editor, under **Providers**, select **Add Provider**.
+1. In the card editor, under **Named formulas**, select **Add Named Formula**.
 2. Type a name and the formula. Optionally, type a description.
 3. Select **Save**. **Result** shows the value of the formula on this card.
-4. Select **Save widget**. Until you save the widget, the card provider is not stored.
+4. Select **Save widget**. Until you save the widget, the card named formula is not stored.
 
-If a card provider has the same name as a library provider, the card uses the card provider. This is also true when a library provider uses the name. For example, the library provider `Yearly` has the formula `=NetIncome * 12`. On a card with a card provider `NetIncome`, `Yearly` uses the card provider. The card shows a warning that the card provider hides the library provider.
+If a card named formula has the same name as a library named formula, the card uses the card named formula. This is also true when a library named formula uses the name. For example, the library named formula `Yearly` has the formula `=NetIncome * 12`. On a card with a card named formula `NetIncome`, `Yearly` uses the card named formula. The card shows a warning that the card named formula hides the library named formula.
 
-#### Use Providers in the Card Editor
+#### Use Named Formulas in the Card Editor
 
-The formula autocomplete shows the card providers and the library providers in their own section.
+The formula autocomplete shows the card named formulas and the library named formulas in their own section.
 
-The card providers are under **Providers**. Each card provider shows its formula and its value or table on this card, and has these buttons:
+The card named formulas are under **Named formulas**. Each card named formula shows its formula and its value or table on this card, and has these buttons:
 
-- **Insert** adds the provider name to the card formula, at the cursor.
-- **Make shared** moves the provider to the formula library. Then select **Save widget**. **Make shared** is not available when the library already has a provider with the same name. If the provider uses a card query or another card provider, Actual does not move it, and shows the names that it uses. A library provider cannot find these names, so make them shared first.
-- **Edit** opens the provider. When you rename a card provider, Actual also changes the name in the formulas of the card and in its other card providers.
-- The delete button removes the provider from the card.
+- **Insert** adds the named formula name to the card formula, at the cursor.
+- **Make shared** moves the named formula to the formula library. Then select **Save widget**. **Make shared** is not available when the library already has a named formula with the same name. If the named formula uses a card query or another card named formula, Actual does not move it, and shows the names that it uses. A library named formula cannot find these names, so make them shared first.
+- **Edit** opens the named formula. When you rename a card named formula, Actual also changes the name in the formulas of the card and in its other card named formulas.
+- The delete button removes the named formula from the card.
 
-To see the library providers, turn on **Show library providers**. If the card formula uses a library provider when you open the editor, this option is already on. Each library provider shows its formula and its value on this card, and has these buttons:
+To see the library named formulas, turn on **Show library named formulas**. If the card formula uses a library named formula when you open the editor, this option is already on. Each library named formula shows its formula and its value on this card, and has these buttons:
 
-- **Insert** adds the provider name to the card formula, at the cursor.
-- **Copy into card** adds a copy of the provider to the card as a card provider. The copy has the same name, so the card uses its copy. Use this to change the provider for one card only.
-- **Edit** opens the library provider. A change applies to every card that uses the provider.
+- **Insert** adds the named formula name to the card formula, at the cursor.
+- **Copy into card** adds a copy of the named formula to the card as a card named formula. The copy has the same name, so the card uses its copy. Use this to change the named formula for one card only.
+- **Edit** opens the library named formula. A change applies to every card that uses the named formula.
 
-#### Rename or Delete a Library Provider
+#### Rename or Delete a Library Named Formula
 
-When you rename a library provider that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the provider name in the formulas and the card providers of the selected cards. Actual also changes the name in every library provider that uses the renamed provider. A card that you clear keeps the old name, and shows an error until you change its formula or add a provider with the old name. A card with a card provider of the same name does not use the library provider, so it does not change.
+When you rename a library named formula that cards use, Actual shows a list of these cards, and each card is selected. Actual changes the named formula name in the formulas and the card named formulas of the selected cards. Actual also changes the name in every library named formula that uses the renamed named formula. A card that you clear keeps the old name, and shows an error until you change its formula or add a named formula with the old name. A card with a card named formula of the same name does not use the library named formula, so it does not change.
 
-Before Actual deletes a library provider, it shows the cards and the providers that use it. After the delete, these cards show the error `Provider "name" not found`.
+Before Actual deletes a library named formula, it shows the cards and the named formulas that use it. After the delete, these cards show the error `Named formula "name" not found`.
 
-#### Provider Errors
+#### Named Formula Errors
 
-- If the formula of a provider gives an error, for example a division by zero, the card shows which provider gives the error.
-- If two library providers have the same name, formulas use the older provider. This can happen when two devices sync. The card shows a warning line at the bottom.
+- If the formula of a named formula gives an error, for example a division by zero, the card shows which named formula gives the error.
+- If two library named formulas have the same name, formulas use the older named formula. This can happen when two devices sync. The card shows a warning line at the bottom.
 
 ### Budget queries with `BUDGET_QUERY`
 

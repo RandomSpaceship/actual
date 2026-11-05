@@ -13,7 +13,7 @@ import { styles } from '@actual-app/components/styles';
 import { theme } from '@actual-app/components/theme';
 import { Toggle } from '@actual-app/components/toggle';
 import { View } from '@actual-app/components/view';
-import { renameProviderInFormula } from '@actual-app/core/shared/formulas/providerNameUses';
+import { renameNamedFormulaInFormula } from '@actual-app/core/shared/formulas/namedFormulaNameUses';
 import type {
   FormulaChartSettings,
   FormulaLibraryItemEntity,
@@ -51,8 +51,8 @@ import {
 import { FormulaTableColumnSettings } from '#components/formula/FormulaTableColumnSettings';
 import { FormulaWarnings } from '#components/formula/FormulaWarnings';
 import { QueryManager } from '#components/formula/QueryManager';
-import { listProviderNames } from '#components/formula/resolveProviders';
-import type { CardProviders } from '#components/formula/resolveProviders';
+import { listNamedFormulaNames } from '#components/formula/resolveNamedFormulas';
+import type { CardNamedFormulas } from '#components/formula/resolveNamedFormulas';
 import { listQueryNames } from '#components/formula/resolveQuery';
 import type { FormulaIssue } from '#components/formula/resolveQuery';
 import { MobileBackButton } from '#components/mobile/MobileBackButton';
@@ -108,8 +108,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
   const [timeFrameOverrides, setTimeFrameOverrides] = useState(
     widget?.meta?.timeFrameOverrides || {},
   );
-  const [cardProviders, setCardProviders] = useState<CardProviders>(
-    widget?.meta?.providers || {},
+  const [cardNamedFormulas, setCardNamedFormulas] = useState<CardNamedFormulas>(
+    widget?.meta?.namedFormulas || {},
   );
   const {
     data: { list: categories, grouped: categoryGroups } = {
@@ -163,7 +163,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     colorFormula,
     queries,
     timeFrameOverrides,
-    cardProviders,
+    cardNamedFormulas,
   }));
   function runFormula() {
     setRanInputs({
@@ -171,7 +171,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
       colorFormula,
       queries,
       timeFrameOverrides,
-      cardProviders,
+      cardNamedFormulas,
     });
   }
   // The settings that Save widget writes
@@ -179,7 +179,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     formula,
     queries,
     timeFrameOverrides,
-    providers: cardProviders,
+    namedFormulas: cardNamedFormulas,
     fontSizeMode,
     staticFontSize,
     showTitle,
@@ -201,7 +201,8 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     JSON.stringify(queries) !== JSON.stringify(ranInputs.queries) ||
     JSON.stringify(timeFrameOverrides) !==
       JSON.stringify(ranInputs.timeFrameOverrides) ||
-    JSON.stringify(cardProviders) !== JSON.stringify(ranInputs.cardProviders);
+    JSON.stringify(cardNamedFormulas) !==
+      JSON.stringify(ranInputs.cardNamedFormulas);
 
   const title = widget?.meta?.name || t('Formula');
 
@@ -229,7 +230,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     simpleAccounts,
     ranInputs.timeFrameOverrides,
     view === 'auto' ? 'auto' : view === 'number' ? 'value' : 'table',
-    ranInputs.cardProviders,
+    ranInputs.cardNamedFormulas,
   );
   const isManualRun = issues.some(
     issue => issue.kind === 'large-table' || issue.kind === 'table-cut',
@@ -355,7 +356,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     simpleAccounts,
     ranInputs.timeFrameOverrides,
     'value',
-    ranInputs.cardProviders,
+    ranInputs.cardNamedFormulas,
   );
 
   // For autocomplete and badges: card queries and library queries
@@ -363,9 +364,9 @@ function FormulaInner({ widget }: FormulaInnerProps) {
     () => listQueryNames({ localQueries: queries, library }),
     [queries, library],
   );
-  const providerNames = useMemo(
-    () => listProviderNames(library, cardProviders),
-    [library, cardProviders],
+  const namedFormulaNames = useMemo(
+    () => listNamedFormulaNames(library, cardNamedFormulas),
+    [library, cardNamedFormulas],
   );
 
   const formulaEditorViewRef = useRef<EditorView | null>(null);
@@ -414,7 +415,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           formula,
           queries,
           timeFrameOverrides,
-          providers: cardProviders,
+          namedFormulas: cardNamedFormulas,
           fontSizeMode,
           staticFontSize,
           showTitle,
@@ -718,7 +719,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                 onChange={setFormula}
                 mode="query"
                 queries={queryNames}
-                providers={providerNames}
+                namedFormulas={namedFormulaNames}
                 categoryBadges={categoryBadges}
                 singleLine={false}
                 showLineNumbers
@@ -936,7 +937,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
                       onChange={setColorFormula}
                       mode="query"
                       queries={queryNames}
-                      providers={providerNames}
+                      namedFormulas={namedFormulaNames}
                       categoryBadges={categoryBadges}
                       singleLine
                       showLineNumbers={false}
@@ -970,7 +971,7 @@ function FormulaInner({ widget }: FormulaInnerProps) {
           )}
         </View>
 
-        {/* A fixed width, so that a wide provider table scrolls in its own
+        {/* A fixed width, so that a wide named formula table scrolls in its own
             box and does not make the column wider */}
         <View
           style={{
@@ -984,19 +985,19 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             onQueriesChange={setQueries}
             timeFrameOverrides={timeFrameOverrides}
             onTimeFrameOverridesChange={setTimeFrameOverrides}
-            cardProviders={cardProviders}
-            onCardProvidersChange={(newCardProviders, rename) => {
-              setCardProviders(newCardProviders);
+            cardNamedFormulas={cardNamedFormulas}
+            onCardNamedFormulasChange={(newCardNamedFormulas, rename) => {
+              setCardNamedFormulas(newCardNamedFormulas);
               if (rename) {
                 setFormula(
-                  renameProviderInFormula(
+                  renameNamedFormulaInFormula(
                     formula,
                     rename.oldName,
                     rename.newName,
                   ),
                 );
                 setColorFormula(
-                  renameProviderInFormula(
+                  renameNamedFormulaInFormula(
                     colorFormula,
                     rename.oldName,
                     rename.newName,
@@ -1007,10 +1008,12 @@ function FormulaInner({ widget }: FormulaInnerProps) {
             formulas={[
               formula,
               colorFormula,
-              ...Object.values(cardProviders).map(provider => provider.formula),
+              ...Object.values(cardNamedFormulas).map(
+                namedFormula => namedFormula.formula,
+              ),
             ]}
             accounts={simpleAccounts}
-            onInsertProvider={insertIntoFormula}
+            onInsertNamedFormula={insertIntoFormula}
           />
         </View>
       </View>
